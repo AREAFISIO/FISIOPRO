@@ -11,14 +11,11 @@
       --text:#0b1220;
       --muted:#5b6b82;
       --line:#e7edf4;
-
       --brand:#2ea08a;
       --brand2:#1f7e6c;
-
       --shadow:0 14px 40px rgba(2,6,23,.10);
       --shadow2:0 10px 26px rgba(2,6,23,.08);
       --radius:20px;
-
       --yellow:#f6d84a;
       --red:#ef4444;
       --blue:#3b82f6;
@@ -33,13 +30,11 @@
                   radial-gradient(900px 500px at 85% 10%, rgba(59,130,246,.10), transparent 55%),
                   var(--bg);
       color:var(--text);
-      font-size:18px;              /* PIÙ GRANDE */
-      line-height:1.45;
+      font-size:19px;
+      line-height:1.5;
     }
+    .app{max-width:1360px;margin:0 auto;padding:18px 18px 30px}
 
-    .app{max-width:1320px;margin:0 auto;padding:18px 18px 30px}
-
-    /* Topbar premium */
     .topbar{
       border-radius:26px;
       padding:18px 18px;
@@ -65,7 +60,7 @@
     .pt-title{min-width:0}
     .pt-title h1{
       margin:0 0 2px;
-      font-size:24px;              /* TITOLO PIÙ EVIDENTE */
+      font-size:26px;
       font-weight:1000;
       letter-spacing:.2px;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -76,7 +71,7 @@
     .pill{
       border-radius:999px;
       padding:11px 14px;
-      font-size:14px;              /* PIÙ GRANDE */
+      font-size:14px;
       font-weight:950;
       border:1px solid rgba(255,255,255,.28);
       background:rgba(255,255,255,.12);
@@ -88,7 +83,6 @@
     .pill.light{background:rgba(255,255,255,.92);color:#0b3b32;border-color:transparent}
     .pill.ghost{background:transparent;border:1px solid rgba(255,255,255,.35)}
 
-    /* Layout */
     .layout{margin-top:14px;display:grid;grid-template-columns:420px 1fr;gap:14px;align-items:start}
     .side,.section{
       background:var(--card);
@@ -98,7 +92,6 @@
       overflow:hidden;
     }
 
-    /* Sidebar */
     .side .head{
       padding:16px 16px;
       border-bottom:1px solid var(--line);
@@ -107,7 +100,7 @@
     }
     .side .head h2{
       margin:0;
-      font-size:18px;              /* TITOLO PIÙ GRANDE */
+      font-size:18px;
       font-weight:1000;
       letter-spacing:.2px;
     }
@@ -115,7 +108,7 @@
     .btn{
       border-radius:999px;
       padding:11px 14px;
-      font-size:14px;              /* PIÙ GRANDE */
+      font-size:14px;
       font-weight:1000;
       border:1px solid var(--line);
       background:#fff;
@@ -141,7 +134,7 @@
       border:1px solid var(--line);
       border-radius:14px;
       padding:12px 13px;
-      font-size:15px;             /* PIÙ GRANDE */
+      font-size:15px;
       outline:none;
       background:#fbfcfe;
     }
@@ -170,7 +163,6 @@
     .case-title{font-weight:1000;font-size:16px;margin:0 0 6px}
     .case-sub{font-size:14px;color:var(--muted);margin:0}
 
-    /* Main header */
     .shead{
       padding:16px 16px;
       border-bottom:1px solid var(--line);
@@ -188,16 +180,33 @@
     }
     .shead h3{
       margin:0;
-      font-size:20px;             /* TITOLO MOLTO PIÙ EVIDENTE */
+      font-size:22px;
       font-weight:1000;
       letter-spacing:.2px;
     }
     .meta{font-size:14px;color:var(--muted);white-space:nowrap}
     .sbody{padding:16px 16px 18px}
 
+    .tabs{display:flex;gap:10px;flex-wrap:wrap}
+    .tab{
+      border-radius:999px;
+      padding:11px 14px;
+      font-size:14px;
+      font-weight:1000;
+      border:1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+      transition:transform .06s ease;
+    }
+    .tab:hover{transform:translateY(-1px)}
+    .tab.active{
+      background:linear-gradient(180deg, rgba(46,160,138,.16), rgba(46,160,138,.08));
+      border-color:rgba(46,160,138,.28);
+      color:#0b3b32;
+    }
+
     .actionsRow{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
 
-    /* List */
     .list{display:flex;flex-direction:column;gap:12px}
     details.item{
       border:1px solid var(--line);
@@ -213,7 +222,7 @@
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
       font-weight:1000;
-      font-size:16px;             /* PIÙ GRANDE */
+      font-size:16px;
     }
     details.item summary::-webkit-details-marker{display:none}
     .sum-left{display:flex;flex-direction:column;gap:4px}
@@ -236,16 +245,15 @@
       background:linear-gradient(180deg,#fbfcfe,#f6f9fd);
       border-radius:16px;
       padding:14px;
-      font-size:15px;             /* PIÙ GRANDE */
+      font-size:15px;
       white-space:pre-wrap;
       line-height:1.5;
     }
 
-    /* Modal */
     .overlay{position:fixed; inset:0; background:rgba(2,6,23,.58);display:none; align-items:center; justify-content:center;padding:18px; z-index:999;}
     .overlay.open{display:flex}
     .modal{
-      width:min(1240px, 96vw);
+      width:min(1280px, 96vw);
       max-height:92vh;
       background:var(--card);
       border-radius:24px;
@@ -260,7 +268,7 @@
       border-bottom:1px solid var(--line);
       display:flex;align-items:center;justify-content:space-between;gap:10px;
     }
-    .modalhead h4{margin:0;font-size:18px;font-weight:1000}
+    .modalhead h4{margin:0;font-size:20px;font-weight:1000}
     .xbtn{
       width:44px;height:44px;border-radius:16px;
       border:1px solid var(--line); background:#fff; cursor:pointer;
@@ -269,40 +277,30 @@
     .modalbody{
       padding:16px 16px 18px;
       display:grid;
-      grid-template-columns: 1.18fr 1fr;
+      grid-template-columns: 1.15fr 1fr;
       gap:14px;
       overflow:auto;
     }
 
-    textarea{
+    textarea, input[type="text"], input[type="date"], select{
       width:100%;
-      min-height:150px;
-      resize:vertical;
       padding:14px;
       border-radius:16px;
       border:1px solid var(--line);
       outline:none;
-      font-size:15px;            /* PIÙ GRANDE */
+      font-size:15px;
       line-height:1.5;
       background:#fbfcfe;
     }
-    textarea:focus{border-color:rgba(46,160,138,.55);box-shadow:0 0 0 4px rgba(46,160,138,.12);background:#fff}
+    textarea{min-height:150px;resize:vertical}
+    textarea:focus, input:focus, select:focus{
+      border-color:rgba(46,160,138,.55);
+      box-shadow:0 0 0 4px rgba(46,160,138,.12);
+      background:#fff
+    }
 
-    .body-card{border:1px solid var(--line);border-radius:20px;padding:12px;background:#fff}
-    .label{font-size:14px;color:var(--muted);margin:2px 2px 10px;display:flex;justify-content:space-between;gap:10px}
-    .legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
-    .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:2px solid rgba(15,23,42,.15)}
-    .dot.red{background:var(--red)} .dot.yellow{background:var(--yellow)} .dot.blue{background:var(--blue)}
-    .legend span{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
-
-    .bodymap{position:relative;width:100%;aspect-ratio:2/3;border-radius:18px;background:linear-gradient(180deg,#f8fafc,#eef2f7);
-      border:1px solid var(--line);overflow:hidden}
-    .body-sil{position:absolute;inset:0;display:grid;place-items:center;opacity:.92;pointer-events:none}
-    .pt{position:absolute;width:28px;height:28px;border-radius:999px;border:2px solid rgba(255,255,255,.92);
-      box-shadow:0 12px 20px rgba(2,6,23,.12);cursor:pointer;transform:translate(-50%,-50%);
-      background:rgba(255,255,255,.70);display:grid;place-items:center}
-    .pt::after{content:"";width:11px;height:11px;border-radius:999px;background:var(--gray);display:block}
-    .pt.s0::after{background:var(--gray)} .pt.s1::after{background:var(--yellow)} .pt.s2::after{background:var(--red)} .pt.s3::after{background:var(--blue)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .fieldlabel{font-size:14px;color:var(--muted);margin:0 0 8px;font-weight:900}
 
     .toolbar{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:12px}
     .hint{font-size:14px;color:var(--muted)}
@@ -311,6 +309,24 @@
       font-size:13px;border:1px solid var(--line);
       background:#fff;padding:5px 9px;border-radius:12px;color:#0f172a
     }
+
+    /* Test modal */
+    .testWrap{display:flex;flex-direction:column;gap:12px}
+    .testCard{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      padding:14px;
+    }
+    .testTitle{font-weight:1000;font-size:18px;margin:0 0 8px}
+    .testMeta{color:var(--muted);font-size:14px;margin:0 0 12px}
+    .videoBox{
+      border:1px solid var(--line);
+      border-radius:18px;
+      overflow:hidden;
+      background:#000;
+    }
+    .videoBox video, .videoBox iframe{width:100%;height:360px;border:0;display:block;background:#000}
 
     .toast{
       position:fixed; right:16px; bottom:16px;
@@ -329,6 +345,8 @@
     @media (max-width:1020px){
       .layout{grid-template-columns:1fr}
       .modalbody{grid-template-columns:1fr}
+      .grid2{grid-template-columns:1fr}
+      .videoBox video, .videoBox iframe{height:260px}
     }
   </style>
 </head>
@@ -339,18 +357,18 @@
         <div class="badge">FP</div>
         <div class="pt-title">
           <h1 id="patientTitle">FISIOPRO</h1>
-          <p id="patientSubtitle">Seleziona un paziente per vedere i trattamenti</p>
+          <p id="patientSubtitle">Seleziona un paziente per vedere la storia clinica</p>
         </div>
       </div>
       <div class="top-actions">
         <div class="pill ghost" id="btnAgenda">Agenda</div>
         <div class="pill light" id="btnSmart">Acquisizione intelligente</div>
-        <div class="pill" id="btnAttachments">Allegati</div>
+        <div class="pill" id="btnDocuments">Documenti</div>
       </div>
     </div>
 
     <div class="layout">
-      <!-- SIDEBAR: ricerca paziente -->
+      <!-- SIDEBAR -->
       <aside class="side">
         <div class="head">
           <h2>Paziente</h2>
@@ -370,43 +388,45 @@
         </div>
       </aside>
 
-      <!-- MAIN: lista trattamenti del paziente -->
+      <!-- MAIN -->
       <main class="main">
         <section class="section">
           <div class="shead">
             <div class="title">
-              <div class="icon">TR</div>
+              <div class="icon">SC</div>
               <div>
-                <h3>Trattamenti</h3>
+                <h3>Storia clinica</h3>
                 <div class="meta" id="countMeta">—</div>
               </div>
             </div>
 
             <div class="actionsRow">
+              <div class="tabs">
+                <button class="tab active" id="tabTreatments">Trattamenti</button>
+                <button class="tab" id="tabEvaluations">Valutazioni</button>
+              </div>
+
               <button class="btn soft" id="btnLoadMore" style="display:none;">Carica altri</button>
-              <button class="btn save" id="btnNewTreatment" disabled>Nuovo trattamento</button>
+              <button class="btn save" id="btnNewRecord" disabled>Nuovo</button>
             </div>
           </div>
 
           <div class="sbody">
-            <div class="list" id="listTrt">
-              <div class="note">Seleziona un paziente per caricare i trattamenti.</div>
-            </div>
+            <div class="list" id="list"></div>
           </div>
         </section>
       </main>
     </div>
   </div>
 
-  <!-- MODAL EDITOR -->
-  <div class="overlay" id="overlay">
+  <!-- MODAL TRATTAMENTO -->
+  <div class="overlay" id="overlayTreatment">
     <div class="modal">
       <div class="modalhead">
-        <h4>Modifica trattamento</h4>
+        <h4>Trattamento</h4>
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn soft" id="btnSmart2">Acquisizione intelligente</button>
-          <button class="btn soft" id="btnAttach2">Allegati</button>
-          <button class="xbtn" id="btnClose">X</button>
+          <button class="btn soft" id="btnAttachTrt">Allegati</button>
+          <button class="xbtn" id="btnCloseTrt">X</button>
         </div>
       </div>
 
@@ -418,74 +438,192 @@
                 <div class="icon">NF</div>
                 <div>
                   <h3>Note fisioterapista</h3>
-                  <div class="meta" id="metaRec">Record: —</div>
+                  <div class="meta" id="metaTrt">Record: —</div>
                 </div>
               </div>
-              <div></div>
             </div>
-            <div class="sbody">
-              <textarea id="edVal" placeholder="Scrivi le note..."></textarea>
-            </div>
+            <div class="sbody"><textarea id="trtNote" placeholder="Scrivi le note..."></textarea></div>
           </div>
 
           <div style="height:12px"></div>
 
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
-            <div class="shead">
-              <div class="title"><div class="icon">TE</div><h3>Trattamento eseguito</h3></div>
-              <div></div>
-            </div>
-            <div class="sbody">
-              <textarea id="edTrt" placeholder="Descrivi il trattamento eseguito..."></textarea>
-            </div>
+            <div class="shead"><div class="title"><div class="icon">TE</div><h3>Trattamento eseguito</h3></div></div>
+            <div class="sbody"><textarea id="trtDone" placeholder="Descrivi il trattamento eseguito..."></textarea></div>
           </div>
 
           <div style="height:12px"></div>
 
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
-            <div class="shead">
-              <div class="title"><div class="icon">IP</div><h3>Indicazioni prossima seduta</h3></div>
-              <div></div>
-            </div>
-            <div class="sbody">
-              <textarea id="edNext" placeholder="Indicazioni per la prossima seduta..."></textarea>
-            </div>
+            <div class="shead"><div class="title"><div class="icon">IP</div><h3>Indicazioni prossima seduta</h3></div></div>
+            <div class="sbody"><textarea id="trtNext" placeholder="Indicazioni per la prossima seduta..."></textarea></div>
           </div>
 
           <div class="toolbar">
             <span class="hint"><span class="kbd">Ctrl/Command + S</span> salva</span>
-            <button class="btn" id="btnCancel">Annulla</button>
-            <button class="btn save" id="btnSave">Salva</button>
+            <button class="btn" id="btnCancelTrt">Annulla</button>
+            <button class="btn save" id="btnSaveTrt">Salva</button>
           </div>
         </div>
 
         <div>
-          <div class="body-card">
-            <div class="label">
-              <span><strong>Body map</strong></span>
-              <span class="legend">
-                <span><i class="dot red"></i> principale</span>
-                <span><i class="dot yellow"></i> sintomo</span>
-                <span><i class="dot blue"></i> secondario</span>
-              </span>
-            </div>
-            <div class="bodymap" id="map">
-              <div class="body-sil">
-                <svg viewBox="0 0 220 320" width="190" height="270" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M110 22c18 0 34 16 34 34 0 14-8 26-20 31v18c0 7 5 12 12 12h18c10 0 18 8 18 18v22c0 12-9 22-22 22h-7l-4 46c-1 14-12 25-26 25h-6c-14 0-25-11-26-25l-4-46h-7c-13 0-22-10-22-22v-22c0-10 8-18 18-18h18c7 0 12-5 12-12V87c-12-5-20-17-20-31 0-18 16-34 34-34Z"
-                    fill="#E8EDF4" stroke="#D6DEEA" stroke-width="2"/>
-                </svg>
-              </div>
+          <div class="note">
+            Body map trattamento: già presente nel progetto precedente.
+            Se vuoi, lo reinseriamo identico come nel modal trattamenti precedente (campo BODY T).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-              <div class="pt s0" data-id="front-right-knee" style="left:55%; top:72%;" title="Ginocchio destro"></div>
-              <div class="pt s0" data-id="front-left-knee"  style="left:45%; top:72%;" title="Ginocchio sinistro"></div>
-              <div class="pt s0" data-id="front-right-shoulder" style="left:62%; top:33%;" title="Spalla destra"></div>
-              <div class="pt s0" data-id="front-left-shoulder"  style="left:38%; top:33%;" title="Spalla sinistra"></div>
-              <div class="pt s0" data-id="front-lumbar" style="left:50%; top:55%;" title="Lombare"></div>
+  <!-- MODAL VALUTAZIONE -->
+  <div class="overlay" id="overlayEval">
+    <div class="modal">
+      <div class="modalhead">
+        <h4>Valutazione</h4>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn soft" id="btnOpenTests">Test clinici</button>
+          <button class="xbtn" id="btnCloseEval">X</button>
+        </div>
+      </div>
+
+      <div class="modalbody">
+        <div>
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead">
+              <div class="title">
+                <div class="icon">DV</div>
+                <div>
+                  <h3>Dati visita</h3>
+                  <div class="meta" id="metaEval">Record: —</div>
+                </div>
+              </div>
             </div>
-            <div class="hint" style="margin-top:10px;">
-              Clicca un punto: <strong>0 → sintomo → principale → secondario</strong>
+            <div class="sbody">
+              <div class="grid2">
+                <div>
+                  <div class="fieldlabel">Data visita</div>
+                  <input type="date" id="evDate" />
+                </div>
+                <div>
+                  <div class="fieldlabel">Scala dolore NRS</div>
+                  <input type="text" id="evNrs" placeholder="0-10" />
+                </div>
+              </div>
+              <div style="height:12px"></div>
+              <div>
+                <div class="fieldlabel">Dolore sede</div>
+                <input type="text" id="evPainSite" placeholder="Esempio: spalla destra, ginocchio..." />
+              </div>
             </div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead"><div class="title"><div class="icon">PV</div><h3>Prima valutazione</h3></div></div>
+            <div class="sbody"><textarea id="evFirst" placeholder="Testo libero..."></textarea></div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead"><div class="title"><div class="icon">AR</div><h3>Anamnesi remota</h3></div></div>
+            <div class="sbody"><textarea id="evRemote" placeholder="Anamnesi remota..."></textarea></div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead"><div class="title"><div class="icon">AP</div><h3>Anamnesi recente</h3></div></div>
+            <div class="sbody"><textarea id="evRecent" placeholder="Anamnesi recente..."></textarea></div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead"><div class="title"><div class="icon">NT</div><h3>Note</h3></div></div>
+            <div class="sbody"><textarea id="evNotes" placeholder="Note aggiuntive..."></textarea></div>
+          </div>
+
+          <div class="toolbar">
+            <span class="hint"><span class="kbd">Ctrl/Command + S</span> salva</span>
+            <button class="btn" id="btnCancelEval">Annulla</button>
+            <button class="btn save" id="btnSaveEval">Salva</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section" style="box-shadow:none;border:1px solid var(--line)">
+            <div class="shead"><div class="title"><div class="icon">TC</div><h3>Test inseriti</h3></div></div>
+            <div class="sbody">
+              <div class="note" id="evTestsSummary">Nessun test inserito.</div>
+              <div style="height:10px"></div>
+              <div class="note">
+                Nel prossimo step: body map valutazione + VAS multipli (campi già presenti nel tuo CSV: dolore principale/secondario/terziario).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TEST CON VIDEO -->
+  <div class="overlay" id="overlayTest">
+    <div class="modal">
+      <div class="modalhead">
+        <h4>Test clinico</h4>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="xbtn" id="btnCloseTest">X</button>
+        </div>
+      </div>
+
+      <div class="modalbody" style="grid-template-columns: 1fr 1fr;">
+        <div class="testWrap">
+          <div class="testCard">
+            <div class="fieldlabel">Categoria</div>
+            <select id="testCategory"></select>
+
+            <div style="height:12px"></div>
+
+            <div class="fieldlabel">Test</div>
+            <select id="testName"></select>
+
+            <div style="height:12px"></div>
+
+            <div class="fieldlabel">Esito</div>
+            <select id="testOutcome">
+              <option value="">Seleziona</option>
+              <option value="Positivo">Positivo</option>
+              <option value="Negativo">Negativo</option>
+              <option value="Dubbio">Dubbio</option>
+              <option value="Non eseguito">Non eseguito</option>
+            </select>
+
+            <div style="height:12px"></div>
+
+            <div class="fieldlabel">Note</div>
+            <textarea id="testNotes" placeholder="Note sul test..."></textarea>
+
+            <div class="toolbar">
+              <button class="btn" id="btnCancelTest">Annulla</button>
+              <button class="btn save" id="btnAddTest">Inserisci in valutazione</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="testWrap">
+          <div class="testCard">
+            <div class="testTitle" id="testTitle">—</div>
+            <div class="testMeta" id="testDesc">—</div>
+
+            <div class="videoBox" id="videoBox">
+              <!-- Render video/iframe via JS -->
+            </div>
+
+            <div style="height:12px"></div>
+            <div class="note" id="testSteps">—</div>
           </div>
         </div>
       </div>
@@ -508,7 +646,7 @@
     // Top actions (mock)
     document.getElementById("btnAgenda").onclick = () => toast("Agenda (step dopo)");
     document.getElementById("btnSmart").onclick = () => toast("Acquisizione intelligente (step dopo)");
-    document.getElementById("btnAttachments").onclick = () => toast("Allegati (step dopo)");
+    document.getElementById("btnDocuments").onclick = () => toast("Documenti (step dopo)");
 
     // API
     async function apiSearchPatients(q){
@@ -518,6 +656,7 @@
       return j.records || [];
     }
 
+    // Trattamenti
     async function apiListTreatmentsByPatient(patientId, offset){
       const url = `/api/treatments?patientId=${encodeURIComponent(patientId)}` + (offset ? `&offset=${encodeURIComponent(offset)}` : "");
       const r = await fetch(url);
@@ -525,61 +664,89 @@
       if(!r.ok) throw new Error(j?.error || ("List failed: " + r.status));
       return j;
     }
-
     async function apiLoadTreatment(recordId){
       const r = await fetch(`/api/treatments?id=${encodeURIComponent(recordId)}`);
       const j = await r.json();
       if(!r.ok) throw new Error(j?.error || ("Load failed: " + r.status));
       return j.fields || {};
     }
-
     async function apiSaveTreatment(recordId, fields){
       const r = await fetch(`/api/treatments`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        method:"POST", headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({ id: recordId, fields })
       });
       const j = await r.json();
       if(!r.ok) throw new Error(j?.error || ("Save failed: " + r.status));
       return j;
     }
-
     async function apiCreateTreatment(patientId){
       const r = await fetch(`/api/treatments`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        method:"POST", headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({ patientId })
       });
       const j = await r.json();
       if(!r.ok) throw new Error(j?.error || ("Create failed: " + r.status));
-      return j; // {ok, id, fields}
+      return j;
     }
 
-    // Patient UI
+    // Valutazioni
+    async function apiListEvaluationsByPatient(patientId, offset){
+      const url = `/api/evaluations?patientId=${encodeURIComponent(patientId)}` + (offset ? `&offset=${encodeURIComponent(offset)}` : "");
+      const r = await fetch(url);
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("List failed: " + r.status));
+      return j;
+    }
+    async function apiLoadEvaluation(recordId){
+      const r = await fetch(`/api/evaluations?id=${encodeURIComponent(recordId)}`);
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Load failed: " + r.status));
+      return j.fields || {};
+    }
+    async function apiSaveEvaluation(recordId, fields){
+      const r = await fetch(`/api/evaluations`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ id: recordId, fields })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Save failed: " + r.status));
+      return j;
+    }
+    async function apiCreateEvaluation(patientId){
+      const r = await fetch(`/api/evaluations`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ patientId })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Create failed: " + r.status));
+      return j;
+    }
+
+    // UI elements
     const patientSearch = document.getElementById("patientSearch");
     const suggest = document.getElementById("suggest");
     const patientInfo = document.getElementById("patientInfo");
     const patientTitle = document.getElementById("patientTitle");
     const patientSubtitle = document.getElementById("patientSubtitle");
-    const listTrt = document.getElementById("listTrt");
+    const listEl = document.getElementById("list");
     const countMeta = document.getElementById("countMeta");
     const btnClear = document.getElementById("btnClear");
     const btnLoadMore = document.getElementById("btnLoadMore");
-    const btnNewTreatment = document.getElementById("btnNewTreatment");
+    const btnNewRecord = document.getElementById("btnNewRecord");
+
+    const tabTreatments = document.getElementById("tabTreatments");
+    const tabEvaluations = document.getElementById("tabEvaluations");
 
     let selectedPatient = null;
-    let treatmentsOffset = null;
+    let currentMode = "treatments"; // treatments | evaluations
+    let offset = null;
     let loadedCount = 0;
 
     function escapeHtml(s){
       return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
+        .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;").replaceAll("'","&#039;");
     }
-
     function clearSuggestions(){ suggest.innerHTML = ""; }
 
     function renderSuggestions(items){
@@ -606,8 +773,8 @@
       patientSearch.value = p.name;
 
       patientTitle.textContent = "FISIOPRO — " + p.name;
-      patientSubtitle.textContent = "Trattamenti associati al paziente";
-      btnNewTreatment.disabled = false;
+      patientSubtitle.textContent = "Storia clinica del paziente";
+      btnNewRecord.disabled = false;
 
       patientInfo.innerHTML = `
         <div class="case-card">
@@ -616,33 +783,90 @@
         </div>
       `;
 
-      treatmentsOffset = null;
-      loadedCount = 0;
-      listTrt.innerHTML = `<div class="note">Caricamento trattamenti...</div>`;
+      offset = null; loadedCount = 0;
+      btnLoadMore.style.display = "none";
+      await loadMore(true);
+    }
+
+    btnClear.onclick = () => {
+      selectedPatient = null;
+      offset = null; loadedCount = 0;
+
+      patientSearch.value = "";
+      clearSuggestions();
+
+      patientTitle.textContent = "FISIOPRO";
+      patientSubtitle.textContent = "Seleziona un paziente per vedere la storia clinica";
+      btnNewRecord.disabled = true;
+
+      patientInfo.innerHTML = `
+        <div class="case-card">
+          <div class="case-title">Nessun paziente selezionato</div>
+          <p class="case-sub">Cerca e clicca un nome</p>
+        </div>
+      `;
+
+      listEl.innerHTML = `<div class="note">Seleziona un paziente per caricare i record.</div>`;
       countMeta.textContent = "—";
       btnLoadMore.style.display = "none";
+    };
 
-      await loadMoreTreatments(true);
-    }
+    // Search debounce
+    let searchTimer = null;
+    patientSearch.addEventListener("input", () => {
+      const q = patientSearch.value.trim();
+      clearTimeout(searchTimer);
+      if(!q){ clearSuggestions(); return; }
+      searchTimer = setTimeout(async ()=>{
+        try{ renderSuggestions(await apiSearchPatients(q)); }
+        catch(err){ suggest.innerHTML = `<div class="note">Errore ricerca: ${escapeHtml(err.message)}</div>`; }
+      }, 200);
+    });
 
-    function pickDate(fields){
-      return fields["DATA TRATTAMENTO"] || fields["Data seduta"] || fields["DATA"] || "";
-    }
-    function pickTitle(fields){
-      return fields["Nome trattamento"] || fields["TIPO PRESTAZIONE"] || fields["Tipo seduta"] || "Trattamento";
-    }
-    function short(text, n=170){
+    // Tabs
+    tabTreatments.onclick = async () => {
+      currentMode = "treatments";
+      tabTreatments.classList.add("active");
+      tabEvaluations.classList.remove("active");
+      btnNewRecord.textContent = "Nuovo trattamento";
+      offset = null; loadedCount = 0;
+      await loadMore(true);
+    };
+
+    tabEvaluations.onclick = async () => {
+      currentMode = "evaluations";
+      tabEvaluations.classList.add("active");
+      tabTreatments.classList.remove("active");
+      btnNewRecord.textContent = "Nuova valutazione";
+      offset = null; loadedCount = 0;
+      await loadMore(true);
+    };
+
+    // Init button label
+    btnNewRecord.textContent = "Nuovo trattamento";
+
+    btnLoadMore.onclick = () => loadMore(false);
+
+    // List render helpers
+    function short(text, n=200){
       const s = (text || "").toString().replace(/\s+/g, " ").trim();
       if(!s) return "";
       return s.length > n ? s.slice(0, n-1) + "…" : s;
+    }
+
+    function pickDateTrt(fields){
+      return fields["DATA TRATTAMENTO"] || fields["Data seduta"] || fields["DATA"] || "";
+    }
+    function pickTitleTrt(fields){
+      return fields["Nome trattamento"] || fields["TIPO PRESTAZIONE"] || fields["Tipo seduta"] || "Trattamento";
     }
 
     function renderTreatmentItem(recordId, fields){
       const wrap = document.createElement("details");
       wrap.className = "item";
 
-      const date = pickDate(fields);
-      const title = pickTitle(fields);
+      const date = pickDateTrt(fields);
+      const title = pickTitleTrt(fields);
 
       const lat = fields["Lateralità"] ? String(fields["Lateralità"]) : "";
       const area = fields["Struttura Anatomica"] ? String(fields["Struttura Anatomica"]) : "";
@@ -671,168 +895,255 @@
           </div>
         </div>
       `;
-
       wrap.querySelector(".js-edit").onclick = () => openTreatmentEditor(recordId);
       return wrap;
     }
 
-    async function loadMoreTreatments(reset){
-      if(!selectedPatient) return;
+    function pickDateEv(fields){
+      return fields["DATA VISITA"] || "";
+    }
+    function pickTitleEv(fields){
+      const sede = fields["DOLORE SEDE"] ? String(fields["DOLORE SEDE"]) : "";
+      return sede ? ("Valutazione · " + sede) : "Valutazione";
+    }
+
+    function renderEvaluationItem(recordId, fields){
+      const wrap = document.createElement("details");
+      wrap.className = "item";
+
+      const date = pickDateEv(fields);
+      const title = pickTitleEv(fields);
+      const nrs = fields["SCALA DOLORE NRS"] ? String(fields["SCALA DOLORE NRS"]) : "";
+
+      const pv = fields["PRIMA VALUTAZIONE"] || "";
+      const ar = fields["ANAMNESI REMOTA"] || "";
+      const ap = fields["ANAMNESI RECENTE"] || "";
+      const note = fields["NOTE"] || "";
+
+      const qt = fields["QUICK TEST"] || "";
+      const st = fields["SPECIAL TEST"] || "";
+      const tn = fields["TEST NEUROLOGICO"] || "";
+
+      const testsLine = [qt, st, tn].filter(Boolean).join(" · ");
+
+      wrap.innerHTML = `
+        <summary>
+          <div class="sum-left">
+            <div><strong>${escapeHtml(title)}</strong>${date ? " · " + escapeHtml(date) : ""}</div>
+            <div style="color:var(--muted);font-size:14px">${escapeHtml(testsLine || "Nessun test inserito")}</div>
+          </div>
+          <div class="sum-right">
+            ${nrs ? `<span class="pill2">NRS ${escapeHtml(nrs)}</span>` : ""}
+          </div>
+        </summary>
+        <div class="content">
+          <div class="note"><strong>Prima valutazione</strong>\n${escapeHtml(short(pv) || "—")}\n\n<strong>Anamnesi remota</strong>\n${escapeHtml(short(ar) || "—")}\n\n<strong>Anamnesi recente</strong>\n${escapeHtml(short(ap) || "—")}\n\n<strong>Note</strong>\n${escapeHtml(short(note) || "—")}</div>
+          <div class="row2">
+            <span class="hint">Record: ${escapeHtml(recordId)}</span>
+            <button class="btn primary js-edit" type="button">Modifica</button>
+          </div>
+        </div>
+      `;
+      wrap.querySelector(".js-edit").onclick = () => openEvaluationEditor(recordId);
+      return wrap;
+    }
+
+    async function loadMore(reset){
+      if(!selectedPatient){
+        listEl.innerHTML = `<div class="note">Seleziona un paziente per caricare i record.</div>`;
+        countMeta.textContent = "—";
+        btnLoadMore.style.display = "none";
+        return;
+      }
 
       try{
-        const data = await apiListTreatmentsByPatient(selectedPatient.id, reset ? null : treatmentsOffset);
+        if(reset){
+          listEl.innerHTML = `<div class="note">Caricamento...</div>`;
+          offset = null; loadedCount = 0;
+          btnLoadMore.style.display = "none";
+        }
+
+        const data = currentMode === "treatments"
+          ? await apiListTreatmentsByPatient(selectedPatient.id, reset ? null : offset)
+          : await apiListEvaluationsByPatient(selectedPatient.id, reset ? null : offset);
+
         const records = data.records || [];
-        treatmentsOffset = data.offset || null;
+        offset = data.offset || null;
 
         if(reset){
-          listTrt.innerHTML = "";
+          listEl.innerHTML = "";
           loadedCount = 0;
         }
 
         if(!records.length && reset){
-          listTrt.innerHTML = `<div class="note">Nessun trattamento trovato per questo paziente.</div>`;
+          listEl.innerHTML = `<div class="note">Nessun record trovato.</div>`;
         } else {
-          records.forEach(r => listTrt.appendChild(renderTreatmentItem(r.id, r.fields)));
+          records.forEach(r=>{
+            const node = currentMode === "treatments"
+              ? renderTreatmentItem(r.id, r.fields)
+              : renderEvaluationItem(r.id, r.fields);
+            listEl.appendChild(node);
+          });
           loadedCount += records.length;
         }
 
-        countMeta.textContent = loadedCount ? `${loadedCount} trattamenti caricati` : "0 trattamenti";
-        btnLoadMore.style.display = treatmentsOffset ? "" : "none";
+        countMeta.textContent = `${loadedCount} record caricati`;
+        btnLoadMore.style.display = offset ? "" : "none";
+        btnNewRecord.textContent = currentMode === "treatments" ? "Nuovo trattamento" : "Nuova valutazione";
       }catch(err){
-        listTrt.innerHTML = `<div class="note">Errore: ${escapeHtml(err.message)}</div>`;
+        listEl.innerHTML = `<div class="note">Errore: ${escapeHtml(err.message)}</div>`;
+        btnLoadMore.style.display = "none";
       }
     }
 
-    btnLoadMore.onclick = () => loadMoreTreatments(false);
-
-    btnClear.onclick = () => {
-      selectedPatient = null;
-      treatmentsOffset = null;
-      loadedCount = 0;
-
-      patientSearch.value = "";
-      clearSuggestions();
-
-      patientTitle.textContent = "FISIOPRO";
-      patientSubtitle.textContent = "Seleziona un paziente per vedere i trattamenti";
-      btnNewTreatment.disabled = true;
-
-      patientInfo.innerHTML = `
-        <div class="case-card">
-          <div class="case-title">Nessun paziente selezionato</div>
-          <p class="case-sub">Cerca e clicca un nome</p>
-        </div>
-      `;
-      listTrt.innerHTML = `<div class="note">Seleziona un paziente per caricare i trattamenti.</div>`;
-      countMeta.textContent = "—";
-      btnLoadMore.style.display = "none";
-    };
-
-    // Search debounce
-    let searchTimer = null;
-    patientSearch.addEventListener("input", () => {
-      const q = patientSearch.value.trim();
-      clearTimeout(searchTimer);
-
-      if(!q){
-        clearSuggestions();
-        return;
-      }
-
-      searchTimer = setTimeout(async ()=>{
-        try{
-          const items = await apiSearchPatients(q);
-          renderSuggestions(items);
-        }catch(err){
-          suggest.innerHTML = `<div class="note">Errore ricerca: ${escapeHtml(err.message)}</div>`;
-        }
-      }, 200);
-    });
-
-    // Nuovo trattamento: crea record Airtable + apre editor
-    btnNewTreatment.onclick = async () => {
+    // NEW record
+    btnNewRecord.onclick = async () => {
       if(!selectedPatient) return;
-      btnNewTreatment.disabled = true;
+      btnNewRecord.disabled = true;
       try{
-        const created = await apiCreateTreatment(selectedPatient.id);
-        toast("Trattamento creato");
-        await openTreatmentEditor(created.id);
-        await loadMoreTreatments(true);
-      }catch(err){
-        toast("Errore creazione:\n" + err.message);
-      }finally{
-        btnNewTreatment.disabled = false;
+        if(currentMode === "treatments"){
+          const created = await apiCreateTreatment(selectedPatient.id);
+          toast("Creato trattamento");
+          await openTreatmentEditor(created.id);
+        } else {
+          const created = await apiCreateEvaluation(selectedPatient.id);
+          toast("Creata valutazione");
+          await openEvaluationEditor(created.id);
+        }
+        await loadMore(true);
+      } catch(err){
+        toast("Errore:\n" + err.message);
+      } finally {
+        btnNewRecord.disabled = false;
       }
     };
 
-    // Modal editor
-    const overlay = document.getElementById("overlay");
-    const btnClose = document.getElementById("btnClose");
-    const btnCancel = document.getElementById("btnCancel");
-    const btnSave = document.getElementById("btnSave");
-    const btnSmart2 = document.getElementById("btnSmart2");
-    const btnAttach2 = document.getElementById("btnAttach2");
-    const metaRec = document.getElementById("metaRec");
+    // ----------------------------
+    // Treatment modal (semplice)
+    // ----------------------------
+    const overlayTreatment = document.getElementById("overlayTreatment");
+    const metaTrt = document.getElementById("metaTrt");
+    const trtNote = document.getElementById("trtNote");
+    const trtDone = document.getElementById("trtDone");
+    const trtNext = document.getElementById("trtNext");
 
-    function closeEditor(){
-      overlay.classList.remove("open");
-      overlay.dataset.current = "";
-      metaRec.textContent = "Record: —";
+    function closeTreatment(){
+      overlayTreatment.classList.remove("open");
+      overlayTreatment.dataset.current = "";
+      metaTrt.textContent = "Record: —";
     }
-    btnClose.onclick = closeEditor;
-    btnCancel.onclick = closeEditor;
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeEditor(); });
-    btnSmart2.onclick = () => toast("Acquisizione intelligente (step dopo)");
-    btnAttach2.onclick = () => toast("Allegati (step dopo)");
-
-    // Bodymap state (campo: BODY T)
-    const cls = ["s0","s1","s2","s3"];
-    const mapStates = {};
-    function applyMapStates(obj){
-      document.querySelectorAll(".pt").forEach(el=>{
-        const pid = el.dataset.id;
-        const v = Number(obj?.[pid] ?? 0);
-        mapStates[pid] = v;
-        el.classList.remove(...cls);
-        el.classList.add("s"+v);
-      });
-    }
-    function exportMapStates(){
-      const out = {};
-      document.querySelectorAll(".pt").forEach(el=>{
-        out[el.dataset.id] = mapStates[el.dataset.id] ?? 0;
-      });
-      return out;
-    }
-    document.querySelectorAll(".pt").forEach(el=>{
-      const pid = el.dataset.id;
-      mapStates[pid] = 0;
-      el.addEventListener("click", ()=>{
-        mapStates[pid] = ((mapStates[pid] ?? 0) + 1) % 4;
-        el.classList.remove(...cls);
-        el.classList.add("s"+mapStates[pid]);
-      });
-    });
+    document.getElementById("btnCloseTrt").onclick = closeTreatment;
+    document.getElementById("btnCancelTrt").onclick = closeTreatment;
+    overlayTreatment.addEventListener("click", (e)=>{ if(e.target === overlayTreatment) closeTreatment(); });
+    document.getElementById("btnAttachTrt").onclick = () => toast("Allegati trattamenti (step dopo)");
 
     async function openTreatmentEditor(recordId){
-      overlay.classList.add("open");
-      overlay.dataset.current = recordId;
-      metaRec.textContent = "Record: " + recordId;
-
-      document.getElementById("edVal").value = "Caricamento...";
-      document.getElementById("edTrt").value = "";
-      document.getElementById("edNext").value = "";
-      applyMapStates({});
+      overlayTreatment.classList.add("open");
+      overlayTreatment.dataset.current = recordId;
+      metaTrt.textContent = "Record: " + recordId;
+      trtNote.value = "Caricamento...";
+      trtDone.value = "";
+      trtNext.value = "";
 
       try{
         const f = await apiLoadTreatment(recordId);
-        document.getElementById("edVal").value  = f["Note Fisioterapista"] || "";
-        document.getElementById("edTrt").value  = f["Trattamento eseguito"] || "";
-        document.getElementById("edNext").value = f["Indicazioni prossima seduta"] || "";
+        trtNote.value = f["Note Fisioterapista"] || "";
+        trtDone.value = f["Trattamento eseguito"] || "";
+        trtNext.value = f["Indicazioni prossima seduta"] || "";
+        toast("Caricato");
+      }catch(err){
+        toast("Errore caricamento:\n" + err.message);
+      }
+    }
 
-        let bm = {};
-        if (f["BODY T"]) { try { bm = JSON.parse(f["BODY T"]); } catch(e){ bm = {}; } }
-        applyMapStates(bm);
+    document.getElementById("btnSaveTrt").onclick = async () => {
+      const id = overlayTreatment.dataset.current;
+      if(!id) return;
+      try{
+        await apiSaveTreatment(id, {
+          "Note Fisioterapista": trtNote.value,
+          "Trattamento eseguito": trtDone.value,
+          "Indicazioni prossima seduta": trtNext.value
+        });
+        toast("Salvato");
+        closeTreatment();
+        await loadMore(true);
+      }catch(err){
+        toast("Errore salvataggio:\n" + err.message);
+      }
+    };
+
+    // ----------------------------
+    // Evaluation modal + Tests
+    // ----------------------------
+    const overlayEval = document.getElementById("overlayEval");
+    const metaEval = document.getElementById("metaEval");
+    const evDate = document.getElementById("evDate");
+    const evNrs = document.getElementById("evNrs");
+    const evPainSite = document.getElementById("evPainSite");
+    const evFirst = document.getElementById("evFirst");
+    const evRemote = document.getElementById("evRemote");
+    const evRecent = document.getElementById("evRecent");
+    const evNotes = document.getElementById("evNotes");
+    const evTestsSummary = document.getElementById("evTestsSummary");
+
+    // Stato test in memoria (poi viene scritto su campi Airtable: QUICK TEST / SPECIAL TEST / TEST NEUROLOGICO)
+    const evalTestsState = {
+      quick: { name:"", outcome:"", notes:"" },
+      special: { name:"", outcome:"", notes:"" },
+      neuro: { name:"", outcome:"", notes:"" }
+    };
+
+    function evalTestsToText(){
+      const lines = [];
+      if(evalTestsState.quick.name)   lines.push(`Quick test: ${evalTestsState.quick.name} · ${evalTestsState.quick.outcome || "—"}\n${evalTestsState.quick.notes || ""}`.trim());
+      if(evalTestsState.special.name) lines.push(`Special test: ${evalTestsState.special.name} · ${evalTestsState.special.outcome || "—"}\n${evalTestsState.special.notes || ""}`.trim());
+      if(evalTestsState.neuro.name)   lines.push(`Test neurologico: ${evalTestsState.neuro.name} · ${evalTestsState.neuro.outcome || "—"}\n${evalTestsState.neuro.notes || ""}`.trim());
+      return lines.length ? lines.join("\n\n") : "Nessun test inserito.";
+    }
+
+    function closeEval(){
+      overlayEval.classList.remove("open");
+      overlayEval.dataset.current = "";
+      metaEval.textContent = "Record: —";
+    }
+    document.getElementById("btnCloseEval").onclick = closeEval;
+    document.getElementById("btnCancelEval").onclick = closeEval;
+    overlayEval.addEventListener("click", (e)=>{ if(e.target === overlayEval) closeEval(); });
+
+    async function openEvaluationEditor(recordId){
+      overlayEval.classList.add("open");
+      overlayEval.dataset.current = recordId;
+      metaEval.textContent = "Record: " + recordId;
+
+      evDate.value = "";
+      evNrs.value = "";
+      evPainSite.value = "";
+      evFirst.value = "Caricamento...";
+      evRemote.value = "";
+      evRecent.value = "";
+      evNotes.value = "";
+
+      evalTestsState.quick = { name:"", outcome:"", notes:"" };
+      evalTestsState.special = { name:"", outcome:"", notes:"" };
+      evalTestsState.neuro = { name:"", outcome:"", notes:"" };
+      evTestsSummary.textContent = evalTestsToText();
+
+      try{
+        const f = await apiLoadEvaluation(recordId);
+        evDate.value = (f["DATA VISITA"] || "").slice(0,10);
+        evNrs.value = f["SCALA DOLORE NRS"] || "";
+        evPainSite.value = f["DOLORE SEDE"] || "";
+        evFirst.value = f["PRIMA VALUTAZIONE"] || "";
+        evRemote.value = f["ANAMNESI REMOTA"] || "";
+        evRecent.value = f["ANAMNESI RECENTE"] || "";
+        evNotes.value = f["NOTE"] || "";
+
+        // Se già presenti, li mostro come testo (base)
+        if(f["QUICK TEST"]) evalTestsState.quick.name = String(f["QUICK TEST"]);
+        if(f["SPECIAL TEST"]) evalTestsState.special.name = String(f["SPECIAL TEST"]);
+        if(f["TEST NEUROLOGICO"]) evalTestsState.neuro.name = String(f["TEST NEUROLOGICO"]);
+        evTestsSummary.textContent = evalTestsToText();
 
         toast("Caricato");
       }catch(err){
@@ -840,36 +1151,204 @@
       }
     }
 
-    btnSave.onclick = async () => {
-      const recordId = overlay.dataset.current;
-      if (!recordId) return;
+    document.getElementById("btnSaveEval").onclick = async () => {
+      const id = overlayEval.dataset.current;
+      if(!id) return;
 
       const fields = {
-        "Note Fisioterapista": document.getElementById("edVal").value,
-        "Trattamento eseguito": document.getElementById("edTrt").value,
-        "Indicazioni prossima seduta": document.getElementById("edNext").value,
-        "BODY T": JSON.stringify(exportMapStates())
+        "DATA VISITA": evDate.value || "",
+        "SCALA DOLORE NRS": evNrs.value || "",
+        "DOLORE SEDE": evPainSite.value || "",
+        "PRIMA VALUTAZIONE": evFirst.value || "",
+        "ANAMNESI REMOTA": evRemote.value || "",
+        "ANAMNESI RECENTE": evRecent.value || "",
+        "NOTE": evNotes.value || "",
+        "QUICK TEST": evalTestsState.quick.name || "",
+        "SPECIAL TEST": evalTestsState.special.name || "",
+        "TEST NEUROLOGICO": evalTestsState.neuro.name || ""
       };
 
       try{
-        await apiSaveTreatment(recordId, fields);
+        await apiSaveEvaluation(id, fields);
         toast("Salvato");
-        closeEditor();
-        await loadMoreTreatments(true);
+        closeEval();
+        await loadMore(true);
       }catch(err){
         toast("Errore salvataggio:\n" + err.message);
       }
     };
 
+    // ----------------------------
+    // Test modal con video
+    // ----------------------------
+    const overlayTest = document.getElementById("overlayTest");
+    const btnCloseTest = document.getElementById("btnCloseTest");
+    const btnCancelTest = document.getElementById("btnCancelTest");
+    const btnAddTest = document.getElementById("btnAddTest");
+    const testCategory = document.getElementById("testCategory");
+    const testName = document.getElementById("testName");
+    const testOutcome = document.getElementById("testOutcome");
+    const testNotes = document.getElementById("testNotes");
+    const testTitle = document.getElementById("testTitle");
+    const testDesc = document.getElementById("testDesc");
+    const testSteps = document.getElementById("testSteps");
+    const videoBox = document.getElementById("videoBox");
+
+    // Libreria test (qui puoi mettere video mp4 o link YouTube/embed)
+    // Se vuoi: nel prossimo step la facciamo arrivare da Airtable (tabella "TEST CLINICI") con allegati video.
+    const TEST_LIBRARY = {
+      "Quick test": [
+        {
+          name: "Screening spalla rapido",
+          desc: "Checklist breve per decidere se approfondire cuffia / impingement / instabilità.",
+          steps: "1) Osservazione\n2) ROM attivo\n3) Resistenza isometrica breve\n4) Dolore e limitazioni",
+          video: { type:"youtube", src:"https://www.youtube.com/embed/ysz5S6PUM-U" }
+        }
+      ],
+      "Special test": [
+        {
+          name: "Jobe / Empty Can",
+          desc: "Valutazione sovraspinato / cuffia dei rotatori.",
+          steps: "1) Abduzione 90°\n2) Intraruotazione (pollici verso il basso)\n3) Resistenza verso il basso\n4) Confronto lato controlaterale",
+          video: { type:"youtube", src:"https://www.youtube.com/embed/ysz5S6PUM-U" }
+        }
+      ],
+      "Test neurologico": [
+        {
+          name: "Slump test",
+          desc: "Valuta tensione neurale (catena posteriore / sciatico).",
+          steps: "1) Seduto, flessione toracica\n2) Estensione ginocchio\n3) Dorsiflessione\n4) Differenziazione con estensione cervicale",
+          video: { type:"youtube", src:"https://www.youtube.com/embed/ysz5S6PUM-U" }
+        }
+      ]
+    };
+
+    function closeTest(){
+      overlayTest.classList.remove("open");
+      overlayTest.dataset.target = "";
+    }
+    btnCloseTest.onclick = closeTest;
+    btnCancelTest.onclick = closeTest;
+    overlayTest.addEventListener("click", (e)=>{ if(e.target === overlayTest) closeTest(); });
+
+    function renderVideo(v){
+      videoBox.innerHTML = "";
+      if(!v || !v.src){
+        videoBox.innerHTML = `<div class="note" style="border:0;background:transparent;color:#fff">Nessun video disponibile</div>`;
+        return;
+      }
+      if(v.type === "youtube"){
+        const ifr = document.createElement("iframe");
+        ifr.src = v.src;
+        ifr.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+        ifr.allowFullscreen = true;
+        videoBox.appendChild(ifr);
+        return;
+      }
+      // mp4
+      const vid = document.createElement("video");
+      vid.src = v.src;
+      vid.controls = true;
+      videoBox.appendChild(vid);
+    }
+
+    function refreshTestUI(){
+      const cat = testCategory.value;
+      const items = TEST_LIBRARY[cat] || [];
+      const idx = Math.max(0, testName.selectedIndex);
+      const item = items[idx] || items[0];
+
+      testTitle.textContent = item ? item.name : "—";
+      testDesc.textContent = item ? item.desc : "—";
+      testSteps.textContent = item ? item.steps : "—";
+      renderVideo(item ? item.video : null);
+    }
+
+    function openTestModal(target){
+      overlayTest.classList.add("open");
+      overlayTest.dataset.target = target;
+
+      // fill categories
+      testCategory.innerHTML = "";
+      Object.keys(TEST_LIBRARY).forEach(k=>{
+        const opt = document.createElement("option");
+        opt.value = k; opt.textContent = k;
+        testCategory.appendChild(opt);
+      });
+
+      // set default category by target
+      if(target === "quick") testCategory.value = "Quick test";
+      if(target === "special") testCategory.value = "Special test";
+      if(target === "neuro") testCategory.value = "Test neurologico";
+
+      // fill tests
+      fillTestsForCategory(testCategory.value);
+
+      testOutcome.value = "";
+      testNotes.value = "";
+      refreshTestUI();
+    }
+
+    function fillTestsForCategory(cat){
+      testName.innerHTML = "";
+      (TEST_LIBRARY[cat] || []).forEach(t=>{
+        const opt = document.createElement("option");
+        opt.value = t.name; opt.textContent = t.name;
+        testName.appendChild(opt);
+      });
+    }
+
+    testCategory.onchange = () => {
+      fillTestsForCategory(testCategory.value);
+      refreshTestUI();
+    };
+    testName.onchange = () => refreshTestUI();
+
+    btnAddTest.onclick = () => {
+      const target = overlayTest.dataset.target;
+      const cat = testCategory.value;
+      const name = testName.value || "";
+      const out = testOutcome.value || "";
+      const notes = testNotes.value || "";
+
+      if(!target || !name){
+        toast("Seleziona un test");
+        return;
+      }
+
+      if(target === "quick") evalTestsState.quick = { name, outcome: out, notes };
+      if(target === "special") evalTestsState.special = { name, outcome: out, notes };
+      if(target === "neuro") evalTestsState.neuro = { name, outcome: out, notes };
+
+      evTestsSummary.textContent = evalTestsToText();
+      closeTest();
+      toast("Test inserito");
+    };
+
+    // Bottone "Test clinici" dentro valutazione
+    document.getElementById("btnOpenTests").onclick = () => {
+      // qui scegliamo quale categoria aprire: per ora apro Special test come default
+      openTestModal("special");
+    };
+
+    // Shortcut save
     document.addEventListener("keydown", (e) => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (overlay.classList.contains("open") && mod && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        btnSave.click();
+
+      if(mod && e.key.toLowerCase() === "s"){
+        if(overlayEval.classList.contains("open")){ e.preventDefault(); document.getElementById("btnSaveEval").click(); }
+        if(overlayTreatment.classList.contains("open")){ e.preventDefault(); document.getElementById("btnSaveTrt").click(); }
       }
-      if (overlay.classList.contains("open") && e.key === "Escape") closeEditor();
+      if(e.key === "Escape"){
+        if(overlayTest.classList.contains("open")) closeTest();
+        else if(overlayEval.classList.contains("open")) closeEval();
+        else if(overlayTreatment.classList.contains("open")) closeTreatment();
+      }
     });
+
+    // First paint
+    listEl.innerHTML = `<div class="note">Seleziona un paziente per caricare i record.</div>`;
   </script>
 </body>
 </html>
