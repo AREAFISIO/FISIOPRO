@@ -6,131 +6,327 @@
   <title>FISIOPRO</title>
   <style>
     :root{
-      --bg:#f3f5f7; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e6eaf0;
-      --shadow:0 10px 28px rgba(2,6,23,.09); --radius:18px;
-      --brand:#2ea08a; --brand2:#1f7e6c;
-      --yellow:#f6d84a; --red:#ef4444; --blue:#3b82f6; --gray:#94a3b8;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text);
-      font-size:17px; line-height:1.35;}
-    .app{max-width:1280px;margin:0 auto;padding:18px 18px 28px}
+      --bg:#f4f6f9;
+      --card:#ffffff;
+      --text:#0b1220;
+      --muted:#5b6b82;
+      --line:#e7edf4;
 
-    .topbar{
-      background:linear-gradient(180deg,var(--brand),var(--brand2));
-      color:#fff;border-radius:22px;padding:18px;box-shadow:var(--shadow);
-      display:flex;align-items:center;justify-content:space-between;gap:12px
+      --brand:#2ea08a;
+      --brand2:#1f7e6c;
+
+      --shadow:0 14px 40px rgba(2,6,23,.10);
+      --shadow2:0 10px 26px rgba(2,6,23,.08);
+      --radius:20px;
+
+      --yellow:#f6d84a;
+      --red:#ef4444;
+      --blue:#3b82f6;
+      --gray:#94a3b8;
     }
-    .left{display:flex;align-items:center;gap:12px;min-width:0}
-    .badge{width:42px;height:42px;border-radius:999px;display:grid;place-items:center;
-      background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.22);font-weight:1000;font-size:14px;letter-spacing:.5px}
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(46,160,138,.10), transparent 55%),
+                  radial-gradient(900px 500px at 85% 10%, rgba(59,130,246,.10), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+      font-size:18px;              /* PIÙ GRANDE */
+      line-height:1.45;
+    }
+
+    .app{max-width:1320px;margin:0 auto;padding:18px 18px 30px}
+
+    /* Topbar premium */
+    .topbar{
+      border-radius:26px;
+      padding:18px 18px;
+      box-shadow: var(--shadow);
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.16), rgba(255,255,255,0)) ,
+        linear-gradient(180deg, var(--brand), var(--brand2));
+      color:#fff;
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      border:1px solid rgba(255,255,255,.18);
+    }
+    .left{display:flex;align-items:center;gap:14px;min-width:0}
+    .badge{
+      width:46px;height:46px;border-radius:999px;
+      display:grid;place-items:center;
+      background:rgba(255,255,255,.16);
+      border:1px solid rgba(255,255,255,.22);
+      font-weight:1000;
+      letter-spacing:.8px;
+      font-size:14px;
+      flex:0 0 auto;
+    }
     .pt-title{min-width:0}
-    .pt-title h1{font-size:19px;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pt-title p{margin:0;font-size:13px;opacity:.92}
+    .pt-title h1{
+      margin:0 0 2px;
+      font-size:24px;              /* TITOLO PIÙ EVIDENTE */
+      font-weight:1000;
+      letter-spacing:.2px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .pt-title p{margin:0;font-size:14px;opacity:.92}
+
     .top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .pill{border-radius:999px;padding:10px 14px;font-size:13px;font-weight:1000;
-      border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
+    .pill{
+      border-radius:999px;
+      padding:11px 14px;
+      font-size:14px;              /* PIÙ GRANDE */
+      font-weight:950;
+      border:1px solid rgba(255,255,255,.28);
+      background:rgba(255,255,255,.12);
+      color:#fff;
+      cursor:pointer;
+      transition: transform .06s ease, background .2s ease;
+    }
+    .pill:hover{background:rgba(255,255,255,.18);transform:translateY(-1px)}
     .pill.light{background:rgba(255,255,255,.92);color:#0b3b32;border-color:transparent}
     .pill.ghost{background:transparent;border:1px solid rgba(255,255,255,.35)}
 
-    .layout{margin-top:14px;display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start}
-    .side,.section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden}
+    /* Layout */
+    .layout{margin-top:14px;display:grid;grid-template-columns:420px 1fr;gap:14px;align-items:start}
+    .side,.section{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow2);
+      border:1px solid var(--line);
+      overflow:hidden;
+    }
 
-    .side .head{padding:14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
-    .side .head h2{margin:0;font-size:15px}
-    .btn{border-radius:999px;padding:10px 12px;font-size:13px;font-weight:1000;border:1px solid var(--line);background:#fff;cursor:pointer}
-    .btn.primary{background:rgba(46,160,138,.12);border-color:rgba(46,160,138,.28);color:#0b3b32}
-    .btn.save{background:var(--brand);border-color:transparent;color:#fff;box-shadow:0 12px 26px rgba(46,160,138,.24)}
-    .search{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:13px;outline:none;background:#fbfcfe}
+    /* Sidebar */
+    .side .head{
+      padding:16px 16px;
+      border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      background:linear-gradient(180deg,#fff,#fbfcfe);
+    }
+    .side .head h2{
+      margin:0;
+      font-size:18px;              /* TITOLO PIÙ GRANDE */
+      font-weight:1000;
+      letter-spacing:.2px;
+    }
 
-    .panel{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#fbfcfd)}
-    .suggest{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+    .btn{
+      border-radius:999px;
+      padding:11px 14px;
+      font-size:14px;              /* PIÙ GRANDE */
+      font-weight:1000;
+      border:1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+      transition: transform .06s ease, box-shadow .2s ease;
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn.primary{
+      background:linear-gradient(180deg, rgba(46,160,138,.16), rgba(46,160,138,.08));
+      border-color:rgba(46,160,138,.28);
+      color:#0b3b32;
+    }
+    .btn.save{
+      background:linear-gradient(180deg, var(--brand), var(--brand2));
+      border-color:transparent;color:#fff;
+      box-shadow:0 16px 30px rgba(46,160,138,.22);
+    }
+    .btn.soft{background:#fbfcfe}
+
+    .panel{padding:14px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#fbfcfd)}
+    .search{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px 13px;
+      font-size:15px;             /* PIÙ GRANDE */
+      outline:none;
+      background:#fbfcfe;
+    }
+    .search:focus{border-color:rgba(46,160,138,.45);box-shadow:0 0 0 4px rgba(46,160,138,.12);background:#fff}
+
+    .suggest{margin-top:12px;display:flex;flex-direction:column;gap:10px}
     .sug{
       border:1px solid var(--line);
-      background:#fff;border-radius:14px;
-      padding:10px 12px; cursor:pointer;
-      display:flex; flex-direction:column; gap:2px;
+      background:#fff;border-radius:16px;
+      padding:12px 12px;
+      cursor:pointer;
+      display:flex; flex-direction:column; gap:4px;
+      transition: box-shadow .2s ease, transform .06s ease, border-color .2s ease;
     }
-    .sug strong{font-size:14px}
-    .sug span{font-size:12px;color:var(--muted)}
-    .sug:hover{border-color:rgba(46,160,138,.45);box-shadow:0 10px 20px rgba(46,160,138,.10)}
+    .sug strong{font-size:16px;font-weight:1000}
+    .sug span{font-size:13px;color:var(--muted)}
+    .sug:hover{border-color:rgba(46,160,138,.38);box-shadow:0 14px 28px rgba(46,160,138,.10);transform:translateY(-1px)}
 
-    .cases{padding:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 290px);overflow:auto}
-    .case-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff}
-    .case-title{font-weight:1000;font-size:14px;margin:0 0 4px}
-    .case-sub{font-size:13px;color:var(--muted);margin:0}
+    .cases{padding:12px 12px;display:flex;flex-direction:column;gap:12px;max-height:calc(100vh - 305px);overflow:auto}
+    .case-card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px 14px;
+      background:#fff;
+    }
+    .case-title{font-weight:1000;font-size:16px;margin:0 0 6px}
+    .case-sub{font-size:14px;color:var(--muted);margin:0}
 
-    .shead{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-      background:linear-gradient(180deg,#fff,#fbfcfe)}
-    .title{display:flex;align-items:center;gap:10px}
-    .icon{width:32px;height:32px;border-radius:12px;display:grid;place-items:center;background:rgba(46,160,138,.12);
-      border:1px solid rgba(46,160,138,.18);color:#0b3b32;font-weight:1000;font-size:13px}
-    .shead h3{margin:0;font-size:15px}
-    .meta{font-size:13px;color:var(--muted);white-space:nowrap}
-    .sbody{padding:14px 16px 16px}
+    /* Main header */
+    .shead{
+      padding:16px 16px;
+      border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      background:linear-gradient(180deg,#fff,#fbfcfe);
+    }
+    .title{display:flex;align-items:center;gap:12px}
+    .icon{
+      width:40px;height:40px;border-radius:16px;
+      display:grid;place-items:center;
+      background:linear-gradient(180deg, rgba(46,160,138,.18), rgba(46,160,138,.08));
+      border:1px solid rgba(46,160,138,.22);
+      color:#0b3b32;font-weight:1000;font-size:14px;
+      flex:0 0 auto;
+    }
+    .shead h3{
+      margin:0;
+      font-size:20px;             /* TITOLO MOLTO PIÙ EVIDENTE */
+      font-weight:1000;
+      letter-spacing:.2px;
+    }
+    .meta{font-size:14px;color:var(--muted);white-space:nowrap}
+    .sbody{padding:16px 16px 18px}
 
-    .list{display:flex;flex-direction:column;gap:10px}
-    details.item{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
+    .actionsRow{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+
+    /* List */
+    .list{display:flex;flex-direction:column;gap:12px}
+    details.item{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      overflow:hidden;
+      transition: box-shadow .2s ease, border-color .2s ease;
+    }
+    details.item[open]{border-color:rgba(46,160,138,.25);box-shadow:0 18px 38px rgba(46,160,138,.08)}
     details.item summary{
       list-style:none; cursor:pointer;
-      padding:12px 14px;
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:14px 14px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
       background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
-      font-weight:1000; font-size:14px;
+      font-weight:1000;
+      font-size:16px;             /* PIÙ GRANDE */
     }
     details.item summary::-webkit-details-marker{display:none}
-    .sum-left{display:flex;flex-direction:column;gap:2px}
+    .sum-left{display:flex;flex-direction:column;gap:4px}
     .sum-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-    .pill2{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fbfcfe;color:#0f172a}
-    .content{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+
+    .pill2{
+      font-size:13px;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fbfcfe;
+      color:var(--text)
+    }
+
+    .content{padding:12px 14px 16px;display:flex;flex-direction:column;gap:12px}
     .row2{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-    .note{border:1px solid var(--line);background:#fbfcfe;border-radius:14px;padding:12px;font-size:14px;white-space:pre-wrap}
 
-    .overlay{position:fixed; inset:0; background:rgba(2,6,23,.55);display:none; align-items:center; justify-content:center;padding:18px; z-index:999;}
+    .note{
+      border:1px solid var(--line);
+      background:linear-gradient(180deg,#fbfcfe,#f6f9fd);
+      border-radius:16px;
+      padding:14px;
+      font-size:15px;             /* PIÙ GRANDE */
+      white-space:pre-wrap;
+      line-height:1.5;
+    }
+
+    /* Modal */
+    .overlay{position:fixed; inset:0; background:rgba(2,6,23,.58);display:none; align-items:center; justify-content:center;padding:18px; z-index:999;}
     .overlay.open{display:flex}
-    .modal{width:min(1180px, 96vw);max-height:92vh;background:var(--card);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.08);overflow:hidden;display:flex;flex-direction:column;}
-    .modalhead{padding:14px 16px;background:linear-gradient(180deg,#fff,#fbfcfe);border-bottom:1px solid var(--line);
-      display:flex;align-items:center;justify-content:space-between;gap:10px;}
-    .modalhead h4{margin:0;font-size:15px}
-    .xbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:1000;font-size:14px}
-    .modalbody{padding:14px 16px 16px;display:grid;grid-template-columns:1.2fr 1fr;gap:14px;overflow:auto}
+    .modal{
+      width:min(1240px, 96vw);
+      max-height:92vh;
+      background:var(--card);
+      border-radius:24px;
+      box-shadow:0 28px 90px rgba(0,0,0,.36);
+      border:1px solid rgba(255,255,255,.08);
+      overflow:hidden;
+      display:flex;flex-direction:column;
+    }
+    .modalhead{
+      padding:16px 16px;
+      background:linear-gradient(180deg,#fff,#fbfcfe);
+      border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+    }
+    .modalhead h4{margin:0;font-size:18px;font-weight:1000}
+    .xbtn{
+      width:44px;height:44px;border-radius:16px;
+      border:1px solid var(--line); background:#fff; cursor:pointer;
+      font-weight:1000;font-size:16px;
+    }
+    .modalbody{
+      padding:16px 16px 18px;
+      display:grid;
+      grid-template-columns: 1.18fr 1fr;
+      gap:14px;
+      overflow:auto;
+    }
 
-    textarea{width:100%;min-height:132px;resize:vertical;padding:12px;border-radius:14px;border:1px solid var(--line);outline:none;font-size:14px;line-height:1.35;background:#fbfcfe}
-    textarea:focus{border-color:rgba(46,160,138,.55);box-shadow:0 0 0 4px rgba(46,160,138,.10);background:#fff}
+    textarea{
+      width:100%;
+      min-height:150px;
+      resize:vertical;
+      padding:14px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      outline:none;
+      font-size:15px;            /* PIÙ GRANDE */
+      line-height:1.5;
+      background:#fbfcfe;
+    }
+    textarea:focus{border-color:rgba(46,160,138,.55);box-shadow:0 0 0 4px rgba(46,160,138,.12);background:#fff}
 
-    .body-card{border:1px solid var(--line);border-radius:18px;padding:10px;background:#fff}
-    .label{font-size:13px;color:var(--muted);margin:2px 2px 8px;display:flex;justify-content:space-between;gap:10px}
-    .legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .body-card{border:1px solid var(--line);border-radius:20px;padding:12px;background:#fff}
+    .label{font-size:14px;color:var(--muted);margin:2px 2px 10px;display:flex;justify-content:space-between;gap:10px}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:2px solid rgba(15,23,42,.15)}
     .dot.red{background:var(--red)} .dot.yellow{background:var(--yellow)} .dot.blue{background:var(--blue)}
-    .legend span{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
-    .bodymap{position:relative;width:100%;aspect-ratio:2/3;border-radius:16px;background:linear-gradient(180deg,#f8fafc,#eef2f7);
+    .legend span{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+
+    .bodymap{position:relative;width:100%;aspect-ratio:2/3;border-radius:18px;background:linear-gradient(180deg,#f8fafc,#eef2f7);
       border:1px solid var(--line);overflow:hidden}
-    .body-sil{position:absolute;inset:0;display:grid;place-items:center;opacity:.9;pointer-events:none}
-    .pt{position:absolute;width:26px;height:26px;border-radius:999px;border:2px solid rgba(255,255,255,.9);
-      box-shadow:0 10px 18px rgba(2,6,23,.12);cursor:pointer;transform:translate(-50%,-50%);
-      background:rgba(255,255,255,.65);display:grid;place-items:center}
-    .pt::after{content:"";width:10px;height:10px;border-radius:999px;background:var(--gray);display:block}
+    .body-sil{position:absolute;inset:0;display:grid;place-items:center;opacity:.92;pointer-events:none}
+    .pt{position:absolute;width:28px;height:28px;border-radius:999px;border:2px solid rgba(255,255,255,.92);
+      box-shadow:0 12px 20px rgba(2,6,23,.12);cursor:pointer;transform:translate(-50%,-50%);
+      background:rgba(255,255,255,.70);display:grid;place-items:center}
+    .pt::after{content:"";width:11px;height:11px;border-radius:999px;background:var(--gray);display:block}
     .pt.s0::after{background:var(--gray)} .pt.s1::after{background:var(--yellow)} .pt.s2::after{background:var(--red)} .pt.s3::after{background:var(--blue)}
 
-    .toolbar{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:10px}
-    .hint{font-size:13px;color:var(--muted)}
-    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:12px;border:1px solid var(--line);
-      background:#fff;padding:4px 8px;border-radius:10px;color:#0f172a}
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:12px}
+    .hint{font-size:14px;color:var(--muted)}
+    .kbd{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size:13px;border:1px solid var(--line);
+      background:#fff;padding:5px 9px;border-radius:12px;color:#0f172a
+    }
 
     .toast{
       position:fixed; right:16px; bottom:16px;
-      background:#0f172a; color:#fff;
-      padding:10px 12px; border-radius:14px;
-      font-size:13px; box-shadow:0 18px 50px rgba(0,0,0,.25);
+      background:#0b1220; color:#fff;
+      padding:12px 14px;
+      border-radius:16px;
+      font-size:14px;
+      box-shadow:0 22px 60px rgba(0,0,0,.28);
       display:none; z-index:2000;
-      max-width:min(460px, 92vw);
+      max-width:min(520px, 92vw);
       white-space:pre-wrap;
+      border:1px solid rgba(255,255,255,.10);
     }
     .toast.show{display:block}
 
-    @media (max-width:980px){
+    @media (max-width:1020px){
       .layout{grid-template-columns:1fr}
       .modalbody{grid-template-columns:1fr}
     }
@@ -178,17 +374,23 @@
       <main class="main">
         <section class="section">
           <div class="shead">
-            <div class="title"><div class="icon">TR</div><h3>Trattamenti</h3></div>
-            <div class="meta" id="countMeta">—</div>
+            <div class="title">
+              <div class="icon">TR</div>
+              <div>
+                <h3>Trattamenti</h3>
+                <div class="meta" id="countMeta">—</div>
+              </div>
+            </div>
+
+            <div class="actionsRow">
+              <button class="btn soft" id="btnLoadMore" style="display:none;">Carica altri</button>
+              <button class="btn save" id="btnNewTreatment" disabled>Nuovo trattamento</button>
+            </div>
           </div>
 
           <div class="sbody">
             <div class="list" id="listTrt">
               <div class="note">Seleziona un paziente per caricare i trattamenti.</div>
-            </div>
-
-            <div style="margin-top:12px; display:flex; justify-content:flex-end;">
-              <button class="btn" id="btnLoadMore" style="display:none;">Carica altri</button>
             </div>
           </div>
         </section>
@@ -202,8 +404,8 @@
       <div class="modalhead">
         <h4>Modifica trattamento</h4>
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn" id="btnSmart2">Acquisizione intelligente</button>
-          <button class="btn" id="btnAttach2">Allegati</button>
+          <button class="btn soft" id="btnSmart2">Acquisizione intelligente</button>
+          <button class="btn soft" id="btnAttach2">Allegati</button>
           <button class="xbtn" id="btnClose">X</button>
         </div>
       </div>
@@ -212,8 +414,14 @@
         <div>
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
-              <div class="title"><div class="icon">NF</div><h3>Note fisioterapista</h3></div>
-              <div class="meta" id="metaRec">Record: —</div>
+              <div class="title">
+                <div class="icon">NF</div>
+                <div>
+                  <h3>Note fisioterapista</h3>
+                  <div class="meta" id="metaRec">Record: —</div>
+                </div>
+              </div>
+              <div></div>
             </div>
             <div class="sbody">
               <textarea id="edVal" placeholder="Scrivi le note..."></textarea>
@@ -225,7 +433,7 @@
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
               <div class="title"><div class="icon">TE</div><h3>Trattamento eseguito</h3></div>
-              <div class="meta"></div>
+              <div></div>
             </div>
             <div class="sbody">
               <textarea id="edTrt" placeholder="Descrivi il trattamento eseguito..."></textarea>
@@ -237,7 +445,7 @@
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
               <div class="title"><div class="icon">IP</div><h3>Indicazioni prossima seduta</h3></div>
-              <div class="meta"></div>
+              <div></div>
             </div>
             <div class="sbody">
               <textarea id="edNext" placeholder="Indicazioni per la prossima seduta..."></textarea>
@@ -263,7 +471,7 @@
             </div>
             <div class="bodymap" id="map">
               <div class="body-sil">
-                <svg viewBox="0 0 220 320" width="180" height="260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <svg viewBox="0 0 220 320" width="190" height="270" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path d="M110 22c18 0 34 16 34 34 0 14-8 26-20 31v18c0 7 5 12 12 12h18c10 0 18 8 18 18v22c0 12-9 22-22 22h-7l-4 46c-1 14-12 25-26 25h-6c-14 0-25-11-26-25l-4-46h-7c-13 0-22-10-22-22v-22c0-10 8-18 18-18h18c7 0 12-5 12-12V87c-12-5-20-17-20-31 0-18 16-34 34-34Z"
                     fill="#E8EDF4" stroke="#D6DEEA" stroke-width="2"/>
                 </svg>
@@ -287,9 +495,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    // -----------------------------
     // Toast
-    // -----------------------------
     const toastEl = document.getElementById("toast");
     let toastTimer = null;
     function toast(msg){
@@ -299,14 +505,12 @@
       toastTimer = setTimeout(()=> toastEl.classList.remove("show"), 2600);
     }
 
-    // top actions (mock)
+    // Top actions (mock)
     document.getElementById("btnAgenda").onclick = () => toast("Agenda (step dopo)");
     document.getElementById("btnSmart").onclick = () => toast("Acquisizione intelligente (step dopo)");
     document.getElementById("btnAttachments").onclick = () => toast("Allegati (step dopo)");
 
-    // -----------------------------
     // API
-    // -----------------------------
     async function apiSearchPatients(q){
       const r = await fetch(`/api/patients?q=${encodeURIComponent(q)}`);
       const j = await r.json();
@@ -340,9 +544,18 @@
       return j;
     }
 
-    // -----------------------------
-    // Patient search + selection
-    // -----------------------------
+    async function apiCreateTreatment(patientId){
+      const r = await fetch(`/api/treatments`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ patientId })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Create failed: " + r.status));
+      return j; // {ok, id, fields}
+    }
+
+    // Patient UI
     const patientSearch = document.getElementById("patientSearch");
     const suggest = document.getElementById("suggest");
     const patientInfo = document.getElementById("patientInfo");
@@ -350,16 +563,24 @@
     const patientSubtitle = document.getElementById("patientSubtitle");
     const listTrt = document.getElementById("listTrt");
     const countMeta = document.getElementById("countMeta");
-    const btnLoadMore = document.getElementById("btnLoadMore");
     const btnClear = document.getElementById("btnClear");
+    const btnLoadMore = document.getElementById("btnLoadMore");
+    const btnNewTreatment = document.getElementById("btnNewTreatment");
 
-    let selectedPatient = null; // {id, name, ...}
+    let selectedPatient = null;
     let treatmentsOffset = null;
-    let treatmentsCount = 0;
+    let loadedCount = 0;
 
-    function clearSuggestions(){
-      suggest.innerHTML = "";
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
     }
+
+    function clearSuggestions(){ suggest.innerHTML = ""; }
 
     function renderSuggestions(items){
       if(!items.length){
@@ -386,6 +607,7 @@
 
       patientTitle.textContent = "FISIOPRO — " + p.name;
       patientSubtitle.textContent = "Trattamenti associati al paziente";
+      btnNewTreatment.disabled = false;
 
       patientInfo.innerHTML = `
         <div class="case-card">
@@ -394,9 +616,8 @@
         </div>
       `;
 
-      // reset list
       treatmentsOffset = null;
-      treatmentsCount = 0;
+      loadedCount = 0;
       listTrt.innerHTML = `<div class="note">Caricamento trattamenti...</div>`;
       countMeta.textContent = "—";
       btnLoadMore.style.display = "none";
@@ -404,85 +625,13 @@
       await loadMoreTreatments(true);
     }
 
-    async function loadMoreTreatments(reset){
-      if(!selectedPatient) return;
-
-      try{
-        const data = await apiListTreatmentsByPatient(selectedPatient.id, reset ? null : treatmentsOffset);
-        const records = data.records || [];
-        treatmentsOffset = data.offset || null;
-
-        if(reset){
-          listTrt.innerHTML = "";
-          treatmentsCount = 0;
-        }
-
-        if(!records.length && reset){
-          listTrt.innerHTML = `<div class="note">Nessun trattamento trovato per questo paziente.</div>`;
-        } else {
-          records.forEach(r => listTrt.appendChild(renderTreatmentItem(r.id, r.fields)));
-          treatmentsCount += records.length;
-        }
-
-        countMeta.textContent = treatmentsCount ? `${treatmentsCount} record caricati` : "0";
-        btnLoadMore.style.display = treatmentsOffset ? "" : "none";
-      }catch(err){
-        listTrt.innerHTML = `<div class="note">Errore: ${escapeHtml(err.message)}</div>`;
-      }
-    }
-
-    btnLoadMore.onclick = () => loadMoreTreatments(false);
-    btnClear.onclick = () => {
-      selectedPatient = null;
-      treatmentsOffset = null;
-      treatmentsCount = 0;
-
-      patientSearch.value = "";
-      clearSuggestions();
-
-      patientTitle.textContent = "FISIOPRO";
-      patientSubtitle.textContent = "Seleziona un paziente per vedere i trattamenti";
-      patientInfo.innerHTML = `
-        <div class="case-card">
-          <div class="case-title">Nessun paziente selezionato</div>
-          <p class="case-sub">Cerca e clicca un nome</p>
-        </div>
-      `;
-      listTrt.innerHTML = `<div class="note">Seleziona un paziente per caricare i trattamenti.</div>`;
-      countMeta.textContent = "—";
-      btnLoadMore.style.display = "none";
-    };
-
-    let searchTimer = null;
-    patientSearch.addEventListener("input", () => {
-      const q = patientSearch.value.trim();
-      clearTimeout(searchTimer);
-
-      if(!q){
-        clearSuggestions();
-        return;
-      }
-
-      searchTimer = setTimeout(async ()=>{
-        try{
-          const items = await apiSearchPatients(q);
-          renderSuggestions(items);
-        }catch(err){
-          suggest.innerHTML = `<div class="note">Errore ricerca: ${escapeHtml(err.message)}</div>`;
-        }
-      }, 220);
-    });
-
-    // -----------------------------
-    // Treatments list rendering
-    // -----------------------------
     function pickDate(fields){
       return fields["DATA TRATTAMENTO"] || fields["Data seduta"] || fields["DATA"] || "";
     }
     function pickTitle(fields){
       return fields["Nome trattamento"] || fields["TIPO PRESTAZIONE"] || fields["Tipo seduta"] || "Trattamento";
     }
-    function short(text, n=140){
+    function short(text, n=170){
       const s = (text || "").toString().replace(/\s+/g, " ").trim();
       if(!s) return "";
       return s.length > n ? s.slice(0, n-1) + "…" : s;
@@ -507,7 +656,7 @@
         <summary>
           <div class="sum-left">
             <div><strong>${escapeHtml(title)}</strong>${date ? " · " + escapeHtml(date) : ""}</div>
-            <div class="case-sub">${escapeHtml([area, lat, pat].filter(Boolean).join(" · "))}</div>
+            <div style="color:var(--muted);font-size:14px">${escapeHtml([area, lat, pat].filter(Boolean).join(" · "))}</div>
           </div>
           <div class="sum-right">
             ${area ? `<span class="pill2">${escapeHtml(area)}</span>` : ""}
@@ -527,9 +676,96 @@
       return wrap;
     }
 
-    // -----------------------------
+    async function loadMoreTreatments(reset){
+      if(!selectedPatient) return;
+
+      try{
+        const data = await apiListTreatmentsByPatient(selectedPatient.id, reset ? null : treatmentsOffset);
+        const records = data.records || [];
+        treatmentsOffset = data.offset || null;
+
+        if(reset){
+          listTrt.innerHTML = "";
+          loadedCount = 0;
+        }
+
+        if(!records.length && reset){
+          listTrt.innerHTML = `<div class="note">Nessun trattamento trovato per questo paziente.</div>`;
+        } else {
+          records.forEach(r => listTrt.appendChild(renderTreatmentItem(r.id, r.fields)));
+          loadedCount += records.length;
+        }
+
+        countMeta.textContent = loadedCount ? `${loadedCount} trattamenti caricati` : "0 trattamenti";
+        btnLoadMore.style.display = treatmentsOffset ? "" : "none";
+      }catch(err){
+        listTrt.innerHTML = `<div class="note">Errore: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    btnLoadMore.onclick = () => loadMoreTreatments(false);
+
+    btnClear.onclick = () => {
+      selectedPatient = null;
+      treatmentsOffset = null;
+      loadedCount = 0;
+
+      patientSearch.value = "";
+      clearSuggestions();
+
+      patientTitle.textContent = "FISIOPRO";
+      patientSubtitle.textContent = "Seleziona un paziente per vedere i trattamenti";
+      btnNewTreatment.disabled = true;
+
+      patientInfo.innerHTML = `
+        <div class="case-card">
+          <div class="case-title">Nessun paziente selezionato</div>
+          <p class="case-sub">Cerca e clicca un nome</p>
+        </div>
+      `;
+      listTrt.innerHTML = `<div class="note">Seleziona un paziente per caricare i trattamenti.</div>`;
+      countMeta.textContent = "—";
+      btnLoadMore.style.display = "none";
+    };
+
+    // Search debounce
+    let searchTimer = null;
+    patientSearch.addEventListener("input", () => {
+      const q = patientSearch.value.trim();
+      clearTimeout(searchTimer);
+
+      if(!q){
+        clearSuggestions();
+        return;
+      }
+
+      searchTimer = setTimeout(async ()=>{
+        try{
+          const items = await apiSearchPatients(q);
+          renderSuggestions(items);
+        }catch(err){
+          suggest.innerHTML = `<div class="note">Errore ricerca: ${escapeHtml(err.message)}</div>`;
+        }
+      }, 200);
+    });
+
+    // Nuovo trattamento: crea record Airtable + apre editor
+    btnNewTreatment.onclick = async () => {
+      if(!selectedPatient) return;
+      btnNewTreatment.disabled = true;
+      try{
+        const created = await apiCreateTreatment(selectedPatient.id);
+        toast("Trattamento creato");
+        await openTreatmentEditor(created.id);
+        await loadMoreTreatments(true);
+      }catch(err){
+        toast("Errore creazione:\n" + err.message);
+      }finally{
+        btnNewTreatment.disabled = false;
+      }
+    };
+
     // Modal editor
-    // -----------------------------
     const overlay = document.getElementById("overlay");
     const btnClose = document.getElementById("btnClose");
     const btnCancel = document.getElementById("btnCancel");
@@ -549,7 +785,7 @@
     btnSmart2.onclick = () => toast("Acquisizione intelligente (step dopo)");
     btnAttach2.onclick = () => toast("Allegati (step dopo)");
 
-    // bodymap state
+    // Bodymap state (campo: BODY T)
     const cls = ["s0","s1","s2","s3"];
     const mapStates = {};
     function applyMapStates(obj){
@@ -590,15 +826,12 @@
 
       try{
         const f = await apiLoadTreatment(recordId);
-
         document.getElementById("edVal").value  = f["Note Fisioterapista"] || "";
         document.getElementById("edTrt").value  = f["Trattamento eseguito"] || "";
         document.getElementById("edNext").value = f["Indicazioni prossima seduta"] || "";
 
         let bm = {};
-        if (f["BODY T"]) {
-          try { bm = JSON.parse(f["BODY T"]); } catch(e){ bm = {}; }
-        }
+        if (f["BODY T"]) { try { bm = JSON.parse(f["BODY T"]); } catch(e){ bm = {}; } }
         applyMapStates(bm);
 
         toast("Caricato");
@@ -622,7 +855,6 @@
         await apiSaveTreatment(recordId, fields);
         toast("Salvato");
         closeEditor();
-        // ricarico lista da zero per vedere subito gli aggiornamenti
         await loadMoreTreatments(true);
       }catch(err){
         toast("Errore salvataggio:\n" + err.message);
@@ -632,25 +864,12 @@
     document.addEventListener("keydown", (e) => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const mod = isMac ? e.metaKey : e.ctrlKey;
-
       if (overlay.classList.contains("open") && mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
         btnSave.click();
       }
       if (overlay.classList.contains("open") && e.key === "Escape") closeEditor();
     });
-
-    // -----------------------------
-    // Utils
-    // -----------------------------
-    function escapeHtml(s){
-      return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
   </script>
 </body>
 </html>
