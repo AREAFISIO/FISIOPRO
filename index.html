@@ -3,165 +3,108 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FISIOPRO — UI</title>
+  <title>FISIOPRO</title>
   <style>
     :root{
       --bg:#f3f5f7; --card:#fff; --text:#0f172a; --muted:#64748b; --line:#e6eaf0;
-      --shadow:0 8px 24px rgba(2,6,23,.08); --radius:18px;
+      --shadow:0 10px 28px rgba(2,6,23,.09); --radius:18px;
       --brand:#2ea08a; --brand2:#1f7e6c;
-      --orange:#ff7a33; --yellow:#f6d84a; --red:#ef4444; --blue:#3b82f6; --gray:#94a3b8;
+      --yellow:#f6d84a; --red:#ef4444; --blue:#3b82f6; --gray:#94a3b8;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text)}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--text);
+      font-size:17px; line-height:1.35;}
     .app{max-width:1280px;margin:0 auto;padding:18px 18px 28px}
 
-    /* top */
     .topbar{
       background:linear-gradient(180deg,var(--brand),var(--brand2));
       color:#fff;border-radius:22px;padding:18px;box-shadow:var(--shadow);
       display:flex;align-items:center;justify-content:space-between;gap:12px
     }
     .left{display:flex;align-items:center;gap:12px;min-width:0}
-    .badge{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;
-      background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.22);font-weight:800}
+    .badge{width:42px;height:42px;border-radius:999px;display:grid;place-items:center;
+      background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.22);font-weight:1000;font-size:14px;letter-spacing:.5px}
     .pt-title{min-width:0}
-    .pt-title h1{font-size:18px;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pt-title p{margin:0;font-size:12px;opacity:.92}
+    .pt-title h1{font-size:19px;margin:0 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pt-title p{margin:0;font-size:13px;opacity:.92}
     .top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .pill{border-radius:999px;padding:10px 14px;font-size:12px;font-weight:800;
+    .pill{border-radius:999px;padding:10px 14px;font-size:13px;font-weight:1000;
       border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.14);color:#fff;cursor:pointer}
-    .pill.orange{background:rgba(255,255,255,.92);color:#0b3b32;border-color:transparent}
+    .pill.light{background:rgba(255,255,255,.92);color:#0b3b32;border-color:transparent}
     .pill.ghost{background:transparent;border:1px solid rgba(255,255,255,.35)}
 
-    /* layout */
-    .layout{margin-top:14px;display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start}
+    .layout{margin-top:14px;display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start}
     .side,.section{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden}
 
-    /* sidebar */
-    .side .head{padding:14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
-    .side .head h2{margin:0;font-size:14px}
-    .btn{border-radius:999px;padding:10px 12px;font-size:12px;font-weight:900;border:1px solid var(--line);background:#fff;cursor:pointer}
+    .side .head{padding:14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .side .head h2{margin:0;font-size:15px}
+    .btn{border-radius:999px;padding:10px 12px;font-size:13px;font-weight:1000;border:1px solid var(--line);background:#fff;cursor:pointer}
     .btn.primary{background:rgba(46,160,138,.12);border-color:rgba(46,160,138,.28);color:#0b3b32}
-    .btn.orange{background:rgba(255,122,51,.12);border-color:rgba(255,122,51,.25);color:#7a2e00}
-    .btn.save{background:var(--brand);border-color:transparent;color:#fff;box-shadow:0 10px 22px rgba(46,160,138,.24)}
-    .search{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12px;outline:none;background:#fbfcfe}
-    .new-case{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#fbfcfd)}
-    .cases{padding:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 220px);overflow:auto}
-    .case-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff;cursor:pointer}
-    .case-card.active{border-color:rgba(46,160,138,.55);box-shadow:0 10px 24px rgba(46,160,138,.12)}
-    .case-title{font-weight:900;font-size:13px;margin:0 0 4px}
-    .case-sub{font-size:12px;color:var(--muted);margin:0}
-    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-    .chip{font-size:11px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fbfcfe}
+    .btn.save{background:var(--brand);border-color:transparent;color:#fff;box-shadow:0 12px 26px rgba(46,160,138,.24)}
+    .search{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:13px;outline:none;background:#fbfcfe}
 
-    /* main cards */
-    .main{display:flex;flex-direction:column;gap:14px}
+    .panel{padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#fbfcfd)}
+    .suggest{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+    .sug{
+      border:1px solid var(--line);
+      background:#fff;border-radius:14px;
+      padding:10px 12px; cursor:pointer;
+      display:flex; flex-direction:column; gap:2px;
+    }
+    .sug strong{font-size:14px}
+    .sug span{font-size:12px;color:var(--muted)}
+    .sug:hover{border-color:rgba(46,160,138,.45);box-shadow:0 10px 20px rgba(46,160,138,.10)}
+
+    .cases{padding:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 290px);overflow:auto}
+    .case-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff}
+    .case-title{font-weight:1000;font-size:14px;margin:0 0 4px}
+    .case-sub{font-size:13px;color:var(--muted);margin:0}
+
     .shead{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
       background:linear-gradient(180deg,#fff,#fbfcfe)}
     .title{display:flex;align-items:center;gap:10px}
-    .icon{width:30px;height:30px;border-radius:12px;display:grid;place-items:center;background:rgba(46,160,138,.12);
-      border:1px solid rgba(46,160,138,.18);color:#0b3b32;font-weight:900}
-    .shead h3{margin:0;font-size:14px}
-    .meta{font-size:12px;color:var(--muted);white-space:nowrap}
+    .icon{width:32px;height:32px;border-radius:12px;display:grid;place-items:center;background:rgba(46,160,138,.12);
+      border:1px solid rgba(46,160,138,.18);color:#0b3b32;font-weight:1000;font-size:13px}
+    .shead h3{margin:0;font-size:15px}
+    .meta{font-size:13px;color:var(--muted);white-space:nowrap}
     .sbody{padding:14px 16px 16px}
 
-    /* tabs */
-    .tabs{display:flex;gap:10px;flex-wrap:wrap}
-    .tab{
-      border-radius:999px;padding:10px 12px;font-size:12px;font-weight:900;
-      border:1px solid var(--line);background:#fff;cursor:pointer
-    }
-    .tab.active{background:rgba(46,160,138,.12);border-color:rgba(46,160,138,.28);color:#0b3b32}
-
-    /* list items */
     .list{display:flex;flex-direction:column;gap:10px}
-    details.item{
-      border:1px solid var(--line);
-      border-radius:16px;
-      background:#fff;
-      overflow:hidden;
-    }
+    details.item{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
     details.item summary{
       list-style:none; cursor:pointer;
       padding:12px 14px;
       display:flex; align-items:center; justify-content:space-between; gap:10px;
       background:linear-gradient(180deg,#ffffff 0%, #fbfcfe 100%);
-      font-weight:900; font-size:13px;
+      font-weight:1000; font-size:14px;
     }
     details.item summary::-webkit-details-marker{display:none}
     .sum-left{display:flex;flex-direction:column;gap:2px}
     .sum-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-    .pill2{
-      font-size:11px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fbfcfe;color:#0f172a
-    }
-    .content{
-      padding:12px 14px 14px;
-      display:flex; flex-direction:column; gap:10px;
-    }
+    .pill2{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:#fbfcfe;color:#0f172a}
+    .content{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
     .row2{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
-    .note{
-      border:1px solid var(--line);
-      background:#fbfcfe;
-      border-radius:14px;
-      padding:12px;
-      font-size:13px;
-      line-height:1.35;
-      color:#0f172a;
-      white-space:pre-wrap;
-    }
+    .note{border:1px solid var(--line);background:#fbfcfe;border-radius:14px;padding:12px;font-size:14px;white-space:pre-wrap}
 
-    /* editor overlay (treatment edit) */
-    .overlay{
-      position:fixed; inset:0; background:rgba(2,6,23,.55);
-      display:none; align-items:center; justify-content:center;
-      padding:18px; z-index:999;
-    }
+    .overlay{position:fixed; inset:0; background:rgba(2,6,23,.55);display:none; align-items:center; justify-content:center;padding:18px; z-index:999;}
     .overlay.open{display:flex}
-    .modal{
-      width:min(1180px, 96vw);
-      max-height:92vh;
-      background:var(--card);
-      border-radius:22px;
-      box-shadow:0 24px 70px rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.08);
-      overflow:hidden;
-      display:flex; flex-direction:column;
-    }
-    .modalhead{
-      padding:14px 16px;
-      background:linear-gradient(180deg,#fff,#fbfcfe);
-      border-bottom:1px solid var(--line);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-    }
-    .modalhead h4{margin:0;font-size:14px}
-    .xbtn{
-      width:38px;height:38px;border-radius:12px;
-      border:1px solid var(--line); background:#fff; cursor:pointer; font-weight:900;
-    }
-    .modalbody{
-      padding:14px 16px 16px;
-      display:grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap:14px;
-      overflow:auto;
-    }
+    .modal{width:min(1180px, 96vw);max-height:92vh;background:var(--card);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.08);overflow:hidden;display:flex;flex-direction:column;}
+    .modalhead{padding:14px 16px;background:linear-gradient(180deg,#fff,#fbfcfe);border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .modalhead h4{margin:0;font-size:15px}
+    .xbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:1000;font-size:14px}
+    .modalbody{padding:14px 16px 16px;display:grid;grid-template-columns:1.2fr 1fr;gap:14px;overflow:auto}
 
-    /* textareas */
-    textarea{
-      width:100%; min-height:120px; resize:vertical;
-      padding:12px; border-radius:14px; border:1px solid var(--line);
-      outline:none; font-size:13px; line-height:1.35; background:#fbfcfe;
-    }
+    textarea{width:100%;min-height:132px;resize:vertical;padding:12px;border-radius:14px;border:1px solid var(--line);outline:none;font-size:14px;line-height:1.35;background:#fbfcfe}
     textarea:focus{border-color:rgba(46,160,138,.55);box-shadow:0 0 0 4px rgba(46,160,138,.10);background:#fff}
 
-    /* body map in editor */
     .body-card{border:1px solid var(--line);border-radius:18px;padding:10px;background:#fff}
-    .label{font-size:12px;color:var(--muted);margin:2px 2px 8px;display:flex;justify-content:space-between;gap:10px}
-    .legend{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+    .label{font-size:13px;color:var(--muted);margin:2px 2px 8px;display:flex;justify-content:space-between;gap:10px}
+    .legend{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;border:2px solid rgba(15,23,42,.15)}
     .dot.red{background:var(--red)} .dot.yellow{background:var(--yellow)} .dot.blue{background:var(--blue)}
-    .legend span{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
-
+    .legend span{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
     .bodymap{position:relative;width:100%;aspect-ratio:2/3;border-radius:16px;background:linear-gradient(180deg,#f8fafc,#eef2f7);
       border:1px solid var(--line);overflow:hidden}
     .body-sil{position:absolute;inset:0;display:grid;place-items:center;opacity:.9;pointer-events:none}
@@ -169,16 +112,23 @@
       box-shadow:0 10px 18px rgba(2,6,23,.12);cursor:pointer;transform:translate(-50%,-50%);
       background:rgba(255,255,255,.65);display:grid;place-items:center}
     .pt::after{content:"";width:10px;height:10px;border-radius:999px;background:var(--gray);display:block}
-    .pt.s0::after{background:var(--gray)} .pt.s1::after{background:var(--yellow)}
-    .pt.s2::after{background:var(--red)} .pt.s3::after{background:var(--blue)}
+    .pt.s0::after{background:var(--gray)} .pt.s1::after{background:var(--yellow)} .pt.s2::after{background:var(--red)} .pt.s3::after{background:var(--blue)}
 
-    .toolbar{
-      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
-      margin-top:10px;
+    .toolbar{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top:10px}
+    .hint{font-size:13px;color:var(--muted)}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:12px;border:1px solid var(--line);
+      background:#fff;padding:4px 8px;border-radius:10px;color:#0f172a}
+
+    .toast{
+      position:fixed; right:16px; bottom:16px;
+      background:#0f172a; color:#fff;
+      padding:10px 12px; border-radius:14px;
+      font-size:13px; box-shadow:0 18px 50px rgba(0,0,0,.25);
+      display:none; z-index:2000;
+      max-width:min(460px, 92vw);
+      white-space:pre-wrap;
     }
-    .hint{font-size:12px;color:var(--muted)}
-    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:11px;
-      border:1px solid var(--line);background:#fff;padding:4px 8px;border-radius:10px;color:#0f172a}
+    .toast.show{display:block}
 
     @media (max-width:980px){
       .layout{grid-template-columns:1fr}
@@ -190,150 +140,55 @@
   <div class="app">
     <div class="topbar">
       <div class="left">
-        <div class="badge">AF</div>
+        <div class="badge">FP</div>
         <div class="pt-title">
-          <h1>FISIOPRO — Dettagli paziente</h1>
-          <p>Storia clinica · Caso: <strong>Gonalgia dx</strong> · Operatore: <strong>AF</strong></p>
+          <h1 id="patientTitle">FISIOPRO</h1>
+          <p id="patientSubtitle">Seleziona un paziente per vedere i trattamenti</p>
         </div>
       </div>
       <div class="top-actions">
-        <div class="pill ghost" id="btnAgenda">🗓️ Agenda</div>
-        <div class="pill orange" id="btnSmart">🧠 Acquisizione intelligente</div>
-        <div class="pill" id="btnAttachments">📎 Allegati</div>
+        <div class="pill ghost" id="btnAgenda">Agenda</div>
+        <div class="pill light" id="btnSmart">Acquisizione intelligente</div>
+        <div class="pill" id="btnAttachments">Allegati</div>
       </div>
     </div>
 
     <div class="layout">
-      <!-- SIDEBAR -->
+      <!-- SIDEBAR: ricerca paziente -->
       <aside class="side">
         <div class="head">
-          <h2>Storia clinica</h2>
-          <button class="btn primary" id="btnNewCase">👨‍⚕️ Nuovo caso</button>
+          <h2>Paziente</h2>
+          <button class="btn primary" id="btnClear">Reset</button>
         </div>
-        <div class="new-case"><input class="search" placeholder="Cerca caso clinico (mock)..." /></div>
 
-        <div class="cases">
-          <div class="case-card active">
-            <div class="case-title">11/12/2025 — Gonalgia dx</div>
-            <p class="case-sub">Problema principale: tendinopatia rotulea</p>
-            <div class="chips"><span class="chip">Valutazioni: 2</span><span class="chip">Trattamenti: 5</span></div>
-          </div>
+        <div class="panel">
+          <input class="search" id="patientSearch" placeholder="Cerca paziente (nome/cognome)..." autocomplete="off" />
+          <div class="suggest" id="suggest"></div>
+        </div>
+
+        <div class="cases" id="patientInfo">
           <div class="case-card">
-            <div class="case-title">22/09/2025 — Spalla sx</div>
-            <p class="case-sub">Problema principale: impingement</p>
-            <div class="chips"><span class="chip">Valutazioni: 1</span><span class="chip">Trattamenti: 3</span></div>
+            <div class="case-title">Nessun paziente selezionato</div>
+            <p class="case-sub">Cerca e clicca un nome</p>
           </div>
         </div>
       </aside>
 
-      <!-- MAIN -->
+      <!-- MAIN: lista trattamenti del paziente -->
       <main class="main">
-        <!-- CASE VIEW (lists like Osteoeasy) -->
         <section class="section">
           <div class="shead">
-            <div class="title"><div class="icon">📁</div><h3>Caso clinico</h3></div>
-            <div class="tabs">
-              <button class="tab active" id="tabVal">Valutazioni</button>
-              <button class="tab" id="tabTrt">Trattamenti</button>
-              <button class="btn orange" id="btnNewVal">➕ Nuova valutazione</button>
-              <button class="btn" id="btnNewTrt">➕ Nuovo trattamento</button>
-            </div>
+            <div class="title"><div class="icon">TR</div><h3>Trattamenti</h3></div>
+            <div class="meta" id="countMeta">—</div>
           </div>
 
           <div class="sbody">
-            <!-- VALUTAZIONI LIST -->
-            <div class="list" id="listVal">
-              <details class="item" open>
-                <summary>
-                  <div class="sum-left">
-                    <div><strong>Valutazione iniziale</strong> · 11/12/2025</div>
-                    <div class="case-sub">Dolore ginocchio dx · RMN negativa · Eco: tendine rotuleo +2mm</div>
-                  </div>
-                  <div class="sum-right">
-                    <span class="pill2">VAS 6/10</span>
-                    <span class="pill2">Body map</span>
-                  </div>
-                </summary>
-                <div class="content">
-                  <div class="note">Testo valutazione (mock)…
-- Anamnesi: 8 mesi
-- Dolore anteriore ginocchio
-- Sport: palestra
-- No limitazioni funzionali</div>
-                  <div class="row2">
-                    <span class="hint">Qui dopo metteremo anche i “Test clinici” completi.</span>
-                    <button class="btn" onclick="alert('Apri editor valutazione (step dopo)')">MODIFICA</button>
-                  </div>
-                </div>
-              </details>
-
-              <details class="item">
-                <summary>
-                  <div class="sum-left">
-                    <div><strong>Follow-up</strong> · 18/12/2025</div>
-                    <div class="case-sub">Riduzione dolore post trattamento · carichi ancora irritanti</div>
-                  </div>
-                  <div class="sum-right">
-                    <span class="pill2">VAS 4/10</span>
-                    <span class="pill2">Test</span>
-                  </div>
-                </summary>
-                <div class="content">
-                  <div class="note">Testo follow-up (mock)…</div>
-                  <div class="row2">
-                    <span class="hint">Aggiungeremo: recap automatico + test + bodymap.</span>
-                    <button class="btn" onclick="alert('Apri editor valutazione (step dopo)')">MODIFICA</button>
-                  </div>
-                </div>
-              </details>
+            <div class="list" id="listTrt">
+              <div class="note">Seleziona un paziente per caricare i trattamenti.</div>
             </div>
 
-            <!-- TRATTAMENTI LIST -->
-            <div class="list" id="listTrt" style="display:none">
-              <details class="item" open>
-                <summary>
-                  <div class="sum-left">
-                    <div><strong>Trattamento</strong> · 12/12/2025</div>
-                    <div class="case-sub">Laser antinfiammatorio + US tendine rotuleo 75%</div>
-                  </div>
-                  <div class="sum-right">
-                    <span class="pill2">Ginocchio dx</span>
-                    <span class="pill2">Indicazioni</span>
-                  </div>
-                </summary>
-                <div class="content">
-                  <div class="note"><strong>Trattamento eseguito</strong>
-Laser antinfiammatorio antiedemigeno e antalgico
-Ultrasuoni tendine rotuleo 75%
-FREMS
-
-<strong>Indicazioni prossima seduta</strong>
-Continuare</div>
-                  <div class="row2">
-                    <span class="hint">Come Osteoeasy: click “MODIFICA” apre editor.</span>
-                    <button class="btn orange" onclick="openTreatmentEditor('trt-1')">MODIFICA</button>
-                  </div>
-                </div>
-              </details>
-
-              <details class="item">
-                <summary>
-                  <div class="sum-left">
-                    <div><strong>Trattamento</strong> · 15/12/2025</div>
-                    <div class="case-sub">Esercizi isometrici + educazione carico</div>
-                  </div>
-                  <div class="sum-right">
-                    <span class="pill2">Esercizi</span>
-                  </div>
-                </summary>
-                <div class="content">
-                  <div class="note">Mock…</div>
-                  <div class="row2">
-                    <span class="hint"></span>
-                    <button class="btn orange" onclick="openTreatmentEditor('trt-2')">MODIFICA</button>
-                  </div>
-                </div>
-              </details>
+            <div style="margin-top:12px; display:flex; justify-content:flex-end;">
+              <button class="btn" id="btnLoadMore" style="display:none;">Carica altri</button>
             </div>
           </div>
         </section>
@@ -341,28 +196,27 @@ Continuare</div>
     </div>
   </div>
 
-  <!-- TREATMENT EDITOR (like Osteoeasy screenshot) -->
+  <!-- MODAL EDITOR -->
   <div class="overlay" id="overlay">
     <div class="modal">
       <div class="modalhead">
         <h4>Modifica trattamento</h4>
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn orange" id="btnSmart2">🧠 Acquisizione intelligente</button>
-          <button class="btn" id="btnAttach2">📎 Allegati</button>
-          <button class="xbtn" id="btnClose">✕</button>
+          <button class="btn" id="btnSmart2">Acquisizione intelligente</button>
+          <button class="btn" id="btnAttach2">Allegati</button>
+          <button class="xbtn" id="btnClose">X</button>
         </div>
       </div>
 
       <div class="modalbody">
-        <!-- LEFT: form -->
         <div>
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
-              <div class="title"><div class="icon">✓</div><h3>Valutazione</h3></div>
-              <div class="meta">Testo libero</div>
+              <div class="title"><div class="icon">NF</div><h3>Note fisioterapista</h3></div>
+              <div class="meta" id="metaRec">Record: —</div>
             </div>
             <div class="sbody">
-              <textarea id="edVal" placeholder="Valutazione..."></textarea>
+              <textarea id="edVal" placeholder="Scrivi le note..."></textarea>
             </div>
           </div>
 
@@ -370,11 +224,11 @@ Continuare</div>
 
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
-              <div class="title"><div class="icon">❤</div><h3>Trattamento eseguito</h3></div>
+              <div class="title"><div class="icon">TE</div><h3>Trattamento eseguito</h3></div>
               <div class="meta"></div>
             </div>
             <div class="sbody">
-              <textarea id="edTrt" placeholder="Trattamento eseguito..."></textarea>
+              <textarea id="edTrt" placeholder="Descrivi il trattamento eseguito..."></textarea>
             </div>
           </div>
 
@@ -382,22 +236,21 @@ Continuare</div>
 
           <div class="section" style="box-shadow:none;border:1px solid var(--line)">
             <div class="shead">
-              <div class="title"><div class="icon">📌</div><h3>Indicazioni prossima seduta</h3></div>
+              <div class="title"><div class="icon">IP</div><h3>Indicazioni prossima seduta</h3></div>
               <div class="meta"></div>
             </div>
             <div class="sbody">
-              <textarea id="edNext" placeholder="Indicazioni prossima seduta..."></textarea>
+              <textarea id="edNext" placeholder="Indicazioni per la prossima seduta..."></textarea>
             </div>
           </div>
 
           <div class="toolbar">
-            <span class="hint"><span class="kbd">⌘/Ctrl + S</span> salva (mock)</span>
+            <span class="hint"><span class="kbd">Ctrl/Command + S</span> salva</span>
             <button class="btn" id="btnCancel">Annulla</button>
             <button class="btn save" id="btnSave">Salva</button>
           </div>
         </div>
 
-        <!-- RIGHT: body map -->
         <div>
           <div class="body-card">
             <div class="label">
@@ -415,6 +268,7 @@ Continuare</div>
                     fill="#E8EDF4" stroke="#D6DEEA" stroke-width="2"/>
                 </svg>
               </div>
+
               <div class="pt s0" data-id="front-right-knee" style="left:55%; top:72%;" title="Ginocchio destro"></div>
               <div class="pt s0" data-id="front-left-knee"  style="left:45%; top:72%;" title="Ginocchio sinistro"></div>
               <div class="pt s0" data-id="front-right-shoulder" style="left:62%; top:33%;" title="Spalla destra"></div>
@@ -430,92 +284,355 @@ Continuare</div>
     </div>
   </div>
 
+  <div class="toast" id="toast"></div>
+
   <script>
-    // Tabs
-    const tabVal = document.getElementById("tabVal");
-    const tabTrt = document.getElementById("tabTrt");
-    const listVal = document.getElementById("listVal");
+    // -----------------------------
+    // Toast
+    // -----------------------------
+    const toastEl = document.getElementById("toast");
+    let toastTimer = null;
+    function toast(msg){
+      toastEl.textContent = String(msg || "");
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=> toastEl.classList.remove("show"), 2600);
+    }
+
+    // top actions (mock)
+    document.getElementById("btnAgenda").onclick = () => toast("Agenda (step dopo)");
+    document.getElementById("btnSmart").onclick = () => toast("Acquisizione intelligente (step dopo)");
+    document.getElementById("btnAttachments").onclick = () => toast("Allegati (step dopo)");
+
+    // -----------------------------
+    // API
+    // -----------------------------
+    async function apiSearchPatients(q){
+      const r = await fetch(`/api/patients?q=${encodeURIComponent(q)}`);
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Search failed: " + r.status));
+      return j.records || [];
+    }
+
+    async function apiListTreatmentsByPatient(patientId, offset){
+      const url = `/api/treatments?patientId=${encodeURIComponent(patientId)}` + (offset ? `&offset=${encodeURIComponent(offset)}` : "");
+      const r = await fetch(url);
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("List failed: " + r.status));
+      return j;
+    }
+
+    async function apiLoadTreatment(recordId){
+      const r = await fetch(`/api/treatments?id=${encodeURIComponent(recordId)}`);
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Load failed: " + r.status));
+      return j.fields || {};
+    }
+
+    async function apiSaveTreatment(recordId, fields){
+      const r = await fetch(`/api/treatments`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ id: recordId, fields })
+      });
+      const j = await r.json();
+      if(!r.ok) throw new Error(j?.error || ("Save failed: " + r.status));
+      return j;
+    }
+
+    // -----------------------------
+    // Patient search + selection
+    // -----------------------------
+    const patientSearch = document.getElementById("patientSearch");
+    const suggest = document.getElementById("suggest");
+    const patientInfo = document.getElementById("patientInfo");
+    const patientTitle = document.getElementById("patientTitle");
+    const patientSubtitle = document.getElementById("patientSubtitle");
     const listTrt = document.getElementById("listTrt");
+    const countMeta = document.getElementById("countMeta");
+    const btnLoadMore = document.getElementById("btnLoadMore");
+    const btnClear = document.getElementById("btnClear");
 
-    tabVal.addEventListener("click", () => {
-      tabVal.classList.add("active"); tabTrt.classList.remove("active");
-      listVal.style.display = ""; listTrt.style.display = "none";
+    let selectedPatient = null; // {id, name, ...}
+    let treatmentsOffset = null;
+    let treatmentsCount = 0;
+
+    function clearSuggestions(){
+      suggest.innerHTML = "";
+    }
+
+    function renderSuggestions(items){
+      if(!items.length){
+        suggest.innerHTML = `<div class="note">Nessun risultato</div>`;
+        return;
+      }
+      suggest.innerHTML = "";
+      items.forEach(p=>{
+        const el = document.createElement("div");
+        el.className = "sug";
+        el.innerHTML = `
+          <strong>${escapeHtml(p.name)}</strong>
+          <span>${p.dob ? "Nato/a: " + escapeHtml(p.dob) : ""}${p.phone ? (p.dob ? " · " : "") + "Tel: " + escapeHtml(p.phone) : ""}</span>
+        `;
+        el.onclick = () => selectPatient(p);
+        suggest.appendChild(el);
+      });
+    }
+
+    async function selectPatient(p){
+      selectedPatient = p;
+      clearSuggestions();
+      patientSearch.value = p.name;
+
+      patientTitle.textContent = "FISIOPRO — " + p.name;
+      patientSubtitle.textContent = "Trattamenti associati al paziente";
+
+      patientInfo.innerHTML = `
+        <div class="case-card">
+          <div class="case-title">${escapeHtml(p.name)}</div>
+          <p class="case-sub">Record ID: ${escapeHtml(p.id)}</p>
+        </div>
+      `;
+
+      // reset list
+      treatmentsOffset = null;
+      treatmentsCount = 0;
+      listTrt.innerHTML = `<div class="note">Caricamento trattamenti...</div>`;
+      countMeta.textContent = "—";
+      btnLoadMore.style.display = "none";
+
+      await loadMoreTreatments(true);
+    }
+
+    async function loadMoreTreatments(reset){
+      if(!selectedPatient) return;
+
+      try{
+        const data = await apiListTreatmentsByPatient(selectedPatient.id, reset ? null : treatmentsOffset);
+        const records = data.records || [];
+        treatmentsOffset = data.offset || null;
+
+        if(reset){
+          listTrt.innerHTML = "";
+          treatmentsCount = 0;
+        }
+
+        if(!records.length && reset){
+          listTrt.innerHTML = `<div class="note">Nessun trattamento trovato per questo paziente.</div>`;
+        } else {
+          records.forEach(r => listTrt.appendChild(renderTreatmentItem(r.id, r.fields)));
+          treatmentsCount += records.length;
+        }
+
+        countMeta.textContent = treatmentsCount ? `${treatmentsCount} record caricati` : "0";
+        btnLoadMore.style.display = treatmentsOffset ? "" : "none";
+      }catch(err){
+        listTrt.innerHTML = `<div class="note">Errore: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    btnLoadMore.onclick = () => loadMoreTreatments(false);
+    btnClear.onclick = () => {
+      selectedPatient = null;
+      treatmentsOffset = null;
+      treatmentsCount = 0;
+
+      patientSearch.value = "";
+      clearSuggestions();
+
+      patientTitle.textContent = "FISIOPRO";
+      patientSubtitle.textContent = "Seleziona un paziente per vedere i trattamenti";
+      patientInfo.innerHTML = `
+        <div class="case-card">
+          <div class="case-title">Nessun paziente selezionato</div>
+          <p class="case-sub">Cerca e clicca un nome</p>
+        </div>
+      `;
+      listTrt.innerHTML = `<div class="note">Seleziona un paziente per caricare i trattamenti.</div>`;
+      countMeta.textContent = "—";
+      btnLoadMore.style.display = "none";
+    };
+
+    let searchTimer = null;
+    patientSearch.addEventListener("input", () => {
+      const q = patientSearch.value.trim();
+      clearTimeout(searchTimer);
+
+      if(!q){
+        clearSuggestions();
+        return;
+      }
+
+      searchTimer = setTimeout(async ()=>{
+        try{
+          const items = await apiSearchPatients(q);
+          renderSuggestions(items);
+        }catch(err){
+          suggest.innerHTML = `<div class="note">Errore ricerca: ${escapeHtml(err.message)}</div>`;
+        }
+      }, 220);
     });
-    tabTrt.addEventListener("click", () => {
-      tabTrt.classList.add("active"); tabVal.classList.remove("active");
-      listTrt.style.display = ""; listVal.style.display = "none";
-    });
 
-    // Mock top buttons
-    document.getElementById("btnAgenda").onclick = () => alert("Agenda (mock) — la faremo dopo.");
-    document.getElementById("btnSmart").onclick = () => alert("Acquisizione intelligente (mock).");
-    document.getElementById("btnAttachments").onclick = () => alert("Allegati (mock).");
-    document.getElementById("btnNewCase").onclick = () => alert("Nuovo caso clinico (mock).");
-    document.getElementById("btnNewVal").onclick = () => alert("Crea nuova valutazione (mock).");
-    document.getElementById("btnNewTrt").onclick = () => alert("Crea nuovo trattamento (mock).");
+    // -----------------------------
+    // Treatments list rendering
+    // -----------------------------
+    function pickDate(fields){
+      return fields["DATA TRATTAMENTO"] || fields["Data seduta"] || fields["DATA"] || "";
+    }
+    function pickTitle(fields){
+      return fields["Nome trattamento"] || fields["TIPO PRESTAZIONE"] || fields["Tipo seduta"] || "Trattamento";
+    }
+    function short(text, n=140){
+      const s = (text || "").toString().replace(/\s+/g, " ").trim();
+      if(!s) return "";
+      return s.length > n ? s.slice(0, n-1) + "…" : s;
+    }
 
-    // Treatment editor open/close
+    function renderTreatmentItem(recordId, fields){
+      const wrap = document.createElement("details");
+      wrap.className = "item";
+
+      const date = pickDate(fields);
+      const title = pickTitle(fields);
+
+      const lat = fields["Lateralità"] ? String(fields["Lateralità"]) : "";
+      const area = fields["Struttura Anatomica"] ? String(fields["Struttura Anatomica"]) : "";
+      const pat = fields["Patologia"] ? String(fields["Patologia"]) : "";
+
+      const note = fields["Note Fisioterapista"] || "";
+      const eseguito = fields["Trattamento eseguito"] || "";
+      const indic = fields["Indicazioni prossima seduta"] || "";
+
+      wrap.innerHTML = `
+        <summary>
+          <div class="sum-left">
+            <div><strong>${escapeHtml(title)}</strong>${date ? " · " + escapeHtml(date) : ""}</div>
+            <div class="case-sub">${escapeHtml([area, lat, pat].filter(Boolean).join(" · "))}</div>
+          </div>
+          <div class="sum-right">
+            ${area ? `<span class="pill2">${escapeHtml(area)}</span>` : ""}
+            ${lat ? `<span class="pill2">${escapeHtml(lat)}</span>` : ""}
+          </div>
+        </summary>
+        <div class="content">
+          <div class="note"><strong>Note fisioterapista</strong>\n${escapeHtml(short(note) || "—")}\n\n<strong>Trattamento eseguito</strong>\n${escapeHtml(short(eseguito) || "—")}\n\n<strong>Indicazioni prossima seduta</strong>\n${escapeHtml(short(indic) || "—")}</div>
+          <div class="row2">
+            <span class="hint">Record: ${escapeHtml(recordId)}</span>
+            <button class="btn primary js-edit" type="button">Modifica</button>
+          </div>
+        </div>
+      `;
+
+      wrap.querySelector(".js-edit").onclick = () => openTreatmentEditor(recordId);
+      return wrap;
+    }
+
+    // -----------------------------
+    // Modal editor
+    // -----------------------------
     const overlay = document.getElementById("overlay");
     const btnClose = document.getElementById("btnClose");
     const btnCancel = document.getElementById("btnCancel");
     const btnSave = document.getElementById("btnSave");
     const btnSmart2 = document.getElementById("btnSmart2");
     const btnAttach2 = document.getElementById("btnAttach2");
-
-    // Mock records
-    const treatmentDB = {
-      "trt-1": {
-        val: "Dolore al ginocchio destro… (mock)\nEco: tendine rotuleo +2mm, liquido intra-articolare.",
-        trt: "Laser antinfiammatorio antiedemigeno e antalgico\nUltrasuoni tendine rotuleo 75%\nFREMS",
-        next: "Continuare"
-      },
-      "trt-2": {
-        val: "Follow-up (mock)…",
-        trt: "Esercizi isometrici + educazione carico",
-        next: "Progressione carichi"
-      }
-    };
-
-    window.openTreatmentEditor = (id) => {
-      overlay.classList.add("open");
-      overlay.dataset.current = id;
-
-      document.getElementById("edVal").value = treatmentDB[id]?.val || "";
-      document.getElementById("edTrt").value = treatmentDB[id]?.trt || "";
-      document.getElementById("edNext").value = treatmentDB[id]?.next || "";
-    };
+    const metaRec = document.getElementById("metaRec");
 
     function closeEditor(){
       overlay.classList.remove("open");
       overlay.dataset.current = "";
+      metaRec.textContent = "Record: —";
     }
-
     btnClose.onclick = closeEditor;
     btnCancel.onclick = closeEditor;
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeEditor(); });
+    btnSmart2.onclick = () => toast("Acquisizione intelligente (step dopo)");
+    btnAttach2.onclick = () => toast("Allegati (step dopo)");
 
-    btnSmart2.onclick = () => alert("Acquisizione intelligente (mock) — qui poi useremo AI.");
-    btnAttach2.onclick = () => alert("Allegati (mock) — qui poi caricheremo file.");
+    // bodymap state
+    const cls = ["s0","s1","s2","s3"];
+    const mapStates = {};
+    function applyMapStates(obj){
+      document.querySelectorAll(".pt").forEach(el=>{
+        const pid = el.dataset.id;
+        const v = Number(obj?.[pid] ?? 0);
+        mapStates[pid] = v;
+        el.classList.remove(...cls);
+        el.classList.add("s"+v);
+      });
+    }
+    function exportMapStates(){
+      const out = {};
+      document.querySelectorAll(".pt").forEach(el=>{
+        out[el.dataset.id] = mapStates[el.dataset.id] ?? 0;
+      });
+      return out;
+    }
+    document.querySelectorAll(".pt").forEach(el=>{
+      const pid = el.dataset.id;
+      mapStates[pid] = 0;
+      el.addEventListener("click", ()=>{
+        mapStates[pid] = ((mapStates[pid] ?? 0) + 1) % 4;
+        el.classList.remove(...cls);
+        el.classList.add("s"+mapStates[pid]);
+      });
+    });
 
-    btnSave.onclick = () => {
-      const id = overlay.dataset.current;
-      if (!id) return;
+    async function openTreatmentEditor(recordId){
+      overlay.classList.add("open");
+      overlay.dataset.current = recordId;
+      metaRec.textContent = "Record: " + recordId;
 
-      treatmentDB[id] = {
-        val: document.getElementById("edVal").value,
-        trt: document.getElementById("edTrt").value,
-        next: document.getElementById("edNext").value
+      document.getElementById("edVal").value = "Caricamento...";
+      document.getElementById("edTrt").value = "";
+      document.getElementById("edNext").value = "";
+      applyMapStates({});
+
+      try{
+        const f = await apiLoadTreatment(recordId);
+
+        document.getElementById("edVal").value  = f["Note Fisioterapista"] || "";
+        document.getElementById("edTrt").value  = f["Trattamento eseguito"] || "";
+        document.getElementById("edNext").value = f["Indicazioni prossima seduta"] || "";
+
+        let bm = {};
+        if (f["BODY T"]) {
+          try { bm = JSON.parse(f["BODY T"]); } catch(e){ bm = {}; }
+        }
+        applyMapStates(bm);
+
+        toast("Caricato");
+      }catch(err){
+        toast("Errore caricamento:\n" + err.message);
+      }
+    }
+
+    btnSave.onclick = async () => {
+      const recordId = overlay.dataset.current;
+      if (!recordId) return;
+
+      const fields = {
+        "Note Fisioterapista": document.getElementById("edVal").value,
+        "Trattamento eseguito": document.getElementById("edTrt").value,
+        "Indicazioni prossima seduta": document.getElementById("edNext").value,
+        "BODY T": JSON.stringify(exportMapStates())
       };
 
-      console.log("MOCK SAVE:", id, treatmentDB[id]);
-      alert("Salvato (mock). (Vedi console per JSON)");
-      closeEditor();
+      try{
+        await apiSaveTreatment(recordId, fields);
+        toast("Salvato");
+        closeEditor();
+        // ricarico lista da zero per vedere subito gli aggiornamenti
+        await loadMoreTreatments(true);
+      }catch(err){
+        toast("Errore salvataggio:\n" + err.message);
+      }
     };
 
-    // Cmd/Ctrl+S save
     document.addEventListener("keydown", (e) => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const mod = isMac ? e.metaKey : e.ctrlKey;
+
       if (overlay.classList.contains("open") && mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
         btnSave.click();
@@ -523,18 +640,17 @@ Continuare</div>
       if (overlay.classList.contains("open") && e.key === "Escape") closeEditor();
     });
 
-    // Body map cycle states
-    const mapStates = {};
-    const cls = ["s0","s1","s2","s3"];
-    document.querySelectorAll(".pt").forEach(el=>{
-      const id = el.dataset.id;
-      mapStates[id]=0;
-      el.addEventListener("click", ()=>{
-        mapStates[id]=(mapStates[id]+1)%4;
-        el.classList.remove(...cls);
-        el.classList.add("s"+mapStates[id]);
-      });
-    });
+    // -----------------------------
+    // Utils
+    // -----------------------------
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
   </script>
 </body>
 </html>
