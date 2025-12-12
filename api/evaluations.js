@@ -51,4 +51,53 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
 
-    //
+    // CREATE
+    if (!body.id && body.patientId) {
+      const patientId = body.patientId;
+      const nowISO = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+      const fields = {
+        "PAZIENTE": [patientId],
+        "DATA VISITA": body.dataVisita || nowISO,
+        "PRIMA VALUTAZIONE": "",
+        "ANAMNESI RECENTE": "",
+        "ANAMNESI REMOTA": "",
+        "DOLORE SEDE": "",
+        "SCALA DOLORE NRS": "",
+        "NOTE": "",
+        "QUICK TEST": "",
+        "SPECIAL TEST": "",
+        "TEST NEUROLOGICO": ""
+      };
+
+      const r = await fetch(baseUrl, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ records: [{ fields }] })
+      });
+
+      const data = await r.json();
+      if (!r.ok) return res.status(r.status).json(data);
+
+      const rec = data.records?.[0];
+      return res.status(200).json({ ok: true, id: rec.id, fields: rec.fields || {} });
+    }
+
+    // PATCH
+    const { id, fields } = body;
+    if (!id || !fields) return res.status(400).json({ error: "id and fields are required" });
+
+    const r = await fetch(`${baseUrl}/${id}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields })
+    });
+
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json(data);
+
+    return res.status(200).json({ ok: true, id: data.id, fields: data.fields || {} });
+  }
+
+  return res.status(405).json({ error: "Method not allowed" });
+}
