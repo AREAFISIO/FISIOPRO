@@ -3,77 +3,41 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FISIOPRO – TEST</title>
+  <title>FISIOPRO – OK</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;padding:24px;background:#0b1220;color:#e9eefc}
-    .card{max-width:980px;margin:0 auto;background:rgba(16,31,58,.65);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:16px}
-    h1{margin:0 0 8px 0;font-size:20px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-    input{flex:1;min-width:260px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.2);color:#fff}
-    button{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(113,196,217,.18);color:#fff;cursor:pointer}
-    button:hover{background:rgba(113,196,217,.26)}
-    pre{white-space:pre-wrap;background:rgba(0,0,0,.25);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.10)}
-    .ok{color:#71C4D9}
-    .ko{color:#ff5c7a}
-    .small{opacity:.8;font-size:12px}
+    body{margin:0;font-family:system-ui;background:#ffffff;color:#111}
+    .wrap{padding:28px}
+    .box{max-width:900px;border:2px solid #111;border-radius:14px;padding:18px}
+    h1{margin:0 0 10px 0;font-size:26px}
+    p{margin:8px 0;font-size:16px}
+    a{color:#111}
+    button{padding:10px 12px;border-radius:10px;border:2px solid #111;background:#f2f2f2;cursor:pointer}
+    pre{background:#f7f7f7;border-radius:10px;padding:12px;overflow:auto}
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>FISIOPRO – Pagina di test (anti “pagina bianca”)</h1>
-    <div class="small">Questa pagina serve solo a verificare che l’API Airtable risponda correttamente.</div>
+  <div class="wrap">
+    <div class="box">
+      <h1>✅ FISIOPRO – Pagina caricata correttamente</h1>
+      <p>Se vedi questa scritta, Vercel sta servendo <b>index.html</b>.</p>
+      <p>Test API: <a href="/api/airtable?op=health">/api/airtable?op=health</a></p>
 
-    <div class="row">
-      <button id="btnHealth">Test API health</button>
-      <button id="btnSearch">Test ricerca “rossi”</button>
-      <button id="btnSearchPhone">Test ricerca “333”</button>
+      <button id="btn">Test API (fetch)</button>
+      <pre id="out">Output: —</pre>
     </div>
-
-    <div class="row">
-      <input id="q" placeholder="Scrivi una ricerca (es. rossi o 333) e premi Enter" />
-      <button id="btnSearchCustom">Cerca</button>
-    </div>
-
-    <div id="status" class="small">Stato: —</div>
-    <pre id="out">Output: —</pre>
   </div>
 
   <script>
     const out = document.getElementById('out');
-    const statusEl = document.getElementById('status');
-    const qEl = document.getElementById('q');
-
-    function setStatus(ok, msg){
-      statusEl.innerHTML = 'Stato: ' + (ok ? '<span class="ok">OK</span>' : '<span class="ko">KO</span>') + ' — ' + msg;
-    }
-
-    async function call(url){
-      try{
-        setStatus(true, 'chiamata in corso…');
-        const r = await fetch(url);
-        const text = await r.text();
-        let json;
-        try{ json = JSON.parse(text); } catch { json = { raw: text }; }
-        out.textContent = JSON.stringify({ httpStatus: r.status, body: json }, null, 2);
-        if(!r.ok) setStatus(false, 'HTTP ' + r.status);
-        else setStatus(true, 'HTTP ' + r.status);
-      } catch(e){
+    document.getElementById('btn').onclick = async () => {
+      try {
+        const r = await fetch('/api/airtable?op=health');
+        const t = await r.text();
+        out.textContent = 'HTTP ' + r.status + '\\n' + t;
+      } catch (e) {
         out.textContent = String(e);
-        setStatus(false, 'Errore fetch');
       }
-    }
-
-    document.getElementById('btnHealth').onclick = () => call('/api/airtable?op=health');
-    document.getElementById('btnSearch').onclick = () => call('/api/airtable?op=searchPatients&q=rossi');
-    document.getElementById('btnSearchPhone').onclick = () => call('/api/airtable?op=searchPatients&q=333');
-    document.getElementById('btnSearchCustom').onclick = () => {
-      const q = (qEl.value || '').trim();
-      if(!q) return;
-      call('/api/airtable?op=searchPatients&q=' + encodeURIComponent(q));
     };
-    qEl.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') document.getElementById('btnSearchCustom').click();
-    });
   </script>
 </body>
 </html>
