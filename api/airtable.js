@@ -1,17 +1,12 @@
 module.exports = async (req, res) => {
+  // Risposte sempre JSON
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+
   try {
     const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
     const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 
-    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
-      res.status(500).json({
-        ok: false,
-        error: "Missing AIRTABLE_TOKEN or AIRTABLE_BASE_ID in Vercel Environment Variables"
-      });
-      return;
-    }
-
-    // ====== CONFIG (TUO AIRTABLE) ======
+    // Config Airtable (dal tuo CSV)
     const TABLE_PATIENTS = "ANAGRAFICA";
     const FIELD_NAME = "Cognome e Nome";
     const FIELD_PHONE = "Numero di telefono";
@@ -19,7 +14,27 @@ module.exports = async (req, res) => {
 
     const op = String(req.query.op || "");
 
-    // Escape robusto per formule Airtable
+    // Se mancano env, NON crashare: rispondi bene
+    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
+      res.status(200).json({
+        ok: false,
+        step: "env",
+        error: "Missing AIRTABLE_TOKEN or AIRTABLE_BASE_ID in Vercel Environment Variables",
+      });
+      return;
+    }
+
+    // Fetch (Node 18 lo ha nativo su Vercel; se non c’è, errore chiaro)
+    const _fetch = global.fetch;
+    if (!_fetch) {
+      res.status(200).json({
+        ok: false,
+        step: "runtime",
+        error: "fetch() not available in this runtime. (Vercel should run Node 18+).",
+      });
+      return;
+    }
+
     const escapeAirtableString = (s) =>
       String(s ?? "")
         .replace(/\\/g, "\\\\")
@@ -27,9 +42,6 @@ module.exports = async (req, res) => {
         .replace(/\r/g, " ")
         .replace(/\n/g, " ")
         .trim();
-
-    // Fetch compatibile anche se Node runtime non supporta fetch nativo
-    const _fetch = global.fetch || (await import("node-fetch")).default;
 
     const callAirtable = async (path) => {
       const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${path}`;
@@ -42,23 +54,35 @@ module.exports = async (req, res) => {
       try { json = JSON.parse(text); } catch { json = { raw: text }; }
 
       if (!r.ok) {
-        throw new Error(json?.error?.message || `Airtable error HTTP ${r.status}`);
+        return { ok: false, httpStatus: r.status, airtable: json };
       }
-      return json;
+      return { ok: true, httpStatus: r.status, airtable: json };
     };
 
-    // ====== HEALTH ======
+    // ===== HEALTH: verifica token/base/tabella =====
     if (op === "health") {
-      const data = await callAirtable(`${encodeURIComponent(TABLE_PATIENTS)}?pageSize=1`);
+      const result = await callAirtable(`${encodeURIComponent(TABLE_PATIENTS)}?pageSize=1`);
+      if (!result.ok) {
+        res.status(200).json({
+          ok: false,
+          step: "airtable-health",
+          table: TABLE_PATIENTS,
+          httpStatus: result.httpStatus,
+          airtable: result.airtable,
+        });
+        return;
+      }
+
       res.status(200).json({
         ok: true,
+        step: "airtable-health",
         table: TABLE_PATIENTS,
-        recordsFound: (data.records || []).length
+        recordsFound: result.airtable?.records?.length || 0,
       });
       return;
     }
 
-    // ====== SEARCH PATIENTS ======
+    // ===== SEARCH PATIENTS =====
     if (op === "searchPatients") {
       const qRaw = String(req.query.q || "").trim();
       if (!qRaw) {
@@ -69,7 +93,7 @@ module.exports = async (req, res) => {
       const q = escapeAirtableString(qRaw);
       const qLower = escapeAirtableString(qRaw.toLowerCase());
 
-      // Formula su UNA riga + campi forzati testo con &""
+      // formula su UNA riga + campi convertiti a testo con &""
       const formula =
         `OR(` +
         `SEARCH("${qLower}", LOWER({${FIELD_NAME}}&""))>0,` +
@@ -77,9 +101,14 @@ module.exports = async (req, res) => {
         `SEARCH("${qLower}", LOWER({${FIELD_EMAIL}}&""))>0` +
         `)`;
 
-      // Se chiami debug=1 ti mostro la formula (utile se Airtable si lamenta)
+      // debug=1 per vedere la formula senza chiamare Airtable
       if (String(req.query.debug || "") === "1") {
-        res.status(200).json({ ok: true, debug: true, table: TABLE_PATIENTS, formula });
+        res.status(200).json({
+          ok: true,
+          debug: true,
+          table: TABLE_PATIENTS,
+          formula,
+        });
         return;
       }
 
@@ -88,9 +117,20 @@ module.exports = async (req, res) => {
         `?filterByFormula=${encodeURIComponent(formula)}` +
         `&pageSize=10`;
 
-      const data = await callAirtable(path);
+      const result = await callAirtable(path);
 
-      const items = (data.records || []).map((r) => ({
+      if (!result.ok) {
+        res.status(200).json({
+          ok: false,
+          step: "airtable-search",
+          httpStatus: result.httpStatus,
+          table: TABLE_PATIENTS,
+          airtable: result.airtable,
+        });
+        return;
+      }
+
+      const items = (result.airtable.records || []).map((r) => ({
         id: r.id,
         name: r.fields?.[FIELD_NAME] || "",
         phone: r.fields?.[FIELD_PHONE] || "",
@@ -101,10 +141,12 @@ module.exports = async (req, res) => {
       return;
     }
 
-    res.status(400).json({ ok: false, error: "Unknown op" });
+    res.status(200).json({ ok: false, error: "Unknown op" });
   } catch (e) {
-    res.status(500).json({
+    // Anche qui: MAI crash, sempre JSON
+    res.status(200).json({
       ok: false,
+      step: "catch",
       error: e?.message || String(e),
     });
   }
