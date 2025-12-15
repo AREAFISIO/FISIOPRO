@@ -3,78 +3,121 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FisioClinik • Configurazione</title>
-  <link rel="stylesheet" href="assets/app.css" />
+  <title>FisioClinik • Caso clinico</title>
+  <link rel="stylesheet" href="../assets/app.css" />
 </head>
 <body>
-  <div class="app">
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html">👥 Pazienti</a>
+      <a data-nav href="agenda.html">🗓️ Agenda</a>
+      <a data-nav href="casi-clinici.html" class="active">🧠 Casi clinici</a>
 
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="dot"></div>
-        <div>
-          <div class="title">FISIOCLINIK</div>
-          <div class="sub">SRL STP • Admin</div>
+      <div class="section">Operativo</div>
+      <a data-nav href="lista-attesa.html">⏳ Lista d’attesa</a>
+      <a data-nav href="file-caricati.html">📎 File caricati</a>
+      <a data-nav href="notifiche.html">🔔 Notifiche</a>
+
+      <div class="section">Setup</div>
+      <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Caso clinico <span class="pill">Editor • Body • Salvataggi</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='casi-clinici.html'">← Lista casi</button>
+          <button class="btn" data-save="draft">💾 Salva bozza</button>
+          <button class="btn primary" data-save="final">✅ Salva definitivo</button>
         </div>
       </div>
+    </div>
 
-      <nav class="nav">
-        <div class="section">Generale</div>
-        <a data-nav href="index.html">👥 Pazienti</a>
-        <a data-nav href="agenda.html">🗓️ Agenda</a>
-        <a data-nav href="impostazioni.html" class="active">⚙️ Configurazione</a>
-      </nav>
-    </aside>
+    <section class="card">
+      <div class="head"><h2>Dati caso</h2><span class="chip">Auto</span></div>
+      <div class="body" style="padding-top:10px;">
+        <form data-case-form>
+          <div class="formgrid">
+            <div class="field">
+              <label>ID Caso</label>
+              <input class="input" name="caseId" readonly />
+            </div>
 
-    <main class="main">
-      <div class="topbar">
-        <div class="toprow">
-          <div class="h1">Configurazione <span class="pill">Moduli • Utenti • Template</span></div>
-          <div class="actions">
-            <button class="btn primary">Salva</button>
-          </div>
-        </div>
-      </div>
+            <div class="field">
+              <label>Paziente</label>
+              <select class="select" name="patientId" data-patient-select></select>
+            </div>
 
-      <div class="grid">
-        <section class="card">
-          <div class="head"><h2>Impostazioni azienda</h2><span class="chip">Mock</span></div>
-          <div class="body" style="color:var(--muted); line-height:1.7;">
-            Qui inseriamo: dati società, sedi, loghi, fatturazione, ecc.
-          </div>
-        </section>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Titolo</label>
+              <input class="input" name="titolo" placeholder="Es. Lombalgia post-gravidanza / Distorsione caviglia..." />
+            </div>
 
-        <section class="card">
-          <div class="head"><h2>Abilitazione moduli</h2><span class="chip">Mock</span></div>
-          <div class="body">
-            <div class="tablewrap">
-              <table>
-                <thead><tr><th>Modulo</th><th>Stato</th><th>Note</th></tr></thead>
-                <tbody>
-                  <tr><td>Notifiche</td><td>🟢 Attivo</td><td>SMS / Email / WhatsApp</td></tr>
-                  <tr><td>Documenti</td><td>🟢 Attivo</td><td>PDF + Upload</td></tr>
-                  <tr><td>InBuoneMani</td><td>🟣 Beta</td><td>Invito paziente</td></tr>
-                </tbody>
-              </table>
+            <div class="field">
+              <label>Stato</label>
+              <select class="select" name="stato">
+                <option>Bozza</option>
+                <option>Definitivo</option>
+              </select>
+            </div>
+
+            <div class="field" style="grid-column:1/-1;">
+              <label>Note (cliniche / operative)</label>
+              <textarea class="textarea" name="note" placeholder="Anamnesi, sintomi, obiettivi, plan..."></textarea>
             </div>
           </div>
-        </section>
+
+          <div class="hr"></div>
+
+          <div class="editorWrap">
+            <div class="editorTop">
+              <div style="font-weight:800;">Body (Originale → Editor)</div>
+              <div class="editorTools">
+                <label class="btn">
+                  📤 Carica Body
+                  <input type="file" accept="image/*" data-body-file style="display:none" />
+                </label>
+                <button type="button" class="btn" onclick="document.querySelector('[data-body-img]').src=''">🧼 Rimuovi</button>
+              </div>
+            </div>
+
+            <div class="canvasArea">
+              <div class="canvas">
+                <img data-body-img alt="Body" />
+              </div>
+              <div style="margin-top:10px; color:var(--muted); font-size:13px; line-height:1.5;">
+                Base pronta. Nel prossimo step reintegro editor avanzato (undo / reset / export PNG).
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
-    </main>
+    </section>
+  </main>
 
-    <aside class="rightbar">
-      <div class="righttitle">Sezioni</div>
-      <div class="rlist">
-        <a href="#">Impostazioni utente <span>›</span></a>
-        <a href="#">Utenti e dispositivi <span>›</span></a>
-        <a href="#">Template notifiche <span>›</span></a>
-        <a href="#">Relazioni paziente <span>›</span></a>
-        <a href="#">Configurazione test <span>›</span></a>
+  <aside class="rightbar">
+    <div class="righttitle">Checklist</div>
+    <div class="card" style="padding:14px;">
+      <div style="font-weight:800;">Standard caso</div>
+      <div style="color:var(--muted); font-size:13px; margin-top:6px; line-height:1.5;">
+        • paziente selezionato<br/>
+        • titolo chiaro<br/>
+        • note minime<br/>
+        • body originale caricato
       </div>
-    </aside>
+      <div style="margin-top:10px;">
+        <button class="btn primary" style="width:100%;" data-save="final">✅ Chiudi e salva</button>
+      </div>
+    </div>
+  </aside>
+</div>
 
-  </div>
-
-  <script src="assets/app.js"></script>
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
 </body>
 </html>
