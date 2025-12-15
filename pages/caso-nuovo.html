@@ -15,6 +15,12 @@
       <a data-nav href="index.html">👥 Pazienti</a>
       <a data-nav href="agenda.html">🗓️ Agenda</a>
       <a data-nav href="casi-clinici.html" class="active">🧠 Casi clinici</a>
+
+      <div class="section">Operativo</div>
+      <a data-nav href="lista-attesa.html">⏳ Lista d’attesa</a>
+      <a data-nav href="file-caricati.html">📎 File caricati</a>
+      <a data-nav href="notifiche.html">🔔 Notifiche</a>
+
       <div class="section">Setup</div>
       <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
     </nav>
@@ -41,14 +47,17 @@
               <label>ID Caso</label>
               <input class="input" name="caseId" readonly />
             </div>
+
             <div class="field">
               <label>Paziente</label>
               <select class="select" name="patientId" data-patient-select></select>
             </div>
+
             <div class="field" style="grid-column:1/-1;">
               <label>Titolo</label>
               <input class="input" name="titolo" placeholder="Es. Lombalgia post-gravidanza / Distorsione caviglia..." />
             </div>
+
             <div class="field">
               <label>Stato</label>
               <select class="select" name="stato">
@@ -56,6 +65,7 @@
                 <option>Definitivo</option>
               </select>
             </div>
+
             <div class="field" style="grid-column:1/-1;">
               <label>Note (cliniche / operative)</label>
               <textarea class="textarea" name="note" placeholder="Anamnesi, sintomi, obiettivi, plan..."></textarea>
@@ -78,16 +88,13 @@
 
             <div class="canvasArea">
               <div class="canvas">
-                <!-- placeholder: nella prossima iterazione ci rimettiamo l’editor avanzato (Konva) -->
                 <img data-body-img alt="Body" />
               </div>
               <div style="margin-top:10px; color:var(--muted); font-size:13px; line-height:1.5;">
-                Questa è la base: carichi il Body originale e lo salvi nel caso (localStorage).  
-                Nel prossimo step ti reintegro **editor avanzato tipo quello che avevamo (Konva)**: punti, linee, testi, undo, reset originale, export PNG.
+                Base pronta. Nel prossimo step reintegro editor avanzato (undo / reset / export PNG).
               </div>
             </div>
           </div>
-
         </form>
       </div>
     </section>
@@ -100,19 +107,12 @@
       <div style="color:var(--muted); font-size:13px; margin-top:6px; line-height:1.5;">
         • paziente selezionato<br/>
         • titolo chiaro<br/>
-        • note minime (anamnesi + obiettivo)<br/>
+        • note minime<br/>
         • body originale caricato
       </div>
       <div style="margin-top:10px;">
         <button class="btn primary" style="width:100%;" data-save="final">✅ Chiudi e salva</button>
       </div>
-    </div>
-
-    <div class="righttitle" style="margin-top:16px;">Prossimi moduli</div>
-    <div class="rlist">
-      <a href="#">🎙️ Audio visita → AI note <span>›</span></a>
-      <a href="#">📄 Relazione PDF <span>›</span></a>
-      <a href="#">✅ Consenso digitale <span>›</span></a>
     </div>
   </aside>
 </div>
