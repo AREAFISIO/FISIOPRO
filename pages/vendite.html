@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Vendite</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Vendite</div></div></div>
+    <nav class="nav">
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard</a>
+      <a data-nav href="vendite.html" class="active" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <div class="section">Sistema</div>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Vendite <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn">Export</button>
+          <button class="btn primary">Nuova vendita</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Elenco vendite</h2><span class="chip">Front Office</span></div>
+      <div class="body">
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Data</th><th>Paziente</th><th>Voce</th><th>Importo</th><th>Note</th></tr></thead>
+            <tbody>
+              <tr><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mini" style="margin-top:10px;color:var(--muted);">Dati reali: /api/sales (già protetto per ruolo).</div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn primary" style="width:100%;" onclick="location.href='front-office.html'">Torna Dashboard</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
