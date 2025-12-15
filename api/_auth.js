@@ -11,9 +11,9 @@ const {
 const FIELDS = {
   email: "Email",
   role: "Ruolo",
-  code: "Codice",
+  code: "Codice accesso",
   active: "Attivo",
-  name: "Nome",
+  name: "Collaboratore",
 };
 
 function b64url(input) {
