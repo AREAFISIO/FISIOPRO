@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Front Office</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+  <style>
+    body{ overflow:auto; background:#f4fbff; }
+    .app{ grid-template-columns: 300px 1fr; }
+    .sidebar.light{
+      background: linear-gradient(180deg, #bfeaff 0%, #cfefff 55%, #bde9ff 100%);
+      border-right: 1px solid rgba(0,0,0,.06);
+    }
+    .sidebar.light .brand{
+      background: rgba(255,255,255,.60);
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 10px 26px rgba(0,0,0,.08);
+    }
+    .sidebar.light .brand .title{ color:#0b2c3d; }
+    .sidebar.light .brand .sub{ color: rgba(11,44,61,.65); }
+    .sidebar.light .nav .section{ color: rgba(11,44,61,.55); }
+    .sidebar.light .nav a{ color: rgba(11,44,61,.80); border-color: transparent; }
+    .sidebar.light .nav a:hover{ background: rgba(255,255,255,.45); border-color: rgba(0,0,0,.06); }
+    .sidebar.light .nav a.active{ background: rgba(255,255,255,.68); border-color: rgba(0,0,0,.08); color:#0b2c3d; }
+    .sidebar.light .badge{ background: rgba(255,255,255,.70); border-color: rgba(0,0,0,.08); color:#0b2c3d; }
+
+    .topbar.light{
+      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70), transparent);
+      color:#0b2c3d;
+    }
+    .topbar.light .pill{
+      background: rgba(0,0,0,.04);
+      border-color: rgba(0,0,0,.06);
+      color: rgba(11,44,61,.65);
+    }
+    .card.soft{
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(0,0,0,.06);
+      box-shadow: 0 12px 30px rgba(0,0,0,.08);
+      color:#0b2c3d;
+    }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid rgba(0,0,0,.06);
+      background: rgba(191,234,255,.55);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: rgba(11,44,61,.68); }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background:#0b6ea1; color:white;
+      border:1px solid rgba(0,0,0,.10);
+    }
+    .two-col{ display:grid; grid-template-columns: 1.6fr 1fr; gap:14px; }
+    @media (max-width: 1100px){ .two-col{ grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar light">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOPRO</div>
+        <div class="sub">Front Office</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" class="active" data-role="front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
+      <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <a data-nav href="archivio-documenti.html" data-role="front,manager">Archivio documenti</a>
+
+      <div class="section">Generale</div>
+      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar light" style="position:sticky; top:0; z-index:10; padding:10px 10px 14px;">
+      <div class="toprow">
+        <div class="h1" style="color:#0b2c3d;">Gestione Pazienti <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" style="background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.08);color:#0b2c3d;" onclick="location.href='anagrafica.html'">Cerca</button>
+          <button class="btn primary" onclick="location.href='anagrafica.html'">Nuovo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <section class="card soft">
+        <div class="head"><h2>ANAGRAFICA E MODULISTICA</h2><span class="chip" style="border-color:rgba(0,0,0,.08);background:rgba(0,0,0,.03);color:#0b2c3d;">Front Office</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='anagrafica.html'">
+            <div><h3>Anagrafica</h3><p>Crea e gestisci dati paziente</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='anamnesi.html'">
+            <div><h3>Anamnesi</h3><p>Stato anamnesi e consensi</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='archivio-documenti.html'">
+            <div><h3>Archivio documenti</h3><p>PDF, allegati, consensi</p></div><div class="go">→</div>
+          </div>
+
+          <div style="height:8px;"></div>
+          <h2 style="margin:0; font-size:16px; letter-spacing:.06em;">VENDITE ED EROGATI</h2>
+
+          <div class="tile" onclick="location.href='vendite.html'">
+            <div><h3>Vendite</h3><p>Creazione e controllo vendite</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='erogato.html'">
+            <div><h3>Erogato</h3><p>Prestazioni erogate e pagamenti</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pratiche-assicurative.html'">
+            <div><h3>Assicurazioni</h3><p>Pratiche e stati</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card soft" style="align-self:start;">
+        <div class="head"><h2>Dashboard operativa</h2></div>
+        <div class="body" style="padding-top:6px;">
+          <div style="color: rgba(11,44,61,.70); line-height:1.7;">
+            <div><b>Link rapidi</b></div>
+            <div style="margin-top:10px;">OsteoEasy</div>
+            <div>FattureInCloud</div>
+            <div style="height:1px; background:rgba(0,0,0,.10); margin:14px 0;"></div>
+            <div><b>Note</b></div>
+            <div style="margin-top:8px;">Qui metteremo alert: consensi mancanti, pratiche in scadenza, pagamenti sospesi.</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+</div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
