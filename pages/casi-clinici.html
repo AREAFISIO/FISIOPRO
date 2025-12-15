@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioClinik • Casi clinici</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html">👥 Pazienti</a>
+      <a data-nav href="agenda.html">🗓️ Agenda</a>
+      <a data-nav href="casi-clinici.html" class="active">🧠 Casi clinici</a>
+      <div class="section">Setup</div>
+      <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Casi clinici <span class="pill">Lista • Bozze • Definitivi</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='index.html'">← Pazienti</button>
+          <button class="btn primary" onclick="location.href='caso-nuovo.html'">＋ Crea caso clinico</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Elenco casi</h2><span class="chip">Auto-save</span></div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="search">🔎 <input data-search placeholder="Cerca per paziente, titolo, note..." /></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <span class="chip">Stato: Tutti</span>
+            <span class="chip">Ordinamento: Ultimi modificati</span>
+          </div>
+        </div>
+
+        <div class="tablewrap" data-table>
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Paziente</th><th>Titolo</th><th>Stato</th><th>Note</th></tr>
+            </thead>
+            <tbody data-cases-tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Flow</div>
+    <div class="card" style="padding:14px;">
+      <div style="font-weight:800;">Crea Caso Clinico</div>
+      <div style="color:var(--muted); font-size:13px; margin-top:6px; line-height:1.5;">
+        1) seleziona paziente<br/>
+        2) titolo + note<br/>
+        3) carica Body originale<br/>
+        4) salva bozza / definitivo
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn primary" style="width:100%;" onclick="location.href='caso-nuovo.html'">＋ Nuovo caso</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
