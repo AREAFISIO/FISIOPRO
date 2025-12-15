@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Paziente</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+  <style>
+    .kv{display:grid;grid-template-columns:160px 1fr;gap:10px;margin-top:8px}
+    .kv div{padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.04)}
+    .kv b{color:rgba(255,255,255,.86)}
+    .panelTitle{font-weight:900;margin:0 0 8px}
+    .mini{color:var(--muted);font-size:13px;line-height:1.5}
+    .empty{padding:14px;border:1px dashed rgba(255,255,255,.14);border-radius:14px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOPRO</div>
+        <div class="sub">SRL STP • Admin</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html" data-role="physio,front,manager">👥 Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">🗓️ Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">🧠 Casi clinici</a>
+
+      <div class="section">Front-Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">🧾 Dashboard Front-Office</a>
+      <a data-nav href="vendite.html" data-role="front,manager">💶 Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">✅ Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">🛡️ Assicurazioni</a>
+
+      <div class="section">Setup</div>
+      <a data-nav href="impostazioni.html" data-role="manager">⚙️ Configurazione</a>
+      <a data-nav href="login.html">🚪 Logout</a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">
+          Paziente <span class="pill" data-user-badge>—</span>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='index.html'">← Indietro</button>
+          <button class="btn primary" data-role="physio,manager" onclick="location.href='caso-nuovo.html'">＋ Crea caso clinico</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD PROFILO -->
+    <section class="card">
+      <div class="profile">
+        <div class="avatar">👤</div>
+        <div style="width:100%;">
+          <h2 id="pName">—</h2>
+          <div class="meta" id="pMeta">Caricamento…</div>
+
+          <div class="kv" style="margin-top:12px;">
+            <div><b>Email</b><div id="pEmail" class="mini">—</div></div>
+            <div><b>Cellulare</b><div id="pPhone" class="mini">—</div></div>
+          </div>
+
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <button class="btn" data-role="front,manager" id="btnVendita">＋ Nuova vendita</button>
+            <button class="btn" data-role="front,manager" id="btnErogato">＋ Nuovo erogato</button>
+            <button class="btn" data-role="physio,manager" id="btnApp">＋ Nuovo appuntamento</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABS -->
+    <section class="card">
+      <div class="tabs">
+        <button class="tab" data-tabbtn="app" data-role="physio,front,manager">Appuntamenti</button>
+        <button class="tab" data-tabbtn="storia" data-role="physio,manager">Storia clinica</button>
+
+        <button class="tab" data-tabbtn="vendite" data-role="front,manager">Vendite</button>
+        <button class="tab" data-tabbtn="erogato" data-role="front,manager">Erogato</button>
+        <button class="tab" data-tabbtn="ass" data-role="front,manager">Assicurazioni</button>
+
+        <button class="tab" data-tabbtn="doc" data-role="manager">Documenti</button>
+        <button class="tab" data-tabbtn="admin" data-role="manager">Admin</button>
+      </div>
+
+      <div class="body" style="padding-top:10px;">
+
+        <!-- APPUNTAMENTI -->
+        <div data-tabpanel="app">
+          <p class="panelTitle">Elenco appuntamenti</p>
+          <div class="toolbar">
+            <div class="search">🔎 <input data-search placeholder="Cerca appuntamenti..." /></div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <span class="chip">Solo futuri</span>
+            </div>
+          </div>
+          <div class="tablewrap" data-table>
+            <table>
+              <thead><tr><th>Data</th><th>Durata</th><th>Prestazione</th><th>Note</th><th>Operatore</th></tr></thead>
+              <tbody id="tbAppointments"></tbody>
+            </table>
+          </div>
+          <div id="emptyAppointments" class="empty" style="display:none;">Nessun appuntamento.</div>
+        </div>
+
+        <!-- STORIA CLINICA -->
+        <div data-tabpanel="storia" style="display:none;">
+          <p class="panelTitle">Storia clinica (solo Fisio / Manager)</p>
+          <div class="mini">Qui carichiamo casi clinici, anamnesi, valutazioni, progressi e note.</div>
+          <div style="height:10px;"></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Data</th><th>Titolo</th><th>Stato</th><th>Note</th></tr></thead>
+              <tbody id="tbCases"></tbody>
+            </table>
+          </div>
+          <div id="emptyCases" class="empty" style="display:none;">Nessuna storia clinica disponibile.</div>
+        </div>
+
+        <!-- VENDITE -->
+        <div data-tabpanel="vendite" style="display:none;">
+          <p class="panelTitle">Vendite (solo Front-Office / Manager)</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Data</th><th>Voce</th><th>Importo</th><th>Note</th></tr></thead>
+              <tbody id="tbSales"></tbody>
+            </table>
+          </div>
+          <div id="emptySales" class="empty" style="display:none;">Nessuna vendita.</div>
+        </div>
+
+        <!-- EROGATO -->
+        <div data-tabpanel="erogato" style="display:none;">
+          <p class="panelTitle">Erogato (solo Front-Office / Manager)</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Data</th><th>Prestazione</th><th>Stato</th><th>Note</th></tr></thead>
+              <tbody id="tbTreatments"></tbody>
+            </table>
+          </div>
+          <div id="emptyTreatments" class="empty" style="display:none;">Nessun erogato.</div>
+        </div>
+
+        <!-- ASSICURAZIONI -->
+        <div data-tabpanel="ass" style="display:none;">
+          <p class="panelTitle">Assicurazioni (solo Front-Office / Manager)</p>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Data</th><th>Pratica</th><th>Stato</th><th>Note</th></tr></thead>
+              <tbody id="tbInsurance"></tbody>
+            </table>
+          </div>
+          <div id="emptyInsurance" class="empty" style="display:none;">Nessuna pratica assicurativa.</div>
+        </div>
+
+        <!-- DOC -->
+        <div data-tabpanel="doc" style="display:none;">
+          <p class="panelTitle">Documenti (solo Manager)</p>
+          <div class="empty">Placeholder documenti.</div>
+        </div>
+
+        <!-- ADMIN -->
+        <div data-tabpanel="admin" style="display:none;">
+          <p class="panelTitle">Admin (solo Manager)</p>
+          <div class="empty">Placeholder admin.</div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- RIGHTBAR -->
+  <aside class="rightbar">
+    <div class="righttitle">Info</div>
+    <div class="card" style="padding:14px;">
+      <div class="mini">ID paziente</div>
+      <div style="font-weight:900; margin-top:6px;" id="pId">—</div>
+      <div style="height:10px;"></div>
+      <button class="btn" style="width:100%;" onclick="location.href='front-office.html'" data-role="front,manager">Apri Front-Office</button>
+    </div>
+  </aside>
+
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+
+<script>
+  // ====== helper fetch con token (coerente col tuo auth) ======
+  function token(){ return localStorage.getItem("token") || ""; }
+  async function apiGet(url){
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + token() }});
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(data.error || ("HTTP "+r.status));
+    return data;
+  }
+
+  function qp(name){
+    const u = new URL(location.href);
+    return u.searchParams.get(name);
+  }
+
+  function row(texts){
+    return "<tr>"+texts.map(t=>`<td>${t ?? ""}</td>`).join("")+"</tr>";
+  }
+
+  async function loadPatient(patientId){
+    const { patient } = await apiGet("/api/patients?id=" + encodeURIComponent(patientId));
+    document.getElementById("pId").textContent = patient.id || patientId;
+
+    const fullName = [patient.nome, patient.cognome].filter(Boolean).join(" ") || patient.nome_completo || "Paziente";
+    document.getElementById("pName").textContent = fullName;
+
+    document.getElementById("pEmail").textContent = patient.email || "—";
+    document.getElementById("pPhone").textContent = patient.cellulare || patient.telefono || "—";
+    document.getElementById("pMeta").textContent = (patient.noteBrevi || patient.note || "").toString().slice(0,120);
+
+    return patient;
+  }
+
+  async function loadAppointments(patientId){
+    const tb = document.getElementById("tbAppointments");
+    const empty = document.getElementById("emptyAppointments");
+    tb.innerHTML = "";
+    const { items } = await apiGet("/api/appointments?patientId=" + encodeURIComponent(patientId));
+    if(!items.length){ empty.style.display=""; return; }
+    empty.style.display="none";
+    tb.innerHTML = items.map(x => row([
+      x.data || x.date || "",
+      x.durata || x.duration || "",
+      x.prestazione || x.service || "",
+      (x.note || "").toString().slice(0,60),
+      x.operatore || x.staff || ""
+    ])).join("");
+  }
+
+  async function loadCases(patientId){
+    const tb = document.getElementById("tbCases");
+    const empty = document.getElementById("emptyCases");
+    tb.innerHTML = "";
+    const { items } = await apiGet("/api/cases?patientId=" + encodeURIComponent(patientId));
+    if(!items.length){ empty.style.display=""; return; }
+    empty.style.display="none";
+    tb.innerHTML = items.map(x => row([
+      x.data || x.date || "",
+      x.titolo || x.title || "",
+      x.stato || x.status || "",
+      (x.note || "").toString().slice(0,80),
+    ])).join("");
+  }
+
+  async function loadSales(patientId){
+    const tb = document.getElementById("tbSales");
+    const empty = document.getElementById("emptySales");
+    tb.innerHTML = "";
+    const { items } = await apiGet("/api/sales?patientId=" + encodeURIComponent(patientId));
+    if(!items.length){ empty.style.display=""; return; }
+    empty.style.display="none";
+    tb.innerHTML = items.map(x => row([
+      x.data || x.date || "",
+      x.voce || x.item || "",
+      x.importo || x.amount || "",
+      (x.note || "").toString().slice(0,80),
+    ])).join("");
+  }
+
+  async function loadTreatments(patientId){
+    const tb = document.getElementById("tbTreatments");
+    const empty = document.getElementById("emptyTreatments");
+    tb.innerHTML = "";
+    const { items } = await apiGet("/api/treatments?patientId=" + encodeURIComponent(patientId));
+    if(!items.length){ empty.style.display=""; return; }
+    empty.style.display="none";
+    tb.innerHTML = items.map(x => row([
+      x.data || x.date || "",
+      x.prestazione || x.service || "",
+      x.stato || x.status || "",
+      (x.note || "").toString().slice(0,80),
+    ])).join("");
+  }
+
+  async function loadInsurance(patientId){
+    const tb = document.getElementById("tbInsurance");
+    const empty = document.getElementById("emptyInsurance");
+    tb.innerHTML = "";
+    const { items } = await apiGet("/api/insurance?patientId=" + encodeURIComponent(patientId));
+    if(!items.length){ empty.style.display=""; return; }
+    empty.style.display="none";
+    tb.innerHTML = items.map(x => row([
+      x.data || x.date || "",
+      x.pratica || x.case || "",
+      x.stato || x.status || "",
+      (x.note || "").toString().slice(0,80),
+    ])).join("");
+  }
+
+  (async function(){
+    const patientId = qp("id");
+    if(!patientId){
+      alert("Manca id paziente nell'URL. Esempio: paziente.html?id=123");
+      return;
+    }
+    try{
+      await loadPatient(patientId);
+
+      // Carico solo ciò che la UI mostra (le tab non autorizzate saranno hidden da data-role + app.js)
+      await loadAppointments(patientId);
+
+      // provo a caricare anche gli altri: se non hai permesso, le API rispondono 403 e io ignoro
+      try{ await loadCases(patientId); } catch(e){}
+      try{ await loadSales(patientId); } catch(e){}
+      try{ await loadTreatments(patientId); } catch(e){}
+      try{ await loadInsurance(patientId); } catch(e){}
+
+      // bottoni
+      document.getElementById("btnVendita").onclick = ()=> alert("TODO: form vendita");
+      document.getElementById("btnErogato").onclick = ()=> alert("TODO: form erogato");
+      document.getElementById("btnApp").onclick = ()=> alert("TODO: form appuntamento");
+    }catch(e){
+      alert("Errore: " + e.message);
+    }
+  })();
+</script>
+</body>
+</html>
