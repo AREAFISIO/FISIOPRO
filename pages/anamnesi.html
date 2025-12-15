@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Anamnesi</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Anamnesi</div></div></div>
+    <nav class="nav">
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
+      <a data-nav href="anamnesi.html" class="active" data-role="front,manager">Anamnesi</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <div class="section">Sistema</div>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Anamnesi <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn primary">Crea anamnesi</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Stato anamnesi e consensi</h2><span class="chip">Front Office</span></div>
+      <div class="body">
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Paziente</th><th>Anamnesi</th><th>Consenso</th><th>Ultimo aggiornamento</th></tr></thead>
+            <tbody>
+              <tr><td><div class="rowlink">placeholder</div></td><td><span class="chip">In attesa</span></td><td><span class="chip">Mancante</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Note</div>
+    <div class="card" style="padding:14px;color:var(--muted);line-height:1.6;">
+      Qui agganciamo i flussi: invio link anamnesi, firma consenso, controllo stato.
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
