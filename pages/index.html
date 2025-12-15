@@ -9,16 +9,25 @@
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="dot"></div><div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div></div>
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOCLINIK</div>
+        <div class="sub">SRL STP • Admin</div>
+      </div>
+    </div>
+
     <nav class="nav">
       <div class="section">Generale</div>
       <a data-nav href="index.html" class="active">👥 Pazienti <span class="badge">2873</span></a>
       <a data-nav href="agenda.html">🗓️ Agenda</a>
       <a data-nav href="casi-clinici.html">🧠 Casi clinici <span class="badge">1</span></a>
+
       <div class="section">Operativo</div>
       <a data-nav href="lista-attesa.html">⏳ Lista d’attesa</a>
       <a data-nav href="file-caricati.html">📎 File caricati</a>
       <a data-nav href="notifiche.html">🔔 Notifiche <span class="badge">1</span></a>
+
       <div class="section">Setup</div>
       <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
     </nav>
@@ -30,13 +39,17 @@
         <div class="h1">Pazienti <span class="pill">Ricerca • Filtri • Lista</span></div>
         <div class="actions">
           <button class="btn">⬇︎ Export</button>
-          <button class="btn primary" onclick="location.href='paziente.html'">＋ Nuovo paziente</button>
+          <button class="btn primary" onclick="location.href='paziente.html?id=899461'">＋ Nuovo paziente</button>
         </div>
       </div>
     </div>
 
     <section class="card">
-      <div class="head"><h2>Elenco pazienti</h2><span class="chip">Demo • localStorage</span></div>
+      <div class="head">
+        <h2>Elenco pazienti</h2>
+        <span class="chip">Demo • localStorage</span>
+      </div>
+
       <div class="body">
         <div class="toolbar">
           <div class="search">🔎 <input data-search placeholder="Cerca per nome, email, telefono..." /></div>
@@ -49,7 +62,9 @@
         <div class="tablewrap" data-table>
           <table>
             <thead>
-              <tr><th>Nome</th><th>Cognome</th><th>Email</th><th>Cellulare</th><th>ID</th><th>Azioni</th></tr>
+              <tr>
+                <th>Nome</th><th>Cognome</th><th>Email</th><th>Cellulare</th><th>ID</th><th>Azioni</th>
+              </tr>
             </thead>
             <tbody>
               <tr style="cursor:pointer" onclick="location.href='paziente.html?id=899461'">
@@ -58,8 +73,11 @@
                 <td>adri.abbate@tiscali.it</td>
                 <td>+39 3505107857</td>
                 <td>899461</td>
-                <td><button class="btn primary" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button></td>
+                <td>
+                  <button class="btn primary" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button>
+                </td>
               </tr>
+
               <tr style="cursor:pointer" onclick="location.href='paziente.html?id=889012'">
                 <td><div class="rowlink">Usama</div></td>
                 <td>Abdelall</td>
@@ -68,6 +86,7 @@
                 <td>889012</td>
                 <td><button class="btn" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button></td>
               </tr>
+
               <tr style="cursor:pointer" onclick="location.href='paziente.html?id=774221'">
                 <td><div class="rowlink">Ghalia</div></td>
                 <td>Abousalah Eddine</td>
@@ -90,6 +109,7 @@
 
   <aside class="rightbar">
     <div class="righttitle">Shortcut</div>
+
     <div class="card" style="padding:14px;">
       <div style="font-weight:800;">Azioni rapide</div>
       <div style="color:var(--muted); font-size:13px; margin-top:6px; line-height:1.5;">
