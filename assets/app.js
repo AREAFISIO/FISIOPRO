@@ -1,10 +1,59 @@
-// ====== Utils ======
-const LS = {
-  get: (k, fallback) => {
-    try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; }
-  },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
-};
+// =====================
+// AUTH + ROLE GUARDS
+// =====================
+function getToken() {
+  return localStorage.getItem("token") || "";
+}
+function getCachedUser() {
+  try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
+}
+
+async function api(path, opts = {}) {
+  const token = getToken();
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  const res = await fetch(path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function ensureAuth() {
+  const isLoginPage = location.pathname.endsWith("/pages/login.html");
+  const token = getToken();
+  if (!token) {
+    if (!isLoginPage) location.href = "/pages/login.html";
+    return null;
+  }
+  try {
+    const { user } = await api("/api/auth-me");
+    localStorage.setItem("user", JSON.stringify(user));
+    return user;
+  } catch (e) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    if (!isLoginPage) location.href = "/pages/login.html";
+    return null;
+  }
+}
+
+function roleGuard(role) {
+  // Nasconde elementi non autorizzati: data-role="front,manager"
+  document.querySelectorAll("[data-role]").forEach(el => {
+    const allowed = (el.getAttribute("data-role") || "")
+      .split(",").map(s => s.trim()).filter(Boolean);
+    if (allowed.length && !allowed.includes(role)) el.style.display = "none";
+  });
+}
+
+function activeNav() {
+  const path = location.pathname.split("/").pop() || "";
+  document.querySelectorAll("[data-nav]").forEach(a => {
+    const href = (a.getAttribute("href") || "").split("/").pop();
+    a.classList.toggle("active", href === path);
+  });
+}
 
 function toast(msg){
   const t = document.querySelector(".toast");
@@ -15,17 +64,10 @@ function toast(msg){
   window.__toastTimer = setTimeout(()=> t.style.display="none", 1600);
 }
 
-// ====== Active nav ======
-(function () {
-  const path = location.pathname.split("/").pop() || "index.html";
-  document.querySelectorAll('[data-nav]').forEach(a => {
-    const href = (a.getAttribute("href") || "").split("/").pop();
-    if (href === path) a.classList.add("active");
-  });
-})();
-
-// ====== Tabs ======
-(function () {
+// =====================
+// TABS
+// =====================
+function initTabs() {
   const tabs = document.querySelectorAll("[data-tabbtn]");
   if (!tabs.length) return;
 
@@ -36,12 +78,20 @@ function toast(msg){
     tabs.forEach(t => t.classList.toggle("active", t.getAttribute("data-tabbtn") === key));
   };
 
-  tabs.forEach(t => t.addEventListener("click", () => show(t.getAttribute("data-tabbtn"))));
-  show(tabs[0].getAttribute("data-tabbtn"));
-})();
+  // trova primo tab visibile
+  const firstVisible = Array.from(tabs).find(t => t.style.display !== "none");
+  if (firstVisible) show(firstVisible.getAttribute("data-tabbtn"));
 
-// ====== Search filter table ======
-(function () {
+  tabs.forEach(t => t.addEventListener("click", () => {
+    if (t.style.display === "none") return;
+    show(t.getAttribute("data-tabbtn"));
+  }));
+}
+
+// =====================
+// SEARCH FILTER TABLE
+// =====================
+function initSearch() {
   const input = document.querySelector("[data-search]");
   const table = document.querySelector("[data-table]");
   if (!input || !table) return;
@@ -53,35 +103,18 @@ function toast(msg){
       tr.style.display = text.includes(q) ? "" : "none";
     });
   });
-})();
+}
 
-// ====== Seed demo data (una volta) ======
-(function seed(){
-  const seeded = LS.get("seeded", false);
-  if(seeded) return;
-
-  const patients = [
-    { id:"899461", nome:"Adriana", cognome:"Abbate", email:"adri.abbate@tiscali.it", cell:"+39 3505107857" },
-    { id:"889012", nome:"Usama", cognome:"Abdelall", email:"usamaabdelnaby@icloud.com", cell:"+39 3458542226" },
-    { id:"774221", nome:"Ghalia", cognome:"Abousalah Eddine", email:"ghaliaabousalaheddine78@gmail.com", cell:"+39 3381738304" }
-  ];
-
-  const cases = [
-    { id:"CC-0001", patientId:"899461", titolo:"Lombalgia post gravidanza", stato:"Bozza", updatedAt: Date.now()-86400000, note:"Dolore lombare, valutazione iniziale." },
-  ];
-
-  LS.set("patients", patients);
-  LS.set("cases", cases);
-  LS.set("seeded", true);
-})();
-
-// ====== Render LISTA CASI ======
-(function renderCases(){
+// =====================
+// CASES LIST RENDER (se presente)
+// =====================
+function renderCasesLocalDemo() {
   const el = document.querySelector("[data-cases-tbody]");
-  if(!el) return;
+  if (!el) return;
 
-  const cases = LS.get("cases", []);
-  const patients = LS.get("patients", []);
+  // demo local: se in futuro vuoi solo API, lo sostituiamo
+  const cases = JSON.parse(localStorage.getItem("cases") || "[]");
+  const patients = JSON.parse(localStorage.getItem("patients") || "[]");
   const pmap = Object.fromEntries(patients.map(p => [p.id, p]));
 
   el.innerHTML = cases
@@ -99,98 +132,22 @@ function toast(msg){
         </tr>
       `;
     }).join("");
-})();
+}
 
-// ====== Editor Caso: carica/salva ======
-(function caseEditor(){
-  const form = document.querySelector("[data-case-form]");
-  if(!form) return;
+// =====================
+// BOOT
+// =====================
+(async function boot() {
+  const user = await ensureAuth();
+  if (!user) return;
 
-  const url = new URL(location.href);
-  const caseId = url.searchParams.get("id");
+  // badge user in alto se c'è un elemento #userBadge
+  const badge = document.querySelector("[data-user-badge]");
+  if (badge) badge.textContent = `${user.name} • ${user.role}`;
 
-  const cases = LS.get("cases", []);
-  const patients = LS.get("patients", []);
-
-  // popola select pazienti
-  const sel = document.querySelector("[data-patient-select]");
-  if(sel){
-    sel.innerHTML = `<option value="">Seleziona...</option>` + patients.map(p =>
-      `<option value="${p.id}">${p.nome} ${p.cognome} • ${p.id}</option>`
-    ).join("");
-  }
-
-  let current = null;
-
-  if(caseId){
-    current = cases.find(c => c.id === caseId) || null;
-    if(current){
-      // riempi campi
-      form.querySelector("[name='caseId']").value = current.id;
-      form.querySelector("[name='patientId']").value = current.patientId || "";
-      form.querySelector("[name='titolo']").value = current.titolo || "";
-      form.querySelector("[name='stato']").value = current.stato || "Bozza";
-      form.querySelector("[name='note']").value = current.note || "";
-      // immagine
-      const imgData = current.bodyImage || "";
-      const img = document.querySelector("[data-body-img]");
-      if(imgData && img) img.src = imgData;
-    }
-  } else {
-    // nuovo caso: id automatico
-    const next = "CC-" + String(Math.floor(1000 + Math.random()*9000));
-    form.querySelector("[name='caseId']").value = next;
-    form.querySelector("[name='stato']").value = "Bozza";
-  }
-
-  // upload immagine body
-  const file = document.querySelector("[data-body-file]");
-  const img = document.querySelector("[data-body-img]");
-  if(file && img){
-    file.addEventListener("change", async (e)=>{
-      const f = e.target.files?.[0];
-      if(!f) return;
-      const dataUrl = await readAsDataURL(f);
-      img.src = dataUrl;
-      toast("Immagine caricata");
-    });
-  }
-
-  // salva bozza / salva definitivo
-  document.querySelectorAll("[data-save]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const mode = btn.getAttribute("data-save"); // draft | final
-      const data = Object.fromEntries(new FormData(form).entries());
-      const bodyImg = document.querySelector("[data-body-img]")?.src || "";
-
-      const payload = {
-        id: data.caseId,
-        patientId: data.patientId,
-        titolo: data.titolo,
-        stato: mode === "final" ? "Definitivo" : (data.stato || "Bozza"),
-        note: data.note,
-        updatedAt: Date.now(),
-        bodyImage: (bodyImg && bodyImg.startsWith("data:")) ? bodyImg : (current?.bodyImage || "")
-      };
-
-      const all = LS.get("cases", []);
-      const idx = all.findIndex(c => c.id === payload.id);
-      if(idx >= 0) all[idx] = { ...all[idx], ...payload };
-      else all.push(payload);
-
-      LS.set("cases", all);
-      toast(mode === "final" ? "Caso salvato (definitivo)" : "Bozza salvata");
-      // se nuovo, aggiorna URL così rientri sullo stesso record
-      if(!caseId) location.href = `caso-nuovo.html?id=${encodeURIComponent(payload.id)}`;
-    });
-  });
-
-  function readAsDataURL(file){
-    return new Promise((res, rej)=>{
-      const r = new FileReader();
-      r.onload = ()=> res(r.result);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-  }
+  roleGuard(user.role);
+  activeNav();
+  initTabs();
+  initSearch();
+  renderCasesLocalDemo();
 })();
