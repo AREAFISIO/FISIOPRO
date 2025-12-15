@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Archivio documenti</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Archivio</div></div></div>
+    <nav class="nav">
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard</a>
+      <a data-nav href="archivio-documenti.html" class="active" data-role="front,manager">Archivio documenti</a>
+      <div class="section">Sistema</div>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Archivio documenti <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn primary">Carica documento</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>File</h2><span class="chip">Front Office</span></div>
+      <div class="body">
+        <div class="empty">Placeholder: elenco PDF, consensi, referti, download.</div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Suggerimenti</div>
+    <div class="card" style="padding:14px;color:var(--muted);line-height:1.6;">
+      Qui possiamo integrare Supabase Storage e collegare gli allegati in Airtable.
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
