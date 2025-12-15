@@ -1,729 +1,243 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FisioPro – Gestionale</title>
+  <meta charset="UTF-8" />
+  <title>FisioClinik – Pazienti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
-    :root{
-      --bg:#0b0f14; --panel:#0f1621; --card:#121c2a; --muted:#93a4bd; --text:#e8eef7;
-      --line:#22324a; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --chip:#1a2a40;
-      --btn:#1f6feb; --btn2:#22324a; --radius:14px;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    :root {
+      --primary: #18b6a4;
+      --primary-dark: #129487;
+      --bg: #f4f7f8;
+      --card: #ffffff;
+      --text: #1f2d3d;
+      --muted: #6b7c93;
+      --border: #e2e8f0;
     }
-    *{ box-sizing:border-box; }
-    body{ margin:0; font-family:var(--font); background:linear-gradient(180deg,#070a0f, #0b0f14 60%); color:var(--text); }
-    a{ color:#a8c8ff; text-decoration:none; }
-    .app{ display:grid; grid-template-columns: 340px 1fr; min-height:100vh; }
-    .sidebar{ border-right:1px solid var(--line); background:rgba(10,14,20,.75); backdrop-filter: blur(10px); padding:16px; }
-    .brand{ display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:12px; }
-    .dot{ width:12px; height:12px; border-radius:50%; background:var(--btn); box-shadow:0 0 0 5px rgba(31,111,235,.15); }
-    .brand h1{ margin:0; font-size:16px; letter-spacing:.2px; }
-    .brand small{ display:block; color:var(--muted); margin-top:2px; font-size:12px; }
-    .search{ margin-top:12px; display:flex; gap:8px; }
-    input[type="text"]{
-      width:100%; padding:10px 12px; border-radius:12px;
-      border:1px solid var(--line); background:#0b1320; color:var(--text);
-      outline:none;
-    }
-    input[type="text"]::placeholder{ color:#6f86a8; }
-    .btn{
-      border:1px solid rgba(255,255,255,.08);
-      background:var(--btn); color:white; padding:10px 12px; border-radius:12px;
-      cursor:pointer; box-shadow: var(--shadow);
-      font-weight:600;
-    }
-    .btn.secondary{ background:transparent; border:1px solid var(--line); color:var(--text); box-shadow:none; }
-    .btn.ghost{ background:transparent; border:1px dashed rgba(255,255,255,.18); color:var(--muted); box-shadow:none; }
-    .btn.small{ padding:7px 10px; border-radius:10px; font-size:12px; }
-    .list{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }
-    .row{
-      border:1px solid var(--line); background:rgba(18,28,42,.55); border-radius:14px;
-      padding:10px 10px; cursor:pointer;
-    }
-    .row:hover{ border-color:#36507a; }
-    .row.active{ outline:2px solid rgba(31,111,235,.35); border-color:#36507a; }
-    .row .title{ font-weight:700; font-size:13px; }
-    .row .meta{ margin-top:4px; color:var(--muted); font-size:12px; display:flex; gap:10px; flex-wrap:wrap; }
-    .chip{ padding:4px 8px; border-radius:999px; background:var(--chip); border:1px solid rgba(255,255,255,.08); font-size:12px; color:#cfe0ff; display:inline-flex; gap:6px; align-items:center; }
-    .chip.ok{ background:rgba(34,197,94,.12); color:#b7f7cc; border-color:rgba(34,197,94,.25); }
-    .chip.warn{ background:rgba(245,158,11,.14); color:#ffe0b3; border-color:rgba(245,158,11,.28); }
-    .chip.bad{ background:rgba(239,68,68,.12); color:#ffb9b9; border-color:rgba(239,68,68,.25); }
 
-    .main{ padding:18px 18px 28px; }
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between; gap:12px;
-      padding:12px 14px; border:1px solid var(--line); border-radius:16px;
-      background:rgba(18,28,42,.55); backdrop-filter: blur(10px);
+    * {
+      box-sizing: border-box;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
     }
-    .breadcrumbs{ color:var(--muted); font-size:12px; }
-    .pageTitle{ margin:2px 0 0; font-size:18px; font-weight:800; }
-    .grid{ margin-top:14px; display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; }
-    .card{
-      border:1px solid var(--line); border-radius:16px; background:rgba(18,28,42,.6);
-      box-shadow: var(--shadow);
-      padding:14px;
-    }
-    .card h2{ margin:0 0 10px; font-size:14px; color:#d6e6ff; letter-spacing:.2px; }
-    .muted{ color:var(--muted); font-size:12px; }
-    .kv{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
-    .kv .k{ color:var(--muted); font-size:12px; }
-    .kv .v{ font-weight:700; font-size:13px; }
-    .split{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .divider{ height:1px; background:var(--line); margin:12px 0; }
-    .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
-    .tab{ padding:8px 10px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--muted); cursor:pointer; }
-    .tab.active{ background:#0b1320; color:var(--text); border-color:#36507a; }
-    .table{ width:100%; border-collapse:collapse; font-size:13px; }
-    .table th, .table td{ border-bottom:1px solid rgba(255,255,255,.06); padding:10px 6px; text-align:left; vertical-align:top; }
-    .table th{ color:var(--muted); font-size:12px; font-weight:700; }
-    .right{ text-align:right; }
-    .notice{
-      border:1px dashed rgba(255,255,255,.16);
-      background:rgba(10,14,20,.35);
-      padding:10px 12px; border-radius:14px; color:var(--muted); font-size:12px;
-    }
-    .footerLinks{ margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; }
-    code{ background:#0b1320; border:1px solid rgba(255,255,255,.08); padding:2px 6px; border-radius:8px; color:#cfe0ff; }
 
-    @media (max-width: 980px){
-      .app{ grid-template-columns: 1fr; }
-      .sidebar{ border-right:none; border-bottom:1px solid var(--line); }
-      .grid{ grid-template-columns: 1fr; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR SINISTRA */
+    .sidebar {
+      width: 240px;
+      background: #ffffff;
+      border-right: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    .sidebar h2 {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .nav-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .nav-item.active {
+      background: rgba(24, 182, 164, 0.12);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* CONTENUTO CENTRALE */
+    .main {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .topbar h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    }
+
+    /* TOOLBAR */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      width: 220px;
+    }
+
+    /* TABELLA */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    /* SIDEBAR DESTRA */
+    .rightbar {
+      width: 260px;
+      background: #ffffff;
+      border-left: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    .rightbar h3 {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .right-item {
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .right-item:hover {
+      background: #f1f5f9;
     }
   </style>
 </head>
 
 <body>
-  <div id="root"></div>
 
-  <script>
-    // ============================================================
-    //  FISIOPRO – Gestionale (single-file)
-    //  Frontend statico che usa le tue API Vercel: /api/*.js
-    //
-    //  Flusso che rispetta il tuo modello:
-    //  Paziente -> (N) Casi Clinici -> dentro Caso: Valutazione + Trattamenti + Appuntamenti + Vendite/Assicurazioni
-    // ============================================================
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <h2>MENU</h2>
+    <div class="nav-item">Dashboard</div>
+    <div class="nav-item">Agenda</div>
+    <div class="nav-item active">Pazienti</div>
+    <div class="nav-item">Prescrizioni</div>
+    <div class="nav-item">Statistiche</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="topbar">
+      <h1>Pazienti</h1>
+      <button class="btn">+ Nuovo paziente</button>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input class="search" placeholder="Ricerca paziente..." />
+        <button class="btn">Filtri</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Cognome</th>
+            <th>Codice fiscale</th>
+            <th>Email</th>
+            <th>Cellulare</th>
+            <th>Data nascita</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Adriana</td>
+            <td>Abbate</td>
+            <td></td>
+            <td>adri.abbate@tiscali.it</td>
+            <td>+39 3505107857</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Usama</td>
+            <td>Abdelall</td>
+            <td></td>
+            <td>usamaabdelnaby@icloud.com</td>
+            <td>+39 3458542226</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>Ghalia</td>
+            <td>Abousalah</td>
+            <td>BSLGHL47A41Z330J</td>
+            <td>ghaliaabousalaheddine78@gmail.com</td>
+            <td>+39 3381738304</td>
+            <td>01/01/1947</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- RIGHT BAR -->
+  <aside class="rightbar">
+    <h3>Configurazione</h3>
+    <div class="right-item">Impostazioni azienda</div>
+    <div class="right-item">Abilitazione moduli</div>
+    <div class="right-item">Utenti e dispositivi</div>
+    <div class="right-item">Template notifiche</div>
+    <div class="right-item">Etichette</div>
+  </aside>
 
-    const DOMAIN = "https://fisiopro.vercel.app"; // come mi hai chiesto: link col tuo dominio
-    const API = (path) => path.startsWith("http") ? path : path; // in produzione usiamo path relativo; i link te li stampo col dominio
-
-    const root = document.getElementById("root");
-
-    const state = {
-      patients: [],
-      selectedPatientId: null,
-      selectedCaseId: null,
-      view: "PATIENT", // PATIENT | CASE
-      query: "",
-      cache: {
-        casesByPatient: new Map(),
-      }
-    };
-
-    function el(html){
-      const t = document.createElement("template");
-      t.innerHTML = html.trim();
-      return t.content.firstChild;
-    }
-
-    function money(n){
-      if (n === null || n === undefined || n === "") return "—";
-      const num = Number(n);
-      if (Number.isNaN(num)) return String(n);
-      return num.toLocaleString("it-IT",{ style:"currency", currency:"EUR" });
-    }
-
-    function safeText(v){
-      return (v === null || v === undefined || v === "") ? "—" : String(v);
-    }
-
-    async function apiFetch(path, opts = {}){
-      const res = await fetch(API(path), {
-        headers: { "Content-Type": "application/json", ...(opts.headers||{}) },
-        ...opts
-      });
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = { raw:text }; }
-      if (!res.ok) {
-        const msg = (data && data.error) ? data.error : (data && data.message) ? data.message : res.statusText;
-        throw new Error(msg);
-      }
-      return data;
-    }
-
-    function render(){
-      root.innerHTML = "";
-      const app = el(`
-        <div class="app">
-          <aside class="sidebar">
-            <div class="brand">
-              <div class="dot"></div>
-              <div>
-                <h1>FisioPro – Gestionale</h1>
-                <small>Frontend (index.html) + API (/api) + Airtable</small>
-              </div>
-            </div>
-
-            <div class="search">
-              <input id="q" type="text" placeholder="Cerca paziente (nome, cognome, città…)" />
-              <button class="btn secondary" id="refresh">↻</button>
-            </div>
-
-            <div class="footerLinks">
-              <span class="chip">API Ping: <a href="${DOMAIN}/api/ping" target="_blank">apri</a></span>
-              <span class="chip">API Patients: <a href="${DOMAIN}/api/patients" target="_blank">apri</a></span>
-              <span class="chip">API Cases: <a href="${DOMAIN}/api/cases" target="_blank">apri</a></span>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="muted">Pazienti</div>
-            <div class="list" id="patientsList"></div>
-          </aside>
-
-          <main class="main">
-            <div class="topbar">
-              <div>
-                <div class="breadcrumbs" id="crumbs">Home</div>
-                <div class="pageTitle" id="title">Seleziona un paziente</div>
-              </div>
-              <div class="split" id="actions"></div>
-            </div>
-
-            <div id="content" style="margin-top:14px;"></div>
-          </main>
-        </div>
-      `);
-
-      root.appendChild(app);
-
-      // UI events
-      const q = app.querySelector("#q");
-      q.value = state.query;
-      q.addEventListener("input", (e)=>{
-        state.query = e.target.value;
-        paintPatientsList();
-      });
-
-      app.querySelector("#refresh").addEventListener("click", async ()=>{
-        await boot(true);
-      });
-
-      paintPatientsList();
-      paintMain();
-    }
-
-    function paintPatientsList(){
-      const list = root.querySelector("#patientsList");
-      if (!list) return;
-
-      const query = (state.query||"").trim().toLowerCase();
-      const filtered = state.patients.filter(p=>{
-        const f = p.fields || {};
-        const blob = [
-          f.Nome, f.Cognome, f["Nome e Cognome"], f.Città, f.Sede, f.Telefono, f.Email
-        ].filter(Boolean).join(" ").toLowerCase();
-        return !query || blob.includes(query);
-      });
-
-      if (filtered.length === 0){
-        list.innerHTML = `<div class="notice">Nessun paziente trovato. Prova un altro testo o premi ↻.</div>`;
-        return;
-      }
-
-      list.innerHTML = filtered.map(p=>{
-        const f = p.fields || {};
-        const full = f["Nome e Cognome"] || [f.Nome, f.Cognome].filter(Boolean).join(" ") || (p.id || "Paziente");
-        const city = f.Città || f.Sede || "—";
-        const eta = f.Età || f.Age || "";
-        const active = (p.id === state.selectedPatientId) ? "active" : "";
-        return `
-          <div class="row ${active}" data-pid="${p.id}">
-            <div class="title">${full}</div>
-            <div class="meta">
-              <span>${safeText(city)}</span>
-              <span>${eta ? (eta + " anni") : ""}</span>
-            </div>
-          </div>
-        `;
-      }).join("");
-
-      [...list.querySelectorAll(".row")].forEach(r=>{
-        r.addEventListener("click", ()=>{
-          const pid = r.getAttribute("data-pid");
-          state.selectedPatientId = pid;
-          state.selectedCaseId = null;
-          state.view = "PATIENT";
-          render();
-        });
-      });
-    }
-
-    function paintMain(){
-      const crumbs = root.querySelector("#crumbs");
-      const title = root.querySelector("#title");
-      const actions = root.querySelector("#actions");
-      const content = root.querySelector("#content");
-
-      actions.innerHTML = "";
-
-      if (!state.selectedPatientId){
-        crumbs.textContent = "Home";
-        title.textContent = "Seleziona un paziente";
-        content.innerHTML = `
-          <div class="card">
-            <h2>Come funziona (semplice)</h2>
-            <div class="notice">
-              1) Seleziona un paziente a sinistra<br>
-              2) Vedi i suoi <b>Casi Clinici</b><br>
-              3) Apri un Caso: dentro hai <b>Valutazione</b> + <b>Trattamenti</b> + (poi) <b>Appuntamenti / Vendite / Assicurazioni</b>
-            </div>
-          </div>
-        `;
-        return;
-      }
-
-      const patient = state.patients.find(p=>p.id === state.selectedPatientId);
-      const pf = (patient && patient.fields) ? patient.fields : {};
-      const full = pf["Nome e Cognome"] || [pf.Nome, pf.Cognome].filter(Boolean).join(" ") || patient.id;
-
-      if (state.view === "PATIENT"){
-        crumbs.textContent = `Pazienti > ${full}`;
-        title.textContent = `Scheda Paziente`;
-
-        actions.appendChild(el(`<button class="btn small" id="newCase">➕ Nuovo Caso Clinico</button>`));
-        actions.appendChild(el(`<button class="btn small secondary" id="openPatientsApi">API Patients</button>`));
-
-        actions.querySelector("#openPatientsApi").addEventListener("click", ()=>{
-          window.open(`${DOMAIN}/api/patients`, "_blank");
-        });
-
-        actions.querySelector("#newCase").addEventListener("click", async ()=>{
-          await createCase(patient.id);
-        });
-
-        content.innerHTML = `
-          <div class="grid">
-            <div class="card">
-              <h2>Dati Paziente</h2>
-              <div class="kv">
-                <div><div class="k">Nome</div><div class="v">${safeText(pf.Nome || (pf["Nome e Cognome"]||"").split(" ")[0])}</div></div>
-                <div><div class="k">Cognome</div><div class="v">${safeText(pf.Cognome || "")}</div></div>
-                <div><div class="k">Età</div><div class="v">${safeText(pf.Età || pf.Age)}</div></div>
-                <div><div class="k">Città / Sede</div><div class="v">${safeText(pf.Città || pf.Sede)}</div></div>
-                <div><div class="k">Telefono</div><div class="v">${safeText(pf.Telefono)}</div></div>
-                <div><div class="k">Email</div><div class="v">${safeText(pf.Email)}</div></div>
-              </div>
-              <div class="divider"></div>
-              <div class="notice">
-                <b>Modello clinico:</b> questo paziente può avere <b>più Casi Clinici</b>.<br>
-                Se torna tra 1 anno per un altro problema → <b>nuovo Caso Clinico</b>.
-              </div>
-            </div>
-
-            <div class="card">
-              <h2>Azioni rapide</h2>
-              <div class="split">
-                <span class="chip">ID Paziente: <code>${patient.id}</code></span>
-                <span class="chip">Link Scheda (manuale): <code>#patient=${patient.id}</code></span>
-              </div>
-              <div class="divider"></div>
-              <div class="notice">
-                Prossimo step “serio”: dentro il Caso Clinico mettiamo<br>
-                1) creazione Valutazione (prima seduta)<br>
-                2) creazione Trattamento (sedute successive o percorso)<br>
-                3) collegamento a Vendite / Erogato / Assicurazioni
-              </div>
-            </div>
-
-            <div class="card" style="grid-column: 1 / -1;">
-              <h2>Casi Clinici</h2>
-              <div id="casesBox" class="notice">Caricamento…</div>
-            </div>
-          </div>
-        `;
-
-        loadCasesIntoUI(patient.id);
-        return;
-      }
-
-      if (state.view === "CASE"){
-        crumbs.textContent = `Pazienti > ${full} > Caso Clinico`;
-        title.textContent = `Caso Clinico`;
-
-        actions.appendChild(el(`<button class="btn small secondary" id="back">← Torna al paziente</button>`));
-        actions.appendChild(el(`<button class="btn small" id="newEval">➕ Crea Valutazione</button>`));
-        actions.appendChild(el(`<button class="btn small" id="newTrt">➕ Crea Trattamento</button>`));
-
-        actions.querySelector("#back").addEventListener("click", ()=>{
-          state.view = "PATIENT";
-          state.selectedCaseId = null;
-          render();
-        });
-
-        actions.querySelector("#newEval").addEventListener("click", async ()=>{
-          await createEvaluation(state.selectedCaseId, patient.id);
-        });
-
-        actions.querySelector("#newTrt").addEventListener("click", async ()=>{
-          await createTreatment(state.selectedCaseId, patient.id);
-        });
-
-        content.innerHTML = `
-          <div class="card">
-            <h2>Sezioni Caso Clinico</h2>
-            <div class="tabs">
-              <button class="tab active" data-tab="overview">Panoramica</button>
-              <button class="tab" data-tab="evaluation">Valutazione</button>
-              <button class="tab" data-tab="treatments">Trattamenti</button>
-              <button class="tab" data-tab="appointments">Appuntamenti</button>
-              <button class="tab" data-tab="sales">Vendite / Assicurazioni</button>
-            </div>
-            <div class="divider"></div>
-            <div id="caseTabContent" class="notice">Caricamento…</div>
-          </div>
-        `;
-
-        const tabs = [...content.querySelectorAll(".tab")];
-        tabs.forEach(t=>{
-          t.addEventListener("click", ()=>{
-            tabs.forEach(x=>x.classList.remove("active"));
-            t.classList.add("active");
-            showCaseTab(t.getAttribute("data-tab"), patient.id, state.selectedCaseId);
-          });
-        });
-
-        showCaseTab("overview", patient.id, state.selectedCaseId);
-        return;
-      }
-    }
-
-    async function loadCasesIntoUI(patientId){
-      const box = root.querySelector("#casesBox");
-      if (!box) return;
-
-      try{
-        const data = await apiFetch(`/api/cases?patientId=${encodeURIComponent(patientId)}`);
-        const records = data.records || data || [];
-        state.cache.casesByPatient.set(patientId, records);
-
-        if (!records.length){
-          box.innerHTML = `<div class="notice">Nessun caso clinico. Clicca <b>“➕ Nuovo Caso Clinico”</b>.</div>`;
-          return;
-        }
-
-        box.innerHTML = `
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Titolo</th>
-                <th>Stato</th>
-                <th>Ultimo aggiornamento</th>
-                <th class="right">Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${records.map(r=>{
-                const f = r.fields || {};
-                const titolo = f.Titolo || f.Nome || "Caso Clinico";
-                const stato = f.Stato || "Attivo";
-                const upd = f["Ultima Modifica"] || f["Updated"] || "—";
-                return `
-                  <tr>
-                    <td><b>${titolo}</b><div class="muted">ID: ${r.id}</div></td>
-                    <td><span class="chip ok">${stato}</span></td>
-                    <td>${upd}</td>
-                    <td class="right">
-                      <button class="btn small secondary" data-open="${r.id}">Apri</button>
-                    </td>
-                  </tr>
-                `;
-              }).join("")}
-            </tbody>
-          </table>
-          <div class="divider"></div>
-          <div class="muted">Link API (copia-incolla veloce): <code>${DOMAIN}/api/cases?patientId=${patientId}</code></div>
-        `;
-
-        [...box.querySelectorAll("[data-open]")].forEach(b=>{
-          b.addEventListener("click", ()=>{
-            state.selectedCaseId = b.getAttribute("data-open");
-            state.view = "CASE";
-            render();
-          });
-        });
-
-      }catch(e){
-        box.innerHTML = `<div class="notice"><span class="chip bad">Errore</span> ${e.message}</div>`;
-      }
-    }
-
-    // ----------------------------
-    // CREAZIONI (Case/Eval/Treatment)
-    // ----------------------------
-    async function createCase(patientId){
-      // il tuo errore prima era "patientId is required": qui lo passiamo SEMPRE.
-      try{
-        const payload = {
-          patientId,
-          title: "Nuovo Caso Clinico",
-          status: "Attivo"
-        };
-
-        const data = await apiFetch("/api/cases", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-
-        // se l’API ritorna record
-        const newId = (data && data.id) ? data.id : (data && data.record && data.record.id) ? data.record.id : null;
-
-        // ricarico lista casi
-        await loadCasesIntoUI(patientId);
-
-        // apro subito il caso (se ho id)
-        if (newId){
-          state.selectedCaseId = newId;
-          state.view = "CASE";
-          render();
-        } else {
-          alert("Caso creato. Se non si apre automaticamente, clicca 'Apri' nella lista.");
-        }
-
-      }catch(e){
-        alert("Errore creazione caso: " + e.message);
-      }
-    }
-
-    async function createEvaluation(caseId, patientId){
-      try{
-        const payload = { caseId, patientId };
-        const data = await apiFetch("/api/evaluations", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        alert("Valutazione creata ✅");
-        showCaseTab("evaluation", patientId, caseId);
-      }catch(e){
-        alert("Errore creazione valutazione: " + e.message);
-      }
-    }
-
-    async function createTreatment(caseId, patientId){
-      try{
-        const payload = { caseId, patientId };
-        const data = await apiFetch("/api/treatments", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        alert("Trattamento creato ✅");
-        showCaseTab("treatments", patientId, caseId);
-      }catch(e){
-        alert("Errore creazione trattamento: " + e.message);
-      }
-    }
-
-    // ----------------------------
-    // Tabs CASE
-    // ----------------------------
-    async function showCaseTab(tab, patientId, caseId){
-      const box = root.querySelector("#caseTabContent");
-      if (!box) return;
-
-      // base: mostro subito loader
-      box.innerHTML = `Caricamento…`;
-
-      try{
-        if (tab === "overview"){
-          box.innerHTML = `
-            <div class="notice">
-              <b>Regola clinica:</b><br>
-              • 1 Caso Clinico = 1 problema/episodio (es. spalla dx)<br>
-              • Dentro: <b>1 Valutazione</b> + <b>N Trattamenti</b><br>
-              • Se torna tra 1 anno con altro problema → <b>nuovo Caso Clinico</b>
-            </div>
-            <div class="divider"></div>
-            <div class="split">
-              <span class="chip">PatientId: <code>${patientId}</code></span>
-              <span class="chip">CaseId: <code>${caseId}</code></span>
-            </div>
-            <div class="divider"></div>
-            <div class="muted">Link veloci:</div>
-            <div class="footerLinks">
-              <span class="chip"><a target="_blank" href="${DOMAIN}/api/evaluations?caseId=${caseId}">Valutazioni</a></span>
-              <span class="chip"><a target="_blank" href="${DOMAIN}/api/treatments?caseId=${caseId}">Trattamenti</a></span>
-              <span class="chip"><a target="_blank" href="${DOMAIN}/api/appointments?caseId=${caseId}">Appuntamenti</a></span>
-              <span class="chip"><a target="_blank" href="${DOMAIN}/api/sales?caseId=${caseId}">Vendite</a></span>
-            </div>
-          `;
-          return;
-        }
-
-        if (tab === "evaluation"){
-          const data = await apiFetch(`/api/evaluations?caseId=${encodeURIComponent(caseId)}`);
-          const recs = data.records || [];
-          if (!recs.length){
-            box.innerHTML = `
-              <div class="notice">
-                Nessuna valutazione trovata per questo caso.<br>
-                Clicca in alto: <b>➕ Crea Valutazione</b>
-              </div>
-            `;
-            return;
-          }
-          box.innerHTML = `
-            <table class="table">
-              <thead><tr><th>Valutazione</th><th>Data</th><th>Note</th></tr></thead>
-              <tbody>
-                ${recs.map(r=>{
-                  const f = r.fields || {};
-                  return `
-                    <tr>
-                      <td><b>${f.Titolo || f.Nome || "Valutazione"}</b><div class="muted">ID: ${r.id}</div></td>
-                      <td>${safeText(f["Data e ora"] || f.Data || f["DATA VISITA"])}</td>
-                      <td>${safeText(f.Note || f.Notes)}</td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-          `;
-          return;
-        }
-
-        if (tab === "treatments"){
-          const data = await apiFetch(`/api/treatments?caseId=${encodeURIComponent(caseId)}`);
-          const recs = data.records || [];
-          if (!recs.length){
-            box.innerHTML = `
-              <div class="notice">
-                Nessun trattamento trovato.<br>
-                Clicca in alto: <b>➕ Crea Trattamento</b>
-              </div>
-            `;
-            return;
-          }
-          box.innerHTML = `
-            <table class="table">
-              <thead><tr><th>Trattamento</th><th>Data</th><th>Operatore</th></tr></thead>
-              <tbody>
-                ${recs.map(r=>{
-                  const f = r.fields || {};
-                  return `
-                    <tr>
-                      <td><b>${f.Titolo || f.Nome || "Trattamento"}</b><div class="muted">ID: ${r.id}</div></td>
-                      <td>${safeText(f["Data e ora"] || f.Data || f["DATA VISITA"])}</td>
-                      <td>${safeText(f.Collaboratore || f.Operatore || f.Fisioterapista)}</td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-          `;
-          return;
-        }
-
-        if (tab === "appointments"){
-          // Nota: prima ti dava "Method not allowed" quando creavi appuntamento.
-          // Qui per ora mostriamo SOLO lista (GET). Poi aggiungiamo creazione quando sistemiamo l’API.
-          const data = await apiFetch(`/api/appointments?caseId=${encodeURIComponent(caseId)}`);
-          const recs = data.records || [];
-          if (!recs.length){
-            box.innerHTML = `
-              <div class="notice">
-                Nessun appuntamento trovato per questo caso.<br>
-                (Step prossimo: aggiungiamo creazione appuntamento + scelta “Valutazione vs Trattamento” per seduta)
-              </div>
-            `;
-            return;
-          }
-          box.innerHTML = `
-            <table class="table">
-              <thead><tr><th>Appuntamento</th><th>Inizio</th><th>Fine</th><th>Presenza</th></tr></thead>
-              <tbody>
-                ${recs.map(r=>{
-                  const f = r.fields || {};
-                  return `
-                    <tr>
-                      <td><b>${f.Titolo || f.Nome || "Seduta"}</b><div class="muted">ID: ${r.id}</div></td>
-                      <td>${safeText(f["Data e ora INIZIO"] || f.Inizio)}</td>
-                      <td>${safeText(f["Data e ora FINE"] || f.Fine)}</td>
-                      <td>${safeText(f["Presenza Paziente"] || f.Presenza)}</td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-          `;
-          return;
-        }
-
-        if (tab === "sales"){
-          const data = await apiFetch(`/api/sales?caseId=${encodeURIComponent(caseId)}`);
-          const recs = data.records || [];
-          if (!recs.length){
-            box.innerHTML = `
-              <div class="notice">
-                Nessuna vendita collegata al caso.<br>
-                (Step prossimo: qui replichiamo la UI “Assicurazione / Prescrizione / Voucher / Stato Rimborso” come nelle tue immagini)
-              </div>
-            `;
-            return;
-          }
-          box.innerHTML = `
-            <table class="table">
-              <thead><tr><th>Vendita</th><th>Data</th><th>Importo</th><th>Stato</th></tr></thead>
-              <tbody>
-                ${recs.map(r=>{
-                  const f = r.fields || {};
-                  return `
-                    <tr>
-                      <td><b>${f.Titolo || f.Nome || f["Voce Listino"] || "Vendita"}</b><div class="muted">ID: ${r.id}</div></td>
-                      <td>${safeText(f["Data Vendita"] || f.Data)}</td>
-                      <td>${money(f["Prezzo Totale Fatture"] || f["Prezzo Totale"] || f.Importo)}</td>
-                      <td><span class="chip ${String(f["Stato Vendita"]||"").includes("CHIUSA") ? "ok":"warn"}">${safeText(f["Stato Vendita"] || f.Stato)}</span></td>
-                    </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
-          `;
-          return;
-        }
-
-      }catch(e){
-        box.innerHTML = `<div class="notice"><span class="chip bad">Errore</span> ${e.message}</div>`;
-      }
-    }
-
-    // ----------------------------
-    // BOOT
-    // ----------------------------
-    async function boot(force=false){
-      render();
-      try{
-        // carico pazienti
-        const data = await apiFetch("/api/patients");
-        const recs = data.records || data || [];
-        state.patients = Array.isArray(recs) ? recs : [];
-        if (!state.selectedPatientId && state.patients.length){
-          state.selectedPatientId = state.patients[0].id;
-        }
-      }catch(e){
-        // se fallisce, mostro errore
-        const content = root.querySelector("#content");
-        if (content){
-          content.innerHTML = `<div class="card"><h2>Errore caricamento</h2><div class="notice">${e.message}</div></div>`;
-        }
-      }
-      render();
-    }
-
-    boot();
-  </script>
 </body>
 </html>
