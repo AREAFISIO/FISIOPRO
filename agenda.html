@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioClinik • Agenda</title>
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">FISIOCLINIK</div>
+          <div class="sub">SRL STP • Admin</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <div class="section">Generale</div>
+        <a data-nav href="index.html">👥 Pazienti</a>
+        <a data-nav href="agenda.html" class="active">🗓️ Agenda</a>
+        <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="toprow">
+          <div class="h1">Agenda <span class="pill">Settimana • Calendario</span></div>
+          <div class="actions">
+            <button class="btn">Oggi</button>
+            <button class="btn">‹</button>
+            <button class="btn">›</button>
+            <button class="btn primary" onclick="location.href='paziente.html'">＋ Nuovo appuntamento</button>
+          </div>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="head">
+          <h2>Dicembre 2025</h2>
+          <span class="chip">Vista: Settimana</span>
+        </div>
+        <div class="body">
+          <div style="display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; min-height:520px;">
+            <div style="color:var(--muted); padding-top:6px;">Ore</div>
+            <div class="chip">LUN 15</div><div class="chip">MAR 16</div><div class="chip">MER 17</div>
+            <div class="chip">GIO 18</div><div class="chip">VEN 19</div><div class="chip">SAB 20</div><div class="chip">DOM 21</div>
+
+            <!-- Colonna ore -->
+            <div style="display:flex; flex-direction:column; gap:14px; padding-top:6px; color:var(--muted);">
+              <div>08:00</div><div>10:00</div><div>12:00</div><div>14:00</div><div>16:00</div><div>18:00</div>
+            </div>
+
+            <!-- giorni (mock) -->
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip" style="display:inline-flex;">TS • 09:00</div>
+              <div style="margin-top:10px;" class="chip">AF • 11:00</div>
+              <div style="margin-top:10px;" class="chip">JM • 16:00</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">LC • 10:00</div>
+              <div style="margin-top:10px;" class="chip">TC • 15:00</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">MM • 09:00</div>
+              <div style="margin-top:10px;" class="chip">S2 • 17:00</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">AF • 12:00</div>
+              <div style="margin-top:10px;" class="chip">LC • 18:00</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">TC • 08:00</div>
+              <div style="margin-top:10px;" class="chip">JM • 14:00</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">—</div>
+            </div>
+
+            <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
+              <div class="chip">—</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px; color:var(--muted); font-size:13px;">
+            Questa è una **mock**. Se vuoi, la trasformiamo in calendario vero (drag & drop, resize, ecc.).
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="rightbar">
+      <div class="righttitle">Filtri agenda</div>
+      <div class="rlist">
+        <a href="#">Incaricati <span>›</span></a>
+        <a href="#">Prestazioni <span>›</span></a>
+        <a href="#">Stati <span>›</span></a>
+      </div>
+      <div class="righttitle" style="margin-top:16px;">Azioni</div>
+      <div class="card" style="padding:14px;">
+        <button class="btn primary" style="width:100%;">＋ Appuntamento</button>
+        <button class="btn" style="width:100%; margin-top:10px;">⬇︎ Export</button>
+      </div>
+    </aside>
+
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
