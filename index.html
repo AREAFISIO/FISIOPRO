@@ -1,243 +1,109 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <title>FisioClinik – Pazienti</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <style>
-    :root {
-      --primary: #18b6a4;
-      --primary-dark: #129487;
-      --bg: #f4f7f8;
-      --card: #ffffff;
-      --text: #1f2d3d;
-      --muted: #6b7c93;
-      --border: #e2e8f0;
-    }
-
-    * {
-      box-sizing: border-box;
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* SIDEBAR SINISTRA */
-    .sidebar {
-      width: 240px;
-      background: #ffffff;
-      border-right: 1px solid var(--border);
-      padding: 20px;
-    }
-
-    .sidebar h2 {
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 16px;
-    }
-
-    .nav-item {
-      padding: 10px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-bottom: 6px;
-      font-size: 14px;
-    }
-
-    .nav-item.active {
-      background: rgba(24, 182, 164, 0.12);
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    /* CONTENUTO CENTRALE */
-    .main {
-      flex: 1;
-      padding: 24px;
-      overflow-y: auto;
-    }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .topbar h1 {
-      font-size: 20px;
-      font-weight: 600;
-    }
-
-    .btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 10px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .btn:hover {
-      background: var(--primary-dark);
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 14px;
-      padding: 20px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.04);
-    }
-
-    /* TOOLBAR */
-    .toolbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-
-    .search {
-      border: 1px solid var(--border);
-      padding: 8px 12px;
-      border-radius: 8px;
-      width: 220px;
-    }
-
-    /* TABELLA */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-
-    th, td {
-      padding: 12px;
-      border-bottom: 1px solid var(--border);
-      text-align: left;
-    }
-
-    th {
-      color: var(--muted);
-      font-weight: 500;
-      font-size: 13px;
-    }
-
-    tr:hover {
-      background: #f9fafb;
-    }
-
-    /* SIDEBAR DESTRA */
-    .rightbar {
-      width: 260px;
-      background: #ffffff;
-      border-left: 1px solid var(--border);
-      padding: 20px;
-    }
-
-    .rightbar h3 {
-      font-size: 14px;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
-
-    .right-item {
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .right-item:hover {
-      background: #f1f5f9;
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioClinik • Pazienti</title>
+  <link rel="stylesheet" href="../assets/app.css" />
 </head>
-
 <body>
-
-  <!-- SIDEBAR -->
+<div class="app">
   <aside class="sidebar">
-    <h2>MENU</h2>
-    <div class="nav-item">Dashboard</div>
-    <div class="nav-item">Agenda</div>
-    <div class="nav-item active">Pazienti</div>
-    <div class="nav-item">Prescrizioni</div>
-    <div class="nav-item">Statistiche</div>
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html" class="active">👥 Pazienti <span class="badge">2873</span></a>
+      <a data-nav href="agenda.html">🗓️ Agenda</a>
+      <a data-nav href="casi-clinici.html">🧠 Casi clinici <span class="badge">1</span></a>
+      <div class="section">Operativo</div>
+      <a data-nav href="lista-attesa.html">⏳ Lista d’attesa</a>
+      <a data-nav href="file-caricati.html">📎 File caricati</a>
+      <a data-nav href="notifiche.html">🔔 Notifiche <span class="badge">1</span></a>
+      <div class="section">Setup</div>
+      <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
+    </nav>
   </aside>
 
-  <!-- MAIN -->
   <main class="main">
     <div class="topbar">
-      <h1>Pazienti</h1>
-      <button class="btn">+ Nuovo paziente</button>
-    </div>
-
-    <div class="card">
-      <div class="toolbar">
-        <input class="search" placeholder="Ricerca paziente..." />
-        <button class="btn">Filtri</button>
+      <div class="toprow">
+        <div class="h1">Pazienti <span class="pill">Ricerca • Filtri • Lista</span></div>
+        <div class="actions">
+          <button class="btn">⬇︎ Export</button>
+          <button class="btn primary" onclick="location.href='paziente.html'">＋ Nuovo paziente</button>
+        </div>
       </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Cognome</th>
-            <th>Codice fiscale</th>
-            <th>Email</th>
-            <th>Cellulare</th>
-            <th>Data nascita</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Adriana</td>
-            <td>Abbate</td>
-            <td></td>
-            <td>adri.abbate@tiscali.it</td>
-            <td>+39 3505107857</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>Usama</td>
-            <td>Abdelall</td>
-            <td></td>
-            <td>usamaabdelnaby@icloud.com</td>
-            <td>+39 3458542226</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>Ghalia</td>
-            <td>Abousalah</td>
-            <td>BSLGHL47A41Z330J</td>
-            <td>ghaliaabousalaheddine78@gmail.com</td>
-            <td>+39 3381738304</td>
-            <td>01/01/1947</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
+
+    <section class="card">
+      <div class="head"><h2>Elenco pazienti</h2><span class="chip">Demo • localStorage</span></div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="search">🔎 <input data-search placeholder="Cerca per nome, email, telefono..." /></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <span class="chip">Aggiungi filtro</span>
+            <span class="chip">Solo attivi</span>
+          </div>
+        </div>
+
+        <div class="tablewrap" data-table>
+          <table>
+            <thead>
+              <tr><th>Nome</th><th>Cognome</th><th>Email</th><th>Cellulare</th><th>ID</th><th>Azioni</th></tr>
+            </thead>
+            <tbody>
+              <tr style="cursor:pointer" onclick="location.href='paziente.html?id=899461'">
+                <td><div class="rowlink">Adriana</div></td>
+                <td>Abbate</td>
+                <td>adri.abbate@tiscali.it</td>
+                <td>+39 3505107857</td>
+                <td>899461</td>
+                <td><button class="btn primary" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button></td>
+              </tr>
+              <tr style="cursor:pointer" onclick="location.href='paziente.html?id=889012'">
+                <td><div class="rowlink">Usama</div></td>
+                <td>Abdelall</td>
+                <td>usamaabdelnaby@icloud.com</td>
+                <td>+39 3458542226</td>
+                <td>889012</td>
+                <td><button class="btn" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button></td>
+              </tr>
+              <tr style="cursor:pointer" onclick="location.href='paziente.html?id=774221'">
+                <td><div class="rowlink">Ghalia</div></td>
+                <td>Abousalah Eddine</td>
+                <td>ghaliaabousalaheddine78@gmail.com</td>
+                <td>+39 3381738304</td>
+                <td>774221</td>
+                <td><button class="btn" onclick="event.stopPropagation();location.href='casi-clinici.html'">Casi</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; color:var(--muted); font-size:13px;">
+          <div>Righe per pagina: <span class="chip">10</span></div>
+          <div>1–10 di 2873</div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <!-- RIGHT BAR -->
   <aside class="rightbar">
-    <h3>Configurazione</h3>
-    <div class="right-item">Impostazioni azienda</div>
-    <div class="right-item">Abilitazione moduli</div>
-    <div class="right-item">Utenti e dispositivi</div>
-    <div class="right-item">Template notifiche</div>
-    <div class="right-item">Etichette</div>
+    <div class="righttitle">Shortcut</div>
+    <div class="card" style="padding:14px;">
+      <div style="font-weight:800;">Azioni rapide</div>
+      <div style="color:var(--muted); font-size:13px; margin-top:6px; line-height:1.5;">
+        • crea caso clinico<br/>• nuova visita<br/>• carica referto
+      </div>
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn primary" onclick="location.href='caso-nuovo.html'">＋ Caso clinico</button>
+        <button class="btn" onclick="location.href='agenda.html'">🗓️ Agenda</button>
+      </div>
+    </div>
   </aside>
+</div>
 
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
 </body>
 </html>
