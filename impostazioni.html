@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioClinik • Configurazione</title>
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body>
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">FISIOCLINIK</div>
+          <div class="sub">SRL STP • Admin</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <div class="section">Generale</div>
+        <a data-nav href="index.html">👥 Pazienti</a>
+        <a data-nav href="agenda.html">🗓️ Agenda</a>
+        <a data-nav href="impostazioni.html" class="active">⚙️ Configurazione</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="toprow">
+          <div class="h1">Configurazione <span class="pill">Moduli • Utenti • Template</span></div>
+          <div class="actions">
+            <button class="btn primary">Salva</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <div class="head"><h2>Impostazioni azienda</h2><span class="chip">Mock</span></div>
+          <div class="body" style="color:var(--muted); line-height:1.7;">
+            Qui inseriamo: dati società, sedi, loghi, fatturazione, ecc.
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="head"><h2>Abilitazione moduli</h2><span class="chip">Mock</span></div>
+          <div class="body">
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th>Modulo</th><th>Stato</th><th>Note</th></tr></thead>
+                <tbody>
+                  <tr><td>Notifiche</td><td>🟢 Attivo</td><td>SMS / Email / WhatsApp</td></tr>
+                  <tr><td>Documenti</td><td>🟢 Attivo</td><td>PDF + Upload</td></tr>
+                  <tr><td>InBuoneMani</td><td>🟣 Beta</td><td>Invito paziente</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="rightbar">
+      <div class="righttitle">Sezioni</div>
+      <div class="rlist">
+        <a href="#">Impostazioni utente <span>›</span></a>
+        <a href="#">Utenti e dispositivi <span>›</span></a>
+        <a href="#">Template notifiche <span>›</span></a>
+        <a href="#">Relazioni paziente <span>›</span></a>
+        <a href="#">Configurazione test <span>›</span></a>
+      </div>
+    </aside>
+
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
