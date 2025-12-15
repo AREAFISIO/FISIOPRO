@@ -157,3 +157,23 @@ tr:hover td{background:rgba(255,255,255,.03)}
 
 @media (max-width:1200px){.app{grid-template-columns:240px 1fr}.rightbar{display:none}}
 @media (max-width:860px){.app{grid-template-columns:1fr}.sidebar{display:none}.formgrid{grid-template-columns:1fr}}
+/* ===== Typography upgrade (no emoji UI, bigger text) ===== */
+:root{
+  --fs-base: 16px;
+  --fs-small: 14px;
+  --fs-title: 22px;
+  --fs-h2: 18px;
+  --fs-th: 12px;
+}
+
+body{ font-size: var(--fs-base); }
+.h1{ font-size: var(--fs-title); }
+.card .head h2{ font-size: var(--fs-h2); }
+th{ font-size: var(--fs-th); }
+td{ font-size: var(--fs-base); }
+.search input{ font-size: var(--fs-base); }
+.pill{ font-size: var(--fs-small); }
+.chip{ font-size: var(--fs-small); }
+.nav a{ font-size: 15px; padding: 11px 12px; }
+.nav .section{ font-size: 12px; }
+
