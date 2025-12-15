@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import type { Appointment } from "./types";
 
 type Props = {
@@ -24,30 +23,27 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
   async function save() {
     setSaving(true);
     try {
-      const res = await fetch(`/api/appointments/${appt.id}`, {
+      const res = await fetch(`/api/appointments?id=${encodeURIComponent(appt.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: form.status ?? null,
-          service_name: form.service_name ?? null,
-          price_label: form.price_label ?? null,
-          duration_label: form.duration_label ?? null,
-          therapist_name: form.therapist_name ?? null,
-          location_name: form.location_name ?? null,
-          internal_note: form.internal_note ?? null,
-          patient_note: form.patient_note ?? null,
-          confirmed_by_patient: !!form.confirmed_by_patient,
-          confirmed_in_platform: !!form.confirmed_in_platform,
+          status: form.status ?? "",
+          service_name: form.service_name ?? "",
+          duration_label: form.duration_label ?? "",
+          therapist_name: form.therapist_name ?? "",
+          internal_note: form.internal_note ?? "",
+          patient_note: form.patient_note ?? "",
         }),
       });
 
-      if (!res.ok) throw new Error(await res.text());
-      const updated = (await res.json()) as Appointment;
-      onSaved?.(updated);
+      const json = await res.json();
+      if (!res.ok) throw new Error(JSON.stringify(json));
+
+      onSaved?.(json as Appointment);
       onClose();
     } catch (e) {
       console.error(e);
-      alert("Errore salvataggio appuntamento. Controlla console/log.");
+      alert("Errore salvataggio su Airtable. Apri Console/Network per vedere il motivo.");
     } finally {
       setSaving(false);
     }
@@ -65,15 +61,20 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
 
         <div className="oe-modal__body">
           <div className="oe-modal__patientline">
-            <div className="oe-modal__patientname">{appt.patient_name}</div>
-            <Link className="oe-modal__patientlink" href={`/pazienti/${appt.patient_id}`}>
+            <div className="oe-modal__patientname">{appt.patient_name || "Paziente"}</div>
+
+            {/* LINK scheda paziente:
+               nel tuo progetto è una pagina HTML "paziente.html".
+               Qui metto un link semplice con query ?id=
+            */}
+            <a className="oe-modal__patientlink" href={`/pages/paziente.html?id=${encodeURIComponent(appt.patient_id || "")}`}>
               Apri scheda paziente
-            </Link>
+            </a>
           </div>
 
           <div className="oe-grid">
             <label className="oe-field">
-              <span>Esito appuntamento</span>
+              <span>Stato</span>
               <input
                 value={form.status ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -82,16 +83,7 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
             </label>
 
             <label className="oe-field">
-              <span>Voce prezzario</span>
-              <input
-                value={form.price_label ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, price_label: e.target.value }))}
-                placeholder="Es. FASDAC (€ 70.00)"
-              />
-            </label>
-
-            <label className="oe-field">
-              <span>Servizio</span>
+              <span>Prestazione</span>
               <input
                 value={form.service_name ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, service_name: e.target.value }))}
@@ -109,7 +101,7 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
             </label>
 
             <label className="oe-field">
-              <span>Agenda / Operatore</span>
+              <span>Operatore</span>
               <input
                 value={form.therapist_name ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, therapist_name: e.target.value }))}
@@ -117,39 +109,8 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
               />
             </label>
 
-            <label className="oe-field">
-              <span>Luogo</span>
-              <input
-                value={form.location_name ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, location_name: e.target.value }))}
-                placeholder="Es. SEDE DI BOLOGNA"
-              />
-            </label>
-
-            <label className="oe-field oe-field--check">
-              <input
-                type="checkbox"
-                checked={!!form.confirmed_by_patient}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, confirmed_by_patient: e.target.checked }))
-                }
-              />
-              <span>Confermato dal paziente</span>
-            </label>
-
-            <label className="oe-field oe-field--check">
-              <input
-                type="checkbox"
-                checked={!!form.confirmed_in_platform}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, confirmed_in_platform: e.target.checked }))
-                }
-              />
-              <span>Conferma in piattaforma</span>
-            </label>
-
             <label className="oe-field oe-field--wide">
-              <span>Note interne</span>
+              <span>Nota rapida (interna)</span>
               <textarea
                 value={form.internal_note ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, internal_note: e.target.value }))}
@@ -158,7 +119,7 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
             </label>
 
             <label className="oe-field oe-field--wide">
-              <span>Note visibili al paziente</span>
+              <span>Note</span>
               <textarea
                 value={form.patient_note ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, patient_note: e.target.value }))}
