@@ -7,14 +7,23 @@ const {
   AUTH_SECRET,
 } = process.env;
 
-// ⬇️ se i campi in Airtable hanno nomi diversi, cambia QUI:
+// Nomi campi Airtable REALI
 const FIELDS = {
   email: "Email",
   role: "Ruolo",
   code: "Codice accesso",
   active: "Attivo",
-  name: "Collaboratore",
+  name: "Collaboratore", // primary
 };
+
+// Mappa ruoli Airtable -> ruoli interni
+export function normalizeRole(raw) {
+  const v = String(raw || "").trim().toLowerCase();
+  if (v === "fisioterapista") return "physio";
+  if (v === "front office" || v === "front-office" || v === "frontoffice") return "front";
+  if (v === "manager") return "manager";
+  return null;
+}
 
 function b64url(input) {
   return Buffer.from(input).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -114,7 +123,8 @@ export async function findCollaboratorByEmail(email) {
   return {
     id: rec.id,
     email: f[FIELDS.email] || "",
-    role: f[FIELDS.role] || "",
+    role_raw: f[FIELDS.role] || "",
+    role: normalizeRole(f[FIELDS.role]),
     code: f[FIELDS.code] || "",
     active: !!f[FIELDS.active],
     name: f[FIELDS.name] || "",
