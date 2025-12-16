@@ -8,6 +8,53 @@
   <title>FisioClinik • Agenda</title>
   <link rel="stylesheet" href="../assets/app.css" />
 </head>
+  <script>
+(async () => {
+  // OGGI (YYYY-MM-DD)
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const today = `${yyyy}-${mm}-${dd}`;
+
+  // 1) Appuntamenti di oggi
+  const rA = await fetch(`/api/appointments?from=${today}&to=${today}`);
+  const a = await rA.json();
+  if (!a.ok) {
+    console.log("appointments error", a);
+    return;
+  }
+
+  // 2) Prendo tutti i patientIds unici
+  const ids = [...new Set(a.records.flatMap(x => Array.isArray(x.patientIds) ? x.patientIds : []))];
+
+  // 3) Carico pazienti in batch
+  let patientsMap = {};
+  if (ids.length) {
+    const rP = await fetch(`/api/patients-batch?ids=${encodeURIComponent(ids.join(","))}`);
+    const p = await rP.json();
+    if (p.ok) {
+      p.records.forEach(rec => { patientsMap[rec.id] = rec.fields; });
+    }
+  }
+
+  // 4) Output pronto per UI
+  const enriched = a.records.map(ap => {
+    const pid = (ap.patientIds && ap.patientIds[0]) ? ap.patientIds[0] : null;
+    const patient = pid ? (patientsMap[pid] || null) : null;
+    return {
+      id: ap.id,
+      start: ap.start,
+      end: ap.end,
+      durata: ap.durata,
+      patientId: pid,
+      patientFields: patient,
+    };
+  });
+
+  console.log("AGENDA ENRICHED:", enriched);
+})();
+</script>
 <body>
 <div class="app">
 
