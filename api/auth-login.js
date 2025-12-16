@@ -1,33 +1,72 @@
-import { findCollaboratorByEmail, signToken } from "./_auth.js";
+import { signSession } from "./_auth.js";
+
+const {
+  AIRTABLE_TOKEN,
+  AIRTABLE_BASE_ID,
+  AIRTABLE_COLLABORATORI_TABLE = "COLLABORATORI",
+} = process.env;
+
+function send(res, status, data, cookie) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  if (cookie) res.setHeader("Set-Cookie", cookie);
+  res.end(JSON.stringify(data));
+}
 
 export default async function handler(req, res) {
+  if (req.method !== "POST") return send(res, 405, { ok: false, error: "method_not_allowed" });
+
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
+    return send(res, 500, { ok: false, error: "missing_env_airtable" });
+  }
+
   try {
-    if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+    // Vercel node functions: req.body c'è già se invii JSON
+    const email = String(req.body?.email || "").trim();
+    const codice = String(req.body?.codice || "").trim();
 
-    const { email, code } = req.body || {};
-    if (!email || !code) return res.status(400).json({ error: "email and code required" });
+    if (!email || !codice) return send(res, 400, { ok: false, error: "missing_fields" });
 
-    const u = await findCollaboratorByEmail(email);
-    if (!u || !u.active) return res.status(401).json({ error: "Invalid credentials or inactive user" });
+    const table = encodeURIComponent(AIRTABLE_COLLABORATORI_TABLE);
+    const filter = encodeURIComponent(`LOWER({Email}) = LOWER("${email}")`);
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}?filterByFormula=${filter}&maxRecords=1`;
 
-    if (String(code).trim() !== String(u.code).trim()) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    if (!u.role) {
-      return res.status(400).json({
-        error: "Ruolo non valido in Airtable",
-        ruolo_trovato: u.role_raw,
-        ruoli_ammessi: ["Fisioterapista", "Front office", "Manager"],
-      });
-    }
-
-    const token = signToken({ email: u.email, role: u.role, name: u.name || u.email });
-    res.status(200).json({
-      token,
-      user: { email: u.email, role: u.role, name: u.name || u.email, roleLabel: u.role_raw }
+    const r = await fetch(url, {
+      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
     });
+
+    if (!r.ok) return send(res, 401, { ok: false, error: "invalid" });
+
+    const data = await r.json();
+    const rec = data.records?.[0];
+    if (!rec) return send(res, 401, { ok: false, error: "invalid" });
+
+    const f = rec.fields || {};
+    const attivo = Boolean(f.Attivo);
+    const ruolo = String(f.Ruolo || "").trim();
+    const codiceDb = String(f["Codice accesso"] || "").trim();
+    const nome = String(f.Nome || "").trim();
+
+    const ruoloValido = ruolo === "Fisioterapista" || ruolo === "Front office" || ruolo === "Manager";
+    if (!attivo || !ruoloValido || !codiceDb || codiceDb !== codice) {
+      return send(res, 401, { ok: false, error: "invalid" });
+    }
+
+    // Sessione firmata
+    const token = signSession({ email, role: ruolo, nome });
+
+    // Cookie SICURA (httpOnly, Secure, SameSite=Lax)
+    const cookie = [
+      `fp_session=${token}`,
+      "Path=/",
+      "HttpOnly",
+      "Secure",
+      "SameSite=Lax",
+      `Max-Age=${60 * 60 * 8}`, // 8 ore (meglio di 12 per sanità)
+    ].join("; ");
+
+    return send(res, 200, { ok: true, role: ruolo, nome }, cookie);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return send(res, 500, { ok: false, error: "server_error" });
   }
 }
