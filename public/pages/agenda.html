@@ -3,1116 +3,168 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FisioPro – Agenda</title>
-
-  <link rel="stylesheet" href="/assets/app.css" />
-  <script src="/assets/auth-guard.js"></script>
-  <script src="/assets/session-timeout.js"></script>
-
-  <style>
-    :root{
-      --leftW: 210px;
-      --rightW: 250px;
-      --radius: 18px;
-      --border: rgba(255,255,255,.10);
-      --card: rgba(255,255,255,.05);
-      --card2: rgba(255,255,255,.04);
-      --gridLine: rgba(255,255,255,.06);
-      --gridLineStrong: rgba(255,255,255,.10);
-      --textMuted: rgba(255,255,255,.72);
-
-      --slotH: 34px;        /* 30 min */
-      --timeColW: 86px;
-      --eventPadX: 10px;
-    }
-
-    body{ margin:0; }
-    .shell{ display:grid; grid-template-columns: var(--leftW) 1fr var(--rightW); min-height:100vh; }
-    .sidebar, .rightbar{ background: rgba(255,255,255,.03); backdrop-filter: blur(10px); }
-    .sidebar{ border-right: 1px solid var(--border); }
-    .rightbar{ border-left: 1px solid var(--border); }
-
-    .brand{ display:flex; gap:10px; align-items:center; padding: 16px; border-bottom: 1px solid var(--border); }
-    .logo{
-      width:38px; height:38px; border-radius: 14px;
-      background: linear-gradient(135deg, rgba(0,255,210,.8), rgba(80,150,255,.8));
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-      flex: 0 0 auto;
-    }
-    .brand h2{ margin:0; font-size:16px; }
-    .brand .sub{ margin-top:2px; font-size:12px; opacity:.75; }
-
-    .menu{ padding: 12px; }
-    .menu h4{ margin: 14px 8px 8px; opacity:.7; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
-    .nav a{
-      display:flex; align-items:center; gap:10px;
-      padding: 11px 12px; margin: 6px 6px;
-      border-radius: 14px; text-decoration:none;
-      border: 1px solid transparent; color: inherit;
-    }
-    .nav a.active{ background: rgba(0,255,210,.10); border-color: rgba(0,255,210,.28); }
-    .nav a:hover{ background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.10); }
-
-    .main{ padding: 16px; overflow:auto; }
-
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between; gap: 14px;
-      padding: 14px 16px; border: 1px solid var(--border);
-      border-radius: var(--radius); background: var(--card);
-    }
-    .topLeft .title{ font-size: 28px; font-weight: 900; margin:0; line-height:1.05; }
-    .topLeft .who{ margin-top:6px; opacity:.8; font-size: 14px; }
-
-    .actions{ display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
-    .btn{
-      padding: 10px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      cursor:pointer;
-      font-weight: 800;
-      user-select:none;
-    }
-    .btn:hover{ background: rgba(255,255,255,.10); }
-    .btn.primary{ border-color: rgba(0,255,210,.28); background: rgba(0,255,210,.10); }
-
-    .chipRow{
-      display:flex; gap:8px; align-items:center; flex-wrap: wrap;
-      margin-top: 12px; padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius); background: var(--card2);
-    }
-    .chip{
-      display:inline-flex; align-items:center; gap:8px;
-      padding: 8px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      font-weight: 900; font-size: 13px;
-    }
-    .dot{
-      width: 22px; height: 22px; border-radius: 999px;
-      display:inline-flex; align-items:center; justify-content:center;
-      font-size: 12px; font-weight: 950;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(255,255,255,.10);
-    }
-
-    .alert{
-      margin-top: 12px;
-      border-radius: var(--radius);
-      padding: 12px 14px;
-      border: 1px solid rgba(255,80,80,.35);
-      background: rgba(255,80,80,.10);
-      color: rgba(255,255,255,.92);
-      font-weight: 800;
-    }
-
-    /* ---------- CALENDARIO ---------- */
-    .calendarWrap{
-      margin-top: 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--card);
-      overflow: hidden;
-    }
-
-    .calHeader{
-      display:grid;
-      grid-template-columns: var(--timeColW) repeat(7, 1fr);
-      border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,.04);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .calHeader .corner{
-      padding: 12px;
-      font-weight: 900;
-      opacity:.8;
-    }
-    .dayHead{
-      padding: 10px 12px;
-      border-left: 1px solid var(--border);
-      display:flex; align-items:center; justify-content:space-between; gap: 8px;
-    }
-    .dayHead .dname{ font-weight: 950; letter-spacing:.02em; }
-    .dayHead .dnum{
-      display:inline-flex; align-items:center; justify-content:center;
-      width: 32px; height: 32px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      font-weight: 950;
-    }
-
-    .calScroller{
-      height: 70vh;          /* scroll vero */
-      overflow-y: auto;
-      scroll-behavior: smooth;
-      position: relative;
-    }
-
-    .calBody{
-      position: relative;
-      display:grid;
-      grid-template-columns: var(--timeColW) repeat(7, 1fr);
-    }
-
-    .timeCol{
-      border-right: 1px solid var(--border);
-      background: rgba(255,255,255,.03);
-      position: sticky;
-      left: 0;
-      z-index: 9;
-    }
-    .timeSlot{
-      height: var(--slotH);
-      border-bottom: 1px solid var(--gridLine);
-      padding: 7px 10px;
-      color: var(--textMuted);
-      font-size: 13px;
-      font-weight: 900;
-      display:flex;
-      align-items:flex-start;
-      justify-content:flex-start;
-    }
-    .timeSlot.hour{
-      border-bottom: 1px solid var(--gridLineStrong);
-      color: rgba(255,255,255,.82);
-    }
-
-    .dayCol{
-      position: relative;
-      border-left: 1px solid var(--border);
-      user-select:none;
-      cursor: crosshair;
-    }
-
-    .gridRow{
-      position:absolute;
-      left:0; right:0;
-      height: var(--slotH);
-      border-bottom: 1px solid var(--gridLine);
-      box-sizing:border-box;
-      pointer-events:none;
-    }
-    .gridRow.hour{
-      border-bottom: 1px solid var(--gridLineStrong);
-    }
-
-    /* hover & selection slot */
-    .slotHover, .slotSelect{
-      position:absolute;
-      left: 6px;
-      right: 6px;
-      height: var(--slotH);
-      border-radius: 10px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.14);
-      z-index: 6;
-      pointer-events:none;
-    }
-    .slotSelect{
-      background: rgba(255,255,255,.12);
-      border-color: rgba(0,255,210,.22);
-    }
-
-    /* popover (minestrina) */
-    .popover{
-      position: fixed;
-      z-index: 60;
-      min-width: 240px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(24,32,44,.95);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 24px 70px rgba(0,0,0,.45);
-      display:none;
-    }
-    .popover.open{ display:block; }
-    .popRow{ display:flex; gap:10px; align-items:center; font-weight: 950; }
-    .popSub{ margin-top:6px; opacity:.75; font-weight: 850; font-size: 13px; }
-    .popActions{ margin-top:10px; display:flex; gap:10px; }
-    .popBtn{
-      padding: 9px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(0,255,210,.28);
-      background: rgba(0,255,210,.10);
-      cursor:pointer;
-      font-weight: 900;
-      width:100%;
-      text-align:center;
-    }
-    .popBtn:hover{ background: rgba(0,255,210,.14); }
-
-    /* eventi */
-    .event{
-      position:absolute;
-      left: var(--eventPadX);
-      right: var(--eventPadX);
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.16);
-      box-shadow: 0 10px 24px rgba(0,0,0,.20);
-      padding: 10px 10px;
-      cursor: pointer;
-      overflow:hidden;
-      z-index: 5;
-    }
-    .event:hover{ filter: brightness(1.05); border-color: rgba(255,255,255,.22); }
-
-    .eventTop{
-      display:flex; justify-content:space-between; gap: 10px; align-items:center;
-      font-weight: 950;
-      font-size: 14px;
-    }
-    .eventMid{
-      margin-top: 6px;
-      font-size: 14px;
-      opacity:.92;
-      font-weight: 900;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .eventBot{
-      margin-top: 6px;
-      font-size: 12px;
-      opacity:.78;
-      font-weight: 900;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* right bar */
-    .rbHead{ padding: 16px; border-bottom:1px solid var(--border); }
-    .rbHead .t1{ font-size: 12px; opacity:.75; letter-spacing:.08em; text-transform:uppercase; }
-    .rbHead .t2{ margin-top: 8px; font-size: 20px; font-weight: 950; }
-    .rbBody{ padding: 12px; }
-    .rbCard{
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: var(--card2);
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-    .rbCard .h{ font-weight: 950; margin-bottom: 6px; }
-    .rbCard .m{ opacity:.75; font-size: 13px; line-height:1.25; }
-
-    /* ---------- MODAL "Nuovo appuntamento" ---------- */
-    .modal{
-      position: fixed; inset:0;
-      background: rgba(0,0,0,.55);
-      display:none;
-      align-items:flex-start;
-      justify-content:center;
-      z-index: 80;
-      padding: 18px;
-      overflow:auto;
-    }
-    .modal.open{ display:flex; }
-
-    .modalCard{
-      width: min(980px, 100%);
-      border-radius: 22px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,.06);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 30px 90px rgba(0,0,0,.45);
-      padding: 16px;
-      margin-top: 24px;
-    }
-    .modalTop{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .modalTitle{ font-size: 22px; font-weight: 950; display:flex; align-items:center; gap:10px; }
-    .xbtn{
-      width: 44px; height: 44px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      cursor:pointer;
-      font-weight: 950;
-    }
-    .xbtn:hover{ background: rgba(255,255,255,.10); }
-
-    .modalRowHead{
-      display:flex; align-items:center; justify-content:space-between;
-      gap: 12px;
-      padding: 14px 2px 10px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      margin-bottom: 12px;
-    }
-    .whenLine{ font-size: 22px; font-weight: 950; opacity:.95; }
-
-    .btn.ghost{
-      border-color: rgba(255,140,0,.35);
-      background: rgba(255,140,0,.10);
-    }
-    .btn.ghost:hover{ background: rgba(255,140,0,.14); }
-
-    .formGrid3{
-      display:grid;
-      grid-template-columns: 1fr 1fr 220px;
-      gap: 12px;
-    }
-    .field{ display:flex; flex-direction:column; gap: 6px; }
-    .label{ font-size: 12px; opacity:.78; font-weight: 900; letter-spacing:.04em; text-transform:uppercase; }
-    .input{
-      padding: 12px 12px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      color: inherit;
-      font-weight: 800;
-      font-size: 15px;
-      outline:none;
-    }
-    .input:focus{ border-color: rgba(0,255,210,.25); }
-
-    .checks{
-      display:flex; gap:14px; flex-wrap:wrap;
-      padding: 10px 10px;
-      border: 1px solid rgba(255,255,255,.10);
-      border-radius: 14px;
-      background: rgba(255,255,255,.04);
-    }
-    .ck{ display:flex; align-items:center; gap:8px; font-weight: 850; opacity:.85; }
-
-    .modalActions{ display:flex; gap: 10px; justify-content:flex-end; margin-top: 14px; }
-
-    @media (max-width: 1100px){
-      .shell{ grid-template-columns: 0 1fr 0; }
-      .sidebar, .rightbar{ display:none; }
-      .formGrid3{ grid-template-columns: 1fr; }
-    }
-  </style>
+  <title>FisioPro — Agenda</title>
+  <link rel="stylesheet" href="/assets/agenda.css" />
 </head>
 
 <body>
-  <div class="shell">
-    <!-- SINISTRA -->
-    <aside class="sidebar">
+  <div class="app">
+    <!-- TOP BAR -->
+    <header class="topbar">
       <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h2>FISIOPRO</h2>
-          <div class="sub" id="sbUser">—</div>
+        <div class="logo">FP</div>
+        <div class="titles">
+          <div class="h1">Agenda</div>
+          <div class="h2">07:00 → 21:00 • slot 30 min</div>
         </div>
       </div>
 
-      <div class="menu">
-        <h4>Generale</h4>
-        <nav class="nav">
-          <a href="/pages/pazienti.html"><span>👥</span> Pazienti</a>
-          <a class="active" href="/pages/agenda.html"><span>🗓️</span> Agenda</a>
-          <a href="/pages/casi-clinici.html"><span>🧠</span> Casi clinici</a>
-        </nav>
+      <div class="controls">
+        <button id="btnToggleLeft" class="btn btnGhost" type="button">Colonna sinistra</button>
+        <button id="btnToggleRight" class="btn btnGhost" type="button">Colonna destra</button>
+        <div class="divider"></div>
 
-        <h4>Operativo</h4>
-        <nav class="nav">
-          <a href="/pages/lista-attesa.html"><span>⏳</span> Lista d’attesa</a>
-          <a href="/pages/file-caricati.html"><span>📎</span> File caricati</a>
-          <a href="/pages/notifiche.html"><span>🔔</span> Notifiche</a>
-        </nav>
+        <button id="btnPrev" class="btn" type="button">←</button>
+        <button id="btnToday" class="btn btnGhost" type="button">Oggi</button>
+        <button id="btnNext" class="btn" type="button">→</button>
 
-        <h4>Setup</h4>
-        <nav class="nav">
-          <a href="/pages/configurazione.html"><span>⚙️</span> Configurazione</a>
-        </nav>
+        <label class="datePick">
+          <span>Data</span>
+          <input id="dateInput" type="date" />
+        </label>
+
+        <button id="btnNew" class="btn btnPrimary" type="button">+ Appuntamento</button>
       </div>
-    </aside>
+    </header>
 
-    <!-- CENTRO -->
-    <main class="main">
-      <div class="topbar">
-        <div class="topLeft">
-          <div class="title">Agenda</div>
-          <div class="who" id="who">—</div>
-        </div>
+    <!-- LAYOUT -->
+    <main class="layout">
+      <!-- LEFT PANEL -->
+      <aside id="leftPanel" class="panel left">
+        <div class="panelHeader">Filtri rapidi</div>
+        <div class="panelBody">
+          <label class="field">
+            <span>Ricerca</span>
+            <input id="searchInput" type="text" placeholder="Paziente / email / nota..." />
+          </label>
 
-        <div class="actions">
-          <button class="btn" id="btnToday">Oggi</button>
-          <button class="btn" id="btnPrev">‹</button>
-          <button class="btn" id="btnNext">›</button>
-          <div class="btn" id="weekLabel" style="cursor:default;">—</div>
-          <button class="btn primary" id="btnRefresh">Aggiorna</button>
-          <button class="btn" id="btnLogout">Logout</button>
-        </div>
-      </div>
+          <label class="field">
+            <span>Risorsa</span>
+            <select id="resourceSelect">
+              <option value="TUTTI">Tutti</option>
+              <option value="Fisio 1">Fisio 1</option>
+              <option value="Fisio 2">Fisio 2</option>
+              <option value="Fisio 3">Fisio 3</option>
+            </select>
+          </label>
 
-      <div class="chipRow" id="chips">
-        <span style="opacity:.75;font-weight:950;">Collaboratori:</span>
-        <span style="opacity:.75;font-weight:850;">Caricamento…</span>
-      </div>
-
-      <div id="errBox" class="alert" style="display:none;"></div>
-
-      <div class="calendarWrap">
-        <div class="calHeader" id="calHeader"></div>
-
-        <div class="calScroller" id="calScroller">
-          <div class="calBody" id="calBody"></div>
-        </div>
-      </div>
-    </main>
-
-    <!-- DESTRA -->
-    <aside class="rightbar">
-      <div class="rbHead">
-        <div class="t1">Filtri agenda</div>
-        <div class="t2">Filtri</div>
-      </div>
-
-      <div class="rbBody">
-        <div class="rbCard">
-          <div class="h">Azioni</div>
-          <button class="btn primary" style="width:100%;" id="btnPlus">+ Appuntamento</button>
-        </div>
-
-        <div class="rbCard">
-          <div class="h">Incaricati</div>
-          <div class="m">(Step dopo: dropdown collaboratori)</div>
-        </div>
-
-        <div class="rbCard">
-          <div class="h">Prestazioni</div>
-          <div class="m">(Step dopo: tipi visita)</div>
-        </div>
-
-        <div class="rbCard">
-          <div class="h">Stati</div>
-          <div class="m">(Step dopo: confermato / da confermare)</div>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <!-- POPOVER (minestrina) -->
-  <div class="popover" id="popover">
-    <div class="popRow" id="popTime">🕒 —</div>
-    <div class="popSub" id="popSub">Slot selezionato</div>
-    <div class="popActions">
-      <div class="popBtn" id="popCreate">+ Appuntamento</div>
-    </div>
-  </div>
-
-  <!-- MODAL: Nuovo appuntamento -->
-  <div class="modal" id="apptModal" aria-hidden="true">
-    <div class="modalCard">
-      <div class="modalTop">
-        <div class="modalTitle"><span>📅</span> Nuovo appuntamento</div>
-        <button class="xbtn" id="apptClose">✕</button>
-      </div>
-
-      <div class="modalRowHead">
-        <div id="apptWhen" class="whenLine">—</div>
-        <button class="btn ghost" id="apptRepeat">RIPETI ↻</button>
-      </div>
-
-      <div class="formGrid3">
-        <div class="field">
-          <div class="label">Tipologia</div>
-          <select class="input" id="apptType">
-            <option value="Appuntamento paziente">Appuntamento paziente</option>
-            <option value="Prima visita">Prima visita</option>
-            <option value="Controllo">Controllo</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <div class="label">Paziente</div>
-          <input class="input" id="apptPatient" placeholder="Nome paziente o recordId Airtable" />
-        </div>
-
-        <div class="field">
-          <div class="label">Durata</div>
-          <select class="input" id="apptDur">
-            <option value="30">30 minuti</option>
-            <option value="60">60 minuti</option>
-            <option value="90">90 minuti</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <div class="label">Agenda (incaricato)</div>
-          <input class="input" id="apptEmail" type="email" placeholder="email fisioterapista" />
-        </div>
-
-        <div class="field" style="grid-column: 1 / -1;">
-          <div class="checks">
-            <label class="ck"><input type="checkbox" id="ckAbsentEmail"> Assente (email)</label>
-            <label class="ck"><input type="checkbox" id="ckAbsentSms"> Assente (sms)</label>
-            <label class="ck"><input type="checkbox" id="ckAbsentWa"> Assente (whatsapp)</label>
-            <label class="ck"><input type="checkbox" id="ckNotify"> Notifica incaricato</label>
+          <div class="hint">
+            Nota: backend lo colleghiamo dopo. Intanto puoi creare/modificare e salva in locale.
           </div>
         </div>
+      </aside>
 
-        <div class="field">
-          <div class="label">Note interne</div>
-          <input class="input" id="apptNoteIn" maxlength="255" placeholder="0 / 255" />
+      <!-- CENTER -->
+      <section class="center">
+        <div class="dayTitle">
+          <div id="dayLabel" class="dayLabel">—</div>
+          <div class="mini">Clicca uno slot per dettagli • trascina scroll per scendere</div>
         </div>
 
-        <div class="field">
-          <div class="label">Note visibili al paziente</div>
-          <input class="input" id="apptNoteOut" maxlength="255" placeholder="0 / 255" />
+        <div class="gridWrap" id="gridWrap">
+          <div class="gridHeader">
+            <div class="corner"></div>
+            <div class="colHead">Fisio 1</div>
+            <div class="colHead">Fisio 2</div>
+            <div class="colHead">Fisio 3</div>
+          </div>
+
+          <div class="gridBody" id="gridBody">
+            <!-- righe generate via JS -->
+          </div>
         </div>
+      </section>
+
+      <!-- RIGHT PANEL -->
+      <aside id="rightPanel" class="panel right">
+        <div class="panelHeader">Lista del giorno</div>
+        <div class="panelBody">
+          <div id="listDay" class="listDay"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modalBack" class="modalBack hidden" aria-hidden="true">
+    <div class="modal">
+      <div class="modalTop">
+        <div class="modalTitle" id="modalTitle">Dettagli appuntamento</div>
+        <button id="btnCloseModal" class="iconBtn" type="button" aria-label="Chiudi">✕</button>
       </div>
 
-      <div class="modalActions">
-        <button class="btn" id="apptCancel">ANNULLA</button>
-        <button class="btn primary" id="apptSave">SALVA</button>
+      <div class="modalBody">
+        <div class="row2">
+          <label class="field">
+            <span>Paziente (testo)</span>
+            <input id="mPaziente" type="text" placeholder="Es. Rossi Mario" />
+          </label>
+
+          <label class="field">
+            <span>Email (opzionale)</span>
+            <input id="mEmail" type="email" placeholder="nome@email.it" />
+          </label>
+        </div>
+
+        <div class="row2">
+          <label class="field">
+            <span>Risorsa</span>
+            <select id="mRisorsa">
+              <option value="Fisio 1">Fisio 1</option>
+              <option value="Fisio 2">Fisio 2</option>
+              <option value="Fisio 3">Fisio 3</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Durata</span>
+            <select id="mDurata">
+              <option value="30">30 min</option>
+              <option value="60">60 min</option>
+              <option value="90">90 min</option>
+              <option value="120">120 min</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="row2">
+          <label class="field">
+            <span>Data e ora INIZIO</span>
+            <input id="mStart" type="datetime-local" />
+          </label>
+
+          <label class="field">
+            <span>Data e ora FINE</span>
+            <input id="mEnd" type="datetime-local" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Note</span>
+          <textarea id="mNote" rows="3" placeholder="Dettagli, promemoria, ecc."></textarea>
+        </label>
+
+        <div class="dangerZone">
+          <button id="btnDelete" class="btn btnDanger" type="button">Elimina</button>
+          <div class="spacer"></div>
+          <button id="btnSave" class="btn btnPrimary" type="button">Salva</button>
+        </div>
+
+        <div class="smallHint" id="saveHint">—</div>
       </div>
     </div>
   </div>
 
-  <script>
-    // ---- CONFIG ----
-    const START_HOUR = 7;
-    const END_HOUR_INCLUSIVE = 21;
-    const STEP_MIN = 30;
-
-    const SLOT_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--slotH')) || 34;
-    const TOTAL_MIN = (END_HOUR_INCLUSIVE - START_HOUR) * 60; // fino alle 21:00
-    const SLOTS = (TOTAL_MIN / STEP_MIN) + 1; // include riga 21:00
-    const PX_PER_MIN = SLOT_H / STEP_MIN;
-
-    // ---- STATE ----
-    let weekStart = startOfWeek(new Date());
-    let patientsMap = {};
-    let meUser = { email:"", role:"" };
-
-    let hovered = null;
-    let selected = null;
-    let lastMouse = { x: 0, y: 0 };
-
-    // ---- API ----
-    async function apiGet(url){
-      const res = await fetch(url, { credentials:"include" });
-      const data = await res.json().catch(()=> ({}));
-      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
-      return data;
-    }
-    async function apiPost(url, body){
-      const res = await fetch(url, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        credentials:"include",
-        body: JSON.stringify(body || {})
-      });
-      const data = await res.json().catch(()=> ({}));
-      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
-      return data;
-    }
-
-    // ---- UI ----
-    function showErr(msg){
-      const b = document.getElementById("errBox");
-      b.style.display = "block";
-      b.textContent = msg || "Errore nel caricamento agenda.";
-    }
-    function hideErr(){
-      const b = document.getElementById("errBox");
-      b.style.display = "none";
-      b.textContent = "";
-    }
-
-    // ---- date helpers ----
-    function pad(n){ return String(n).padStart(2,'0'); }
-    function toISODate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-    function startOfWeek(d){
-      const x = new Date(d);
-      const day = (x.getDay() + 6) % 7;
-      x.setHours(0,0,0,0);
-      x.setDate(x.getDate() - day);
-      return x;
-    }
-    function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
-    function dayNameShort(d){
-      const names = ["LUN","MAR","MER","GIO","VEN","SAB","DOM"];
-      const idx = (d.getDay()+6)%7;
-      return names[idx];
-    }
-    function fmtWeekLabel(ws){
-      const we = addDays(ws, 6);
-      const mid = addDays(ws, 3);
-      const m = mid.toLocaleDateString("it-IT", { month:"long", year:"numeric" });
-      return `${m} • ${pad(ws.getDate())}/${pad(ws.getMonth()+1)} → ${pad(we.getDate())}/${pad(we.getMonth()+1)}`;
-    }
-
-    // ---- parsing records ----
-    function pick(v, ...keys){
-      for(const k of keys){
-        if(v && v[k] != null && v[k] !== "") return v[k];
-      }
-      return "";
-    }
-    function parseAppointment(r){
-      const start = pick(r, "start", "inizio", "startAt", "Data e ora INIZIO");
-      const end   = pick(r, "end", "fine", "endAt", "Data e ora FINE");
-      const durata = pick(r, "durata", "Durata");
-      const email = pick(r, "email", "Email");
-      const patientId = pick(r, "patientId", "PazienteId", "pazienteId", "patient");
-      return { start, end, durata, email, patientId, raw:r };
-    }
-
-    function minutesFromStart(iso){
-      const d = new Date(iso);
-      return (d.getHours()*60 + d.getMinutes()) - (START_HOUR*60);
-    }
-    function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
-    function hhmm(iso){
-      const d = new Date(iso);
-      return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
-    }
-
-    // ---- colors ----
-    const PALETTE = [
-      { bg:"rgba(0,255,210,.14)", br:"rgba(0,255,210,.30)" },
-      { bg:"rgba(80,150,255,.14)", br:"rgba(80,150,255,.30)" },
-      { bg:"rgba(255,140,0,.14)", br:"rgba(255,140,0,.30)" },
-      { bg:"rgba(160,90,255,.14)", br:"rgba(160,90,255,.30)" },
-      { bg:"rgba(255,80,80,.14)", br:"rgba(255,80,80,.30)" },
-      { bg:"rgba(120,255,120,.14)", br:"rgba(120,255,120,.30)" },
-      { bg:"rgba(255,255,120,.12)", br:"rgba(255,255,120,.26)" },
-      { bg:"rgba(120,200,255,.14)", br:"rgba(120,200,255,.30)" },
-    ];
-    function hashStr(s){
-      let h = 2166136261;
-      for(let i=0;i<s.length;i++){
-        h ^= s.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-      }
-      return (h >>> 0);
-    }
-    function colorForEmail(email){
-      const e = (email || "").toLowerCase().trim();
-      const idx = hashStr(e || "x") % PALETTE.length;
-      return PALETTE[idx];
-    }
-    function initialsFromEmail(email){
-      const x = (email || "").split("@")[0] || "";
-      const parts = x.split(/[.\-_]/).filter(Boolean);
-      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-      return (x.slice(0,2) || "??").toUpperCase();
-    }
-
-    // ---- patient name ----
-    function patientName(patientId){
-      const p = patientsMap[patientId];
-      if(!p) return "—";
-      const nome = (p.Nome || p.nome || "").trim();
-      const cogn = (p.Cognome || p.cognome || "").trim();
-      return (nome + " " + cogn).trim() || "—";
-    }
-
-    // ---- calendar skeleton ----
-    function buildCalendarSkeleton(){
-      const header = document.getElementById("calHeader");
-      header.innerHTML = "";
-
-      const corner = document.createElement("div");
-      corner.className = "corner";
-      corner.textContent = "Ore";
-      header.appendChild(corner);
-
-      for(let i=0;i<7;i++){
-        const d = addDays(weekStart, i);
-        const dh = document.createElement("div");
-        dh.className = "dayHead";
-        dh.innerHTML = `
-          <div class="dname">${dayNameShort(d)}</div>
-          <div class="dnum">${pad(d.getDate())}</div>
-        `;
-        header.appendChild(dh);
-      }
-
-      const body = document.getElementById("calBody");
-      body.innerHTML = "";
-      body.style.height = (SLOTS * SLOT_H) + "px";
-
-      const timeCol = document.createElement("div");
-      timeCol.className = "timeCol";
-      for(let s=0;s<SLOTS;s++){
-        const mins = s * STEP_MIN;
-        const hour = START_HOUR + Math.floor(mins / 60);
-        const min = mins % 60;
-
-        const t = document.createElement("div");
-        t.className = "timeSlot" + (min === 0 ? " hour" : "");
-        t.textContent = (min === 0) ? `${pad(hour)}:00` : "";
-        timeCol.appendChild(t);
-      }
-      body.appendChild(timeCol);
-
-      for(let i=0;i<7;i++){
-        const col = document.createElement("div");
-        col.className = "dayCol";
-        col.dataset.dayIndex = String(i);
-
-        for(let s=0;s<SLOTS;s++){
-          const line = document.createElement("div");
-          line.className = "gridRow" + ((s % 2 === 0) ? " hour" : "");
-          line.style.top = (s * SLOT_H) + "px";
-          col.appendChild(line);
-        }
-
-        col.addEventListener("mousemove", (ev) => {
-          lastMouse = { x: ev.clientX, y: ev.clientY };
-          const info = slotFromEvent(col, ev);
-          setHover(info);
-        });
-        col.addEventListener("mouseleave", () => clearHover());
-
-        col.addEventListener("click", (ev) => {
-          if(ev.target.closest(".event")) return;
-          const info = slotFromEvent(col, ev);
-          setSelected(info);
-          openPopoverAt(lastMouse.x, lastMouse.y);
-        });
-
-        body.appendChild(col);
-      }
-
-      clearHover();
-      clearSelected();
-      closePopover();
-      closeApptModal();
-    }
-
-    function slotFromEvent(col, ev){
-      const rect = col.getBoundingClientRect();
-      const y = ev.clientY - rect.top;
-
-      const slotIndex = clamp(Math.floor(y / SLOT_H), 0, SLOTS-1);
-      const minutes = slotIndex * STEP_MIN;
-      const hh = START_HOUR + Math.floor(minutes / 60);
-      const mm = minutes % 60;
-
-      const dayIndex = parseInt(col.dataset.dayIndex, 10);
-      const date = addDays(weekStart, dayIndex);
-      const isoDate = toISODate(date);
-
-      return { dayIndex, slotIndex, isoDate, hhmm: `${pad(hh)}:${pad(mm)}` };
-    }
-
-    // ---- hover/select overlays ----
-    function clearHover(){
-      document.querySelectorAll(".slotHover").forEach(x => x.remove());
-      hovered = null;
-    }
-    function setHover(info){
-      hovered = info;
-      document.querySelectorAll(".slotHover").forEach(x => x.remove());
-
-      const col = document.querySelector(`.dayCol[data-day-index="${info.dayIndex}"]`);
-      if(!col) return;
-
-      const h = document.createElement("div");
-      h.className = "slotHover";
-      h.style.top = (info.slotIndex * SLOT_H + 2) + "px";
-      col.appendChild(h);
-    }
-
-    function clearSelected(){
-      document.querySelectorAll(".slotSelect").forEach(x => x.remove());
-      selected = null;
-    }
-    function setSelected(info){
-      selected = info;
-      document.querySelectorAll(".slotSelect").forEach(x => x.remove());
-
-      const col = document.querySelector(`.dayCol[data-day-index="${info.dayIndex}"]`);
-      if(!col) return;
-
-      const s = document.createElement("div");
-      s.className = "slotSelect";
-      s.style.top = (info.slotIndex * SLOT_H + 2) + "px";
-      col.appendChild(s);
-
-      document.getElementById("popTime").textContent = `🕒 ${info.hhmm}`;
-      document.getElementById("popSub").textContent = `Giorno: ${info.isoDate}`;
-    }
-
-    // ---- popover ----
-    const pop = document.getElementById("popover");
-    function openPopoverAt(x,y){
-      const left = Math.min(window.innerWidth - 260, x + 12);
-      const top  = Math.min(window.innerHeight - 170, y + 12);
-      pop.style.left = left + "px";
-      pop.style.top = top + "px";
-      pop.classList.add("open");
-    }
-    function closePopover(){ pop.classList.remove("open"); }
-
-    window.addEventListener("keydown", (e) => {
-      if(e.key === "Escape"){
-        closePopover();
-        clearSelected();
-        closeApptModal();
-      }
-    });
-    window.addEventListener("click", (e) => {
-      if(pop.classList.contains("open")){
-        if(!e.target.closest(".popover") && !e.target.closest(".dayCol")){
-          closePopover();
-          clearSelected();
-        }
-      }
-    });
-
-    // ---- render events ----
-    function clearEvents(){
-      document.querySelectorAll(".dayCol").forEach(c => c.querySelectorAll(".event").forEach(e => e.remove()));
-    }
-
-    function renderEvent(dayIndex, ap){
-      const col = document.querySelector(`.dayCol[data-day-index="${dayIndex}"]`);
-      if(!col) return;
-
-      const startM = minutesFromStart(ap.start);
-      const endM = minutesFromStart(ap.end);
-
-      const maxM = TOTAL_MIN; // fino alle 21:00
-      const topM = clamp(startM, 0, maxM);
-      const botM = clamp(endM, 0, maxM);
-      const durM = Math.max(15, botM - topM);
-
-      const topPx = topM * PX_PER_MIN;
-      const heightPx = Math.max(30, durM * PX_PER_MIN);
-
-      const ev = document.createElement("div");
-      ev.className = "event";
-      ev.style.top = `${topPx + 4}px`;
-      ev.style.height = `${heightPx - 6}px`;
-
-      const c = colorForEmail(ap.email);
-      ev.style.background = c.bg;
-      ev.style.borderColor = c.br;
-
-      const pName = ap.patientId ? patientName(ap.patientId) : "—";
-
-      ev.innerHTML = `
-        <div class="eventTop">
-          <div>${hhmm(ap.start)}–${hhmm(ap.end)}</div>
-          <div style="opacity:.85;">${ap.durata || ""}</div>
-        </div>
-        <div class="eventMid">${pName}</div>
-        <div class="eventBot">${ap.email || ""}</div>
-      `;
-
-      if(ap.patientId){
-        ev.onclick = () => location.href = `/pages/paziente.html?id=${encodeURIComponent(ap.patientId)}`;
-      } else {
-        ev.style.cursor = "default";
-      }
-
-      col.appendChild(ev);
-    }
-
-    // ---- load week ----
-    async function loadWeek(){
-      hideErr();
-      clearEvents();
-      closePopover();
-      clearSelected();
-
-      document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
-
-      const all = [];
-      for(let i=0;i<7;i++){
-        const d = addDays(weekStart, i);
-        const iso = toISODate(d);
-
-        const data = await apiGet(`/api/appointments?date=${encodeURIComponent(iso)}`);
-        const recs = data.records || data.appointments || [];
-
-        for(const r of recs){
-          const ap = parseAppointment(r);
-          all.push({ ...ap, dayISO: iso });
-        }
-      }
-
-      const patientIds = Array.from(new Set(all.map(x => x.patientId).filter(Boolean)));
-      patientsMap = {};
-      if(patientIds.length){
-        const pb = await apiPost("/api/patients-batch", { recordIds: patientIds });
-        const list = pb.records || pb.patients || pb || [];
-        for(const p of list){
-          patientsMap[p.id] = p;
-        }
-      }
-
-      renderChips(all);
-
-      for(const ap of all){
-        if(!ap.start || !ap.end) continue;
-        const dayIdx = dayIndexFromISO(ap.dayISO);
-        if(dayIdx >= 0) renderEvent(dayIdx, ap);
-      }
-
-      scrollToHour(9);
-    }
-
-    function dayIndexFromISO(iso){
-      for(let i=0;i<7;i++){
-        if(toISODate(addDays(weekStart, i)) === iso) return i;
-      }
-      return -1;
-    }
-
-    function renderChips(all){
-      const chips = document.getElementById("chips");
-      const emails = Array.from(new Set(all.map(x => (x.email||"").toLowerCase()).filter(Boolean)));
-
-      chips.innerHTML = `<span style="opacity:.75;font-weight:950;">Collaboratori:</span>`;
-      if(!emails.length){
-        const s = document.createElement("span");
-        s.style.opacity = ".75";
-        s.style.fontWeight = "850";
-        s.textContent = "Nessun appuntamento in settimana";
-        chips.appendChild(s);
-        return;
-      }
-
-      const view = emails.slice(0, 12);
-      for(const em of view){
-        const c = colorForEmail(em);
-        const el = document.createElement("span");
-        el.className = "chip";
-
-        const d = document.createElement("span");
-        d.className = "dot";
-        d.textContent = initialsFromEmail(em);
-        d.style.background = c.bg;
-        d.style.borderColor = c.br;
-
-        const t = document.createElement("span");
-        t.textContent = em;
-
-        el.appendChild(d);
-        el.appendChild(t);
-        chips.appendChild(el);
-      }
-      if(emails.length > view.length){
-        const more = document.createElement("span");
-        more.className = "chip";
-        more.textContent = `+${emails.length - view.length}`;
-        chips.appendChild(more);
-      }
-    }
-
-    function scrollToHour(hour){
-      const sc = document.getElementById("calScroller");
-      const h = Math.max(START_HOUR, Math.min(END_HOUR_INCLUSIVE, hour));
-      const mins = (h - START_HOUR) * 60;
-      sc.scrollTop = mins * PX_PER_MIN;
-    }
-
-    // ---- MODAL: nuovo appuntamento ----
-    const apptModal = document.getElementById("apptModal");
-
-    function openApptModalFromSlot(slot){
-      const when = `${slot.isoDate} ${slot.hhmm}`;
-      document.getElementById("apptWhen").textContent = when;
-
-      document.getElementById("apptType").value = "Appuntamento paziente";
-      document.getElementById("apptDur").value = "30";
-      document.getElementById("apptEmail").value = meUser.email || "";
-      document.getElementById("apptPatient").value = "";
-      document.getElementById("apptNoteIn").value = "";
-      document.getElementById("apptNoteOut").value = "";
-      document.getElementById("ckAbsentEmail").checked = false;
-      document.getElementById("ckAbsentSms").checked = false;
-      document.getElementById("ckAbsentWa").checked = false;
-      document.getElementById("ckNotify").checked = false;
-
-      apptModal.classList.add("open");
-    }
-
-    function closeApptModal(){
-      apptModal.classList.remove("open");
-    }
-
-    document.getElementById("apptClose").onclick = closeApptModal;
-    document.getElementById("apptCancel").onclick = closeApptModal;
-    apptModal.addEventListener("click", (e) => { if(e.target === apptModal) closeApptModal(); });
-
-    document.getElementById("apptRepeat").onclick = () => alert("Step dopo: ripetizione appuntamento");
-
-    document.getElementById("apptSave").onclick = () => {
-      const payload = {
-        tipologia: document.getElementById("apptType").value,
-        paziente: document.getElementById("apptPatient").value.trim(),
-        durataMin: parseInt(document.getElementById("apptDur").value, 10),
-        email: document.getElementById("apptEmail").value.trim(),
-        assenteEmail: document.getElementById("ckAbsentEmail").checked,
-        assenteSms: document.getElementById("ckAbsentSms").checked,
-        assenteWhatsapp: document.getElementById("ckAbsentWa").checked,
-        notificaIncaricato: document.getElementById("ckNotify").checked,
-        noteInterne: document.getElementById("apptNoteIn").value.trim(),
-        notePaziente: document.getElementById("apptNoteOut").value.trim(),
-        data: selected?.isoDate || "",
-        ora: selected?.hhmm || ""
-      };
-      console.log("APPT_SAVE_PAYLOAD", payload);
-      closeApptModal();
-    };
-
-    // ---- buttons ----
-    document.getElementById("popCreate").onclick = () => {
-      if(!selected) return;
-      closePopover();
-      openApptModalFromSlot(selected);
-    };
-
-    document.getElementById("btnPlus").onclick = () => {
-      // Se non hai selezionato uno slot: apriamo oggi alle 09:00
-      const d = new Date();
-      const isoDate = toISODate(d);
-      selected = { isoDate, hhmm: "09:00", dayIndex: 0, slotIndex: 0 };
-      openApptModalFromSlot(selected);
-    };
-
-    document.getElementById("btnToday").onclick = () => {
-      weekStart = startOfWeek(new Date());
-      buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
-    };
-    document.getElementById("btnPrev").onclick = () => {
-      weekStart = addDays(weekStart, -7);
-      buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
-    };
-    document.getElementById("btnNext").onclick = () => {
-      weekStart = addDays(weekStart, 7);
-      buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
-    };
-    document.getElementById("btnRefresh").onclick = () => {
-      buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
-    };
-    document.getElementById("btnLogout").onclick = async () => {
-      try { await fetch("/api/auth-logout", { method:"POST", credentials:"include" }); } catch {}
-      location.href = "/";
-    };
-
-    // ---- init ----
-    async function init(){
-      const me = await apiGet("/api/auth-me");
-      meUser = { email: me.email || "", role: me.role || "" };
-
-      document.getElementById("who").textContent = `${meUser.email || "—"} · ${meUser.role || "—"}`;
-      document.getElementById("sbUser").textContent = `${meUser.email || "—"} · ${meUser.role || "—"}`;
-
-      buildCalendarSkeleton();
-      document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
-
-      await loadWeek();
-    }
-
-    init().catch(e => showErr(e.message || "Errore nel caricamento agenda."));
-  </script>
+  <script src="/assets/agenda.js"></script>
 </body>
 </html>
