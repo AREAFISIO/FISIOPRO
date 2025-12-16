@@ -19,6 +19,12 @@
     .fp-btn { width:100%; margin-top:16px; }
   </style>
 </head>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("timeout") === "1") {
+    alert("Sessione terminata per inattività. Effettua di nuovo il login.");
+  }
+</script>
 
 <body>
   <div class="fp-login-wrap">
