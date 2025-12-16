@@ -1,21 +1,8 @@
+import { setJson, clearSessionCookie } from "./_auth.js";
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.statusCode = 405;
-    res.setHeader("Content-Type", "application/json");
-    return res.end(JSON.stringify({ ok: false }));
-  }
+  if (req.method !== "POST") return setJson(res, 405, { ok: false, error: "method_not_allowed" });
 
-  const cookie = [
-    "fp_session=",
-    "Path=/",
-    "HttpOnly",
-    "Secure",
-    "SameSite=Lax",
-    "Max-Age=0",
-  ].join("; ");
-
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Set-Cookie", cookie);
-  res.end(JSON.stringify({ ok: true }));
+  const cookie = clearSessionCookie();
+  return setJson(res, 200, { ok: true }, cookie);
 }
