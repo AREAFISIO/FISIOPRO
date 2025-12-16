@@ -5,56 +5,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FisioPro - Login</title>
 
-  <!-- STESSO CSS DEL GESTIONALE -->
   <link rel="stylesheet" href="/assets/app.css" />
 
   <style>
-    /* Solo mini layout: il resto viene da app.css */
     .fp-login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .fp-login-card { width: 420px; max-width: 95vw; }
-    .fp-login-title { font-size: 22px; font-weight: 800; margin: 0; }
-    .fp-login-sub { opacity: .7; margin: 8px 0 16px; }
-    .fp-field { display:flex; flex-direction:column; gap:6px; margin-top: 12px; }
-    .fp-err { display:none; margin-top:12px; padding:10px; border-radius:12px; background:#fff5f5; border:1px solid #fed7d7; }
-    .fp-btn { width:100%; margin-top:16px; }
+    .fp-login-card { width: 520px; max-width: 95vw; }
+
+    /* TESTI PIÙ GRANDI */
+    .fp-login-title { font-size: 34px; font-weight: 900; margin: 0; letter-spacing: -0.3px; }
+    .fp-login-sub { font-size: 20px; opacity: .75; margin: 10px 0 18px; line-height: 1.35; }
+    .fp-field { display:flex; flex-direction:column; gap:8px; margin-top: 16px; }
+    .fp-field label { font-size: 20px; font-weight: 800; }
+    .fp-field input { font-size: 18px; padding: 14px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); }
+
+    .fp-err { display:none; margin-top:14px; padding:12px; border-radius:12px; background:#fff5f5; border:1px solid #fed7d7; font-size: 16px; }
+    .fp-btn { width:100%; margin-top:18px; font-size: 18px; padding: 14px 14px; border-radius: 12px; font-weight: 900; cursor:pointer; }
+
+    .fp-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top: 14px; }
+    .fp-link { font-size: 16px; opacity: .85; text-decoration: underline; cursor:pointer; }
+    .fp-link:hover { opacity: 1; }
+
+    /* pannello reset */
+    .fp-reset {
+      display:none;
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.15);
+      font-size: 16px;
+      line-height: 1.4;
+    }
+    .fp-reset h3 { margin: 0 0 8px; font-size: 18px; }
+    .fp-reset small { opacity: .8; }
+    .fp-reset input { margin-top: 10px; width: 100%; font-size: 16px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); }
+    .fp-reset .fp-mini { margin-top: 10px; width: 100%; padding: 12px; border-radius: 12px; font-weight: 900; cursor:pointer; }
   </style>
 </head>
-<script>
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("timeout") === "1") {
-    alert("Sessione terminata per inattività. Effettua di nuovo il login.");
-  }
-</script>
 
 <body>
   <div class="fp-login-wrap">
-    <!-- Se nel gestionale usi una "card" class specifica, mettila qui -->
     <div class="fp-login-card">
       <h1 class="fp-login-title">FisioPro</h1>
       <div class="fp-login-sub">Accedi con Email e Codice accesso.</div>
 
       <form id="loginForm">
         <div class="fp-field">
-          <label for="email"><b>Email</b></label>
+          <label for="email">Email</label>
           <input id="email" type="email" placeholder="nome@dominio.it" required />
         </div>
 
         <div class="fp-field">
-          <label for="codice"><b>Codice accesso</b></label>
+          <label for="codice">Codice accesso</label>
           <input id="codice" type="password" placeholder="••••••••" required />
         </div>
 
         <div id="errBox" class="fp-err">Credenziali non valide o utente non attivo.</div>
 
         <button id="loginBtn" class="fp-btn" type="submit">Accedi</button>
+
+        <div class="fp-row">
+          <span id="forgotLink" class="fp-link">Password dimenticata?</span>
+        </div>
+
+        <!-- PANNELLO RESET (manuale, sicuro) -->
+        <div id="resetBox" class="fp-reset">
+          <h3>Recupero accesso</h3>
+          <div>
+            Inserisci la tua email e invia una richiesta.
+            <br/>
+            <small>Per motivi di sicurezza, il reset viene gestito dal Manager/Amministrazione (non automatico).</small>
+          </div>
+
+          <input id="resetEmail" type="email" placeholder="La tua email" />
+
+          <button id="resetBtn" class="fp-mini" type="button">Invia richiesta</button>
+          <div id="resetMsg" style="margin-top:10px; opacity:.85;"></div>
+        </div>
       </form>
     </div>
   </div>
 
-  <!-- Se nel gestionale hai JS globale, puoi caricarlo anche qui -->
   <script src="/assets/app.js"></script>
 
   <script>
+    // LOGIN
     const form = document.querySelector("#loginForm");
     const emailEl = document.querySelector("#email");
     const codiceEl = document.querySelector("#codice");
@@ -89,6 +124,62 @@
         errBox.style.display = "block";
         btn.disabled = false;
         btn.textContent = "Accedi";
+      }
+    });
+
+    // TIMEOUT ALERT (se presente)
+    (function(){
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("timeout") === "1") {
+        alert("Sessione terminata per inattività. Effettua di nuovo il login.");
+      }
+    })();
+
+    // PASSWORD DIMENTICATA (apre pannello + manda richiesta al server)
+    const forgotLink = document.querySelector("#forgotLink");
+    const resetBox = document.querySelector("#resetBox");
+    const resetEmail = document.querySelector("#resetEmail");
+    const resetBtn = document.querySelector("#resetBtn");
+    const resetMsg = document.querySelector("#resetMsg");
+
+    forgotLink.addEventListener("click", () => {
+      resetMsg.textContent = "";
+      resetBox.style.display = (resetBox.style.display === "block") ? "none" : "block";
+      resetEmail.value = (emailEl.value || "").trim();
+      resetEmail.focus();
+    });
+
+    resetBtn.addEventListener("click", async () => {
+      resetMsg.textContent = "";
+      const email = (resetEmail.value || "").trim();
+      if (!email) {
+        resetMsg.textContent = "Inserisci un'email valida.";
+        return;
+      }
+
+      resetBtn.disabled = true;
+      resetBtn.textContent = "Invio...";
+
+      try {
+        const r = await fetch("/api/auth-forgot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
+
+        resetBtn.disabled = false;
+        resetBtn.textContent = "Invia richiesta";
+
+        if (!r.ok) {
+          resetMsg.textContent = "Non è stato possibile inviare la richiesta. Contatta il Manager.";
+          return;
+        }
+
+        resetMsg.textContent = "Richiesta inviata. Verrai ricontattato dal Manager.";
+      } catch (e) {
+        resetBtn.disabled = false;
+        resetBtn.textContent = "Invia richiesta";
+        resetMsg.textContent = "Errore di rete. Contatta il Manager.";
       }
     });
   </script>
