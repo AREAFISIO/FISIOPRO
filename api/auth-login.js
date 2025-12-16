@@ -46,7 +46,9 @@ export default async function handler(req, res) {
 
     const token = signSession({ email, role: ruolo, nome });
 
-    const cookie = makeSessionCookie(token, 60 * 60 * 8); // 8 ore
+    // 1 ORA durata massima cookie (GDPR-friendly)
+    const cookie = makeSessionCookie(token, 60 * 60 * 1);
+
     return setJson(res, 200, { ok: true, email, role: ruolo, nome }, cookie);
   } catch (e) {
     return setJson(res, 500, { ok: false, error: "server_error" });
