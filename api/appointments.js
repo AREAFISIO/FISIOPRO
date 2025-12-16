@@ -10,28 +10,26 @@ export default async function handler(req, res) {
     }
 
     // -------------------------
-    // GET: lista appuntamenti
+    // GET: lista appuntamenti (con filtro settimana)
+    // /api/appointments?start=ISO&end=ISO
     // -------------------------
     if (req.method === "GET") {
-      // opzionali: start/end (ISO) per filtrare
       const { start, end, maxRecords } = req.query;
 
-      let filterByFormula = "";
-      if (start && end) {
-        // Airtable formula: record dentro intervallo
-        // NB: {Data} è il campo datetime (dal tuo CSV)
-        filterByFormula = `AND(
-          IS_AFTER({Data}, DATETIME_PARSE("${start}")),
-          IS_BEFORE({Data}, DATETIME_PARSE("${end}"))
-        )`;
-      }
-
       const params = new URLSearchParams();
-      if (filterByFormula) params.set("filterByFormula", filterByFormula);
       params.set("pageSize", "100");
       if (maxRecords) params.set("maxRecords", String(maxRecords));
       params.set("sort[0][field]", "Data");
       params.set("sort[0][direction]", "asc");
+
+      // filtro per intervallo su campo {Data}
+      if (start && end) {
+        const filterByFormula = `AND(
+          IS_AFTER({Data}, DATETIME_PARSE("${start}")),
+          IS_BEFORE({Data}, DATETIME_PARSE("${end}"))
+        )`;
+        params.set("filterByFormula", filterByFormula);
+      }
 
       const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(
         TABLE
@@ -42,23 +40,27 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: "Airtable error", details: data });
+      if (!r.ok) {
+        return res.status(r.status).json({ error: "Airtable error (GET)", details: data });
+      }
 
-      // Normalizzazione -> formato usato da UI
+      // Normalizzazione -> formato UI
       const out = (data.records || []).map((rec) => {
         const f = rec.fields || {};
 
-        // questi campi vengono dal tuo CSV
         const patientName =
           Array.isArray(f["Paziente"]) ? (f["Paziente"][0] || "") : (f["Paziente"] || "");
 
         const patientId =
           Array.isArray(f["ANAGRAFICA"]) ? (f["ANAGRAFICA"][0] || "") : (f["ANAGRAFICA"] || "");
 
+        const therapist =
+          Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || "");
+
         return {
-          id: rec.id, // recordId vero di Airtable (recXXXX)
-          patient_id: patientId,
-          patient_name: patientName,
+          id: rec.id,                 // recordId Airtable: recXXXX
+          patient_id: patientId,      // recordId tabella ANAGRAFICA (se link)
+          patient_name: patientName,  // testo
 
           start_at: f["Data"] || "",
           end_at: "",
@@ -66,9 +68,7 @@ export default async function handler(req, res) {
           status: f["Stato"] || "",
           service_name: f["Prestazione"] || "",
           duration_label: f["Durata"] || "",
-
-          therapist_name:
-            Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || ""),
+          therapist_name: therapist,
 
           location_name: "",
 
@@ -82,18 +82,17 @@ export default async function handler(req, res) {
 
     // -------------------------
     // PATCH: aggiorna 1 appuntamento
-    // chiamata: /api/appointments?id=recXXXX
+    // /api/appointments?id=recXXXX
     // -------------------------
     if (req.method === "PATCH") {
       const { id } = req.query;
-      if (!id) return res.status(400).json({ error: "Missing query param: id (recordId)" });
+      if (!id) return res.status(400).json({ error: "Missing query param: id (Airtable recordId)" });
 
-      // body potrebbe arrivare come stringa
       let payload = req.body;
       if (typeof payload === "string") payload = JSON.parse(payload || "{}");
       if (!payload || typeof payload !== "object") payload = {};
 
-      // Mappa campi UI -> campi Airtable (dal tuo CSV)
+      // Mappa campi UI -> campi Airtable
       const fields = {};
 
       if ("status" in payload) fields["Stato"] = payload.status ?? "";
@@ -103,7 +102,6 @@ export default async function handler(req, res) {
       if ("internal_note" in payload) fields["Nota rapida"] = payload.internal_note ?? "";
       if ("patient_note" in payload) fields["Note"] = payload.patient_note ?? "";
 
-      // Se non c’è niente da aggiornare
       if (Object.keys(fields).length === 0) {
         return res.status(400).json({ error: "No fields to update" });
       }
@@ -122,38 +120,37 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: "Airtable error", details: data });
+      if (!r.ok) {
+        return res.status(r.status).json({ error: "Airtable error (PATCH)", details: data });
+      }
 
-      // Ritorno lo stesso formato della GET
       const f = data.fields || {};
       const patientName =
         Array.isArray(f["Paziente"]) ? (f["Paziente"][0] || "") : (f["Paziente"] || "");
       const patientId =
         Array.isArray(f["ANAGRAFICA"]) ? (f["ANAGRAFICA"][0] || "") : (f["ANAGRAFICA"] || "");
+      const therapist =
+        Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || "");
 
       return res.status(200).json({
         id: data.id,
         patient_id: patientId,
         patient_name: patientName,
-
         start_at: f["Data"] || "",
         end_at: "",
-
         status: f["Stato"] || "",
         service_name: f["Prestazione"] || "",
         duration_label: f["Durata"] || "",
-        therapist_name: Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || ""),
+        therapist_name: therapist,
         location_name: "",
         internal_note: f["Nota rapida"] || "",
         patient_note: f["Note"] || "",
       });
     }
 
-    // altri metodi non permessi
     return res.status(405).json({ error: "Method not allowed" });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "Server error", details: String(e?.message || e) });
   }
 }
-
