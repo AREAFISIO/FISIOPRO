@@ -4,39 +4,34 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro – Agenda</title>
+
   <link rel="stylesheet" href="/assets/app.css" />
   <script src="/assets/auth-guard.js"></script>
   <script src="/assets/session-timeout.js"></script>
 
   <style>
     :root{
-      --leftW: 220px;   /* più stretta */
-      --rightW: 260px;  /* più stretta */
+      --leftW: 210px;     /* più strette */
+      --rightW: 250px;    /* più strette */
       --radius: 18px;
       --border: rgba(255,255,255,.10);
       --card: rgba(255,255,255,.05);
       --card2: rgba(255,255,255,.04);
       --soft: rgba(255,255,255,.06);
-      --soft2: rgba(255,255,255,.08);
-      --accent: rgba(0,255,210,.10);
-      --accentB: rgba(0,255,210,.28);
+      --soft2: rgba(255,255,255,.09);
       --gridLine: rgba(255,255,255,.06);
       --textMuted: rgba(255,255,255,.72);
-      --slotH: 52px; /* altezza di 1 ora, simile a OsteoEasy */
+
+      --slotH: 52px;      /* 1 ora */
+      --timeColW: 86px;
+      --eventPadX: 10px;
+
+      --modalBg: rgba(0,0,0,.55);
     }
 
-    body { margin:0; }
-
-    .shell{
-      display:grid;
-      grid-template-columns: var(--leftW) 1fr var(--rightW);
-      min-height: 100vh;
-    }
-
-    .sidebar, .rightbar{
-      background: rgba(255,255,255,.03);
-      backdrop-filter: blur(10px);
-    }
+    body{ margin:0; }
+    .shell{ display:grid; grid-template-columns: var(--leftW) 1fr var(--rightW); min-height:100vh; }
+    .sidebar, .rightbar{ background: rgba(255,255,255,.03); backdrop-filter: blur(10px); }
     .sidebar{ border-right: 1px solid var(--border); }
     .rightbar{ border-left: 1px solid var(--border); }
 
@@ -71,41 +66,20 @@
       border: 1px solid transparent;
       color: inherit;
     }
-    .nav a.active{
-      background: var(--accent);
-      border-color: var(--accentB);
-    }
-    .nav a:hover{
-      background: rgba(255,255,255,.05);
-      border-color: rgba(255,255,255,.10);
-    }
+    .nav a.active{ background: rgba(0,255,210,.10); border-color: rgba(0,255,210,.28); }
+    .nav a:hover{ background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.10); }
 
-    .main{
-      padding: 16px;
-      overflow:auto;
-    }
+    .main{ padding: 16px; overflow:auto; }
 
     .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 14px;
+      display:flex; align-items:center; justify-content:space-between; gap: 14px;
       padding: 14px 16px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--card);
     }
-    .topLeft .title{
-      font-size: 28px;
-      font-weight: 850;
-      margin:0;
-      line-height:1.05;
-    }
-    .topLeft .who{
-      margin-top:6px;
-      opacity:.8;
-      font-size: 14px;
-    }
+    .topLeft .title{ font-size: 28px; font-weight: 900; margin:0; line-height:1.05; }
+    .topLeft .who{ margin-top:6px; opacity:.8; font-size: 14px; }
 
     .actions{ display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
     .btn{
@@ -114,20 +88,14 @@
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
       cursor:pointer;
-      font-weight: 700;
+      font-weight: 800;
       user-select:none;
     }
     .btn:hover{ background: rgba(255,255,255,.10); }
-    .btn.primary{
-      border-color: rgba(0,255,210,.28);
-      background: rgba(0,255,210,.10);
-    }
+    .btn.primary{ border-color: rgba(0,255,210,.28); background: rgba(0,255,210,.10); }
 
-    .pillRow{
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap: wrap;
+    .chipRow{
+      display:flex; gap:8px; align-items:center; flex-wrap: wrap;
       margin-top: 12px;
       padding: 10px 12px;
       border: 1px solid var(--border);
@@ -135,26 +103,20 @@
       background: var(--card2);
     }
     .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
+      display:inline-flex; align-items:center; gap:8px;
       padding: 8px 10px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
-      font-weight: 800;
+      font-weight: 900;
       font-size: 13px;
     }
     .dot{
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.25);
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      font-size: 12px;
-      font-weight: 900;
+      width: 22px; height: 22px; border-radius: 999px;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size: 12px; font-weight: 950;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
     }
 
     .alert{
@@ -164,9 +126,10 @@
       border: 1px solid rgba(255,80,80,.35);
       background: rgba(255,80,80,.10);
       color: rgba(255,255,255,.92);
+      font-weight: 800;
     }
 
-    /* ---------- CALENDARIO SETTIMANA (stile OsteoEasy) ---------- */
+    /* ---------- CALENDARIO (OsteoEasy-like) ---------- */
     .calendarWrap{
       margin-top: 12px;
       border: 1px solid var(--border);
@@ -177,13 +140,13 @@
 
     .calHeader{
       display:grid;
-      grid-template-columns: 88px repeat(7, 1fr);
+      grid-template-columns: var(--timeColW) repeat(7, 1fr);
       border-bottom: 1px solid var(--border);
       background: rgba(255,255,255,.04);
     }
     .calHeader .corner{
       padding: 12px;
-      font-weight: 800;
+      font-weight: 900;
       opacity:.8;
     }
     .dayHead{
@@ -194,35 +157,42 @@
       justify-content:space-between;
       gap: 8px;
     }
-    .dayHead .dname{ font-weight: 900; letter-spacing:.02em; }
+    .dayHead .dname{ font-weight: 950; letter-spacing:.02em; }
     .dayHead .dnum{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      width: 32px;
-      height: 32px;
+      display:inline-flex; align-items:center; justify-content:center;
+      width: 32px; height: 32px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
-      font-weight: 900;
+      font-weight: 950;
+    }
+
+    /* body scrollabile come OsteoEasy */
+    .calScroller{
+      max-height: calc(var(--slotH) * 12 + 2px);
+      overflow-y: auto;
+      scroll-behavior: smooth;
     }
 
     .calBody{
       position: relative;
       display:grid;
-      grid-template-columns: 88px repeat(7, 1fr);
-      height: calc(var(--slotH) * 12); /* 12 ore visibili (08-20) */
+      grid-template-columns: var(--timeColW) repeat(7, 1fr);
+      height: calc(var(--slotH) * 12);
     }
 
     .timeCol{
       border-right: 1px solid var(--border);
       background: rgba(255,255,255,.03);
+      position: sticky;
+      left: 0;
+      z-index: 3;
     }
     .timeSlot{
       height: var(--slotH);
       border-bottom: 1px solid var(--gridLine);
       padding: 10px 10px;
-      font-weight: 800;
+      font-weight: 900;
       color: var(--textMuted);
       font-size: 14px;
     }
@@ -230,6 +200,8 @@
     .dayCol{
       position: relative;
       border-left: 1px solid var(--border);
+      cursor: crosshair;
+      user-select:none;
     }
     .hourLine{
       position:absolute;
@@ -237,38 +209,57 @@
       height: var(--slotH);
       border-bottom: 1px solid var(--gridLine);
       box-sizing:border-box;
+      pointer-events:none;
     }
 
-    .event{
+    /* linea ora attuale */
+    .nowLine{
+      position:absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(255, 80, 80, .85);
+      box-shadow: 0 0 0 3px rgba(255,80,80,.12);
+      z-index: 4;
+      pointer-events:none;
+    }
+    .nowDot{
       position:absolute;
       left: 10px;
-      right: 10px;
+      top: -5px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 80, 80, .95);
+      box-shadow: 0 0 0 6px rgba(255,80,80,.14);
+      pointer-events:none;
+    }
+
+    /* eventi colorati */
+    .event{
+      position:absolute;
+      left: var(--eventPadX);
+      right: var(--eventPadX);
       border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.16);
       box-shadow: 0 10px 24px rgba(0,0,0,.20);
       padding: 10px 10px;
       cursor: pointer;
       overflow:hidden;
+      z-index: 2;
     }
-    .event:hover{
-      background: rgba(255,255,255,.10);
-      border-color: rgba(0,255,210,.22);
-    }
+    .event:hover{ filter: brightness(1.05); border-color: rgba(255,255,255,.22); }
 
     .eventTop{
-      display:flex;
-      justify-content:space-between;
-      gap: 10px;
-      align-items:center;
-      font-weight: 900;
+      display:flex; justify-content:space-between; gap: 10px; align-items:center;
+      font-weight: 950;
       font-size: 14px;
     }
     .eventMid{
       margin-top: 6px;
       font-size: 14px;
-      opacity:.90;
-      font-weight: 800;
+      opacity:.92;
+      font-weight: 900;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -276,29 +267,17 @@
     .eventBot{
       margin-top: 6px;
       font-size: 12px;
-      opacity:.75;
-      font-weight: 800;
+      opacity:.78;
+      font-weight: 900;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    /* Rightbar */
-    .rbHead{
-      padding: 16px;
-      border-bottom:1px solid var(--border);
-    }
-    .rbHead .t1{
-      font-size: 12px;
-      opacity:.75;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-    }
-    .rbHead .t2{
-      margin-top: 8px;
-      font-size: 20px;
-      font-weight: 900;
-    }
+    /* right bar */
+    .rbHead{ padding: 16px; border-bottom:1px solid var(--border); }
+    .rbHead .t1{ font-size: 12px; opacity:.75; letter-spacing:.08em; text-transform:uppercase; }
+    .rbHead .t2{ margin-top: 8px; font-size: 20px; font-weight: 950; }
     .rbBody{ padding: 12px; }
     .rbCard{
       border: 1px solid var(--border);
@@ -307,21 +286,62 @@
       padding: 12px;
       margin-bottom: 10px;
     }
-    .rbCard .h{
-      font-weight: 900;
-      margin-bottom: 6px;
+    .rbCard .h{ font-weight: 950; margin-bottom: 6px; }
+    .rbCard .m{ opacity:.75; font-size: 13px; line-height:1.25; }
+
+    /* MODAL */
+    .modal{
+      position: fixed;
+      inset: 0;
+      background: var(--modalBg);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 50;
+      padding: 18px;
     }
-    .rbCard .m{
-      opacity:.75;
-      font-size: 13px;
-      line-height:1.25;
+    .modal.open{ display:flex; }
+    .modalCard{
+      width: min(560px, 100%);
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(20,28,38,.92);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 30px 90px rgba(0,0,0,.45);
+      padding: 16px;
     }
+    .modalTop{ display:flex; justify-content:space-between; align-items:center; gap: 12px; }
+    .modalTitle{ font-size: 18px; font-weight: 950; }
+    .xbtn{
+      width: 40px; height: 40px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      font-weight: 950;
+    }
+    .xbtn:hover{ background: rgba(255,255,255,.10); }
+
+    .formGrid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .field{ display:flex; flex-direction:column; gap: 6px; }
+    .label{ font-size: 12px; opacity:.78; font-weight: 900; letter-spacing:.04em; text-transform:uppercase; }
+    .input{
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: inherit;
+      font-weight: 800;
+      font-size: 14px;
+      outline:none;
+    }
+    .input:focus{ border-color: rgba(0,255,210,.25); }
+    .modalActions{ display:flex; gap: 10px; justify-content:flex-end; margin-top: 12px; }
+    .hint{ margin-top: 10px; opacity:.75; font-size: 13px; font-weight: 800; }
 
     @media (max-width: 1100px){
       .shell{ grid-template-columns: 0 1fr 0; }
       .sidebar, .rightbar{ display:none; }
-      .calHeader{ grid-template-columns: 72px repeat(7, 1fr); }
-      .calBody{ grid-template-columns: 72px repeat(7, 1fr); }
     }
   </style>
 </head>
@@ -378,21 +398,23 @@
         </div>
       </div>
 
-      <div class="pillRow" id="chips">
-        <span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span>
-        <span class="muted">Caricamento…</span>
+      <div class="chipRow" id="chips">
+        <span style="opacity:.75;font-weight:950;">Collaboratori:</span>
+        <span style="opacity:.75;font-weight:850;">Caricamento…</span>
       </div>
 
       <div id="errBox" class="alert" style="display:none;"></div>
 
       <div class="calendarWrap">
-        <div class="calHeader" id="calHeader">
-          <!-- generato via JS -->
-        </div>
+        <div class="calHeader" id="calHeader"></div>
 
-        <div class="calBody" id="calBody">
-          <!-- timeCol + 7 dayCol generati via JS -->
+        <div class="calScroller" id="calScroller">
+          <div class="calBody" id="calBody"></div>
         </div>
+      </div>
+
+      <div class="hint">
+        Tip: clicca su uno spazio vuoto per creare un appuntamento già con data/ora precompilata.
       </div>
     </main>
 
@@ -406,11 +428,11 @@
       <div class="rbBody">
         <div class="rbCard">
           <div class="h">Incaricati</div>
-          <div class="m">(Step dopo: dropdown collaboratori)</div>
+          <div class="m">(Step dopo: dropdown collaboratori + colori come OsteoEasy)</div>
         </div>
         <div class="rbCard">
           <div class="h">Prestazioni</div>
-          <div class="m">(Step dopo: tipi visita)</div>
+          <div class="m">(Step dopo: tipi visita + colore per prestazione)</div>
         </div>
         <div class="rbCard">
           <div class="h">Stati</div>
@@ -426,58 +448,95 @@
     </aside>
   </div>
 
+  <!-- MODAL: nuovo appuntamento -->
+  <div class="modal" id="modal">
+    <div class="modalCard">
+      <div class="modalTop">
+        <div class="modalTitle">Nuovo appuntamento</div>
+        <button class="xbtn" id="modalClose">✕</button>
+      </div>
+
+      <div class="formGrid">
+        <div class="field">
+          <div class="label">Data</div>
+          <input class="input" id="mDate" type="date" />
+        </div>
+
+        <div class="field">
+          <div class="label">Ora inizio</div>
+          <input class="input" id="mStart" type="time" step="900" />
+        </div>
+
+        <div class="field">
+          <div class="label">Durata (min)</div>
+          <input class="input" id="mDur" type="number" min="15" step="15" value="60" />
+        </div>
+
+        <div class="field">
+          <div class="label">Email fisioterapista</div>
+          <input class="input" id="mEmail" type="email" placeholder="nome@dominio.it" />
+        </div>
+
+        <div class="field" style="grid-column: 1 / -1;">
+          <div class="label">Paziente (Record ID Airtable)</div>
+          <input class="input" id="mPatientId" type="text" placeholder="recXXXXXXXXXXXXXX" />
+        </div>
+      </div>
+
+      <div class="modalActions">
+        <button class="btn" id="mCancel">Annulla</button>
+        <button class="btn primary" id="mCreate">Crea</button>
+      </div>
+
+      <div class="hint" id="mHint">
+        Per ora “Crea” stampa i dati. Nel prossimo step lo colleghiamo a una API di creazione su Airtable.
+      </div>
+    </div>
+  </div>
+
   <script>
-    // -------- CONFIG VISTA (08:00 - 20:00) --------
+    // ---------- CONFIG VISTA ----------
     const START_HOUR = 8;
     const END_HOUR = 20;
     const HOURS = END_HOUR - START_HOUR; // 12
     const SLOT_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--slotH')) || 52;
 
-    // -------- STATE --------
+    // ---------- STATE ----------
     let weekStart = startOfWeek(new Date()); // lunedì
-    let patientsMap = {}; // patientId -> {Nome,Cognome,...}
+    let patientsMap = {}; // patientId -> record
+    let meUser = { email:"", role:"" };
 
-    // -------- HELPERS DATE --------
+    // ---------- HELPERS DATE ----------
     function pad(n){ return String(n).padStart(2,'0'); }
-    function toISODate(d){
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    }
+    function toISODate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
     function startOfWeek(d){
       const x = new Date(d);
-      const day = (x.getDay() + 6) % 7; // lun=0 ... dom=6
+      const day = (x.getDay() + 6) % 7; // lun=0
       x.setHours(0,0,0,0);
       x.setDate(x.getDate() - day);
       return x;
     }
-    function addDays(d, n){
-      const x = new Date(d);
-      x.setDate(x.getDate()+n);
-      return x;
-    }
-    function sameISO(a,b){ return toISODate(a) === toISODate(b); }
-
-    function fmtWeekLabel(ws){
-      const we = addDays(ws, 6);
-      const opt = { month:"long", year:"numeric" };
-      const mid = addDays(ws, 3);
-      const m = mid.toLocaleDateString("it-IT", opt);
-      return `${m} • ${pad(ws.getDate())}/${pad(ws.getMonth()+1)} → ${pad(we.getDate())}/${pad(we.getMonth()+1)}`;
-    }
-
+    function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
     function dayNameShort(d){
       const names = ["LUN","MAR","MER","GIO","VEN","SAB","DOM"];
       const idx = (d.getDay()+6)%7;
       return names[idx];
     }
+    function fmtWeekLabel(ws){
+      const we = addDays(ws, 6);
+      const mid = addDays(ws, 3);
+      const m = mid.toLocaleDateString("it-IT", { month:"long", year:"numeric" });
+      return `${m} • ${pad(ws.getDate())}/${pad(ws.getMonth()+1)} → ${pad(we.getDate())}/${pad(we.getMonth()+1)}`;
+    }
+    function roundTo15(mins){ return Math.round(mins / 15) * 15; }
 
-    // -------- API --------
+    // ---------- API ----------
     async function apiGet(url){
       const res = await fetch(url, { credentials:"include" });
       const data = await res.json().catch(()=> ({}));
       if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
       return data;
     }
-
     async function apiPost(url, body){
       const res = await fetch(url, {
         method:"POST",
@@ -490,7 +549,7 @@
       return data;
     }
 
-    // -------- UI ERR --------
+    // ---------- UI ERR ----------
     function showErr(msg){
       const b = document.getElementById("errBox");
       b.style.display = "block";
@@ -502,7 +561,7 @@
       b.textContent = "";
     }
 
-    // -------- BUILD CALENDAR SKELETON --------
+    // ---------- BUILD CALENDAR SKELETON ----------
     function buildCalendarSkeleton(){
       // Header
       const h = document.getElementById("calHeader");
@@ -531,45 +590,65 @@
       // Time column
       const timeCol = document.createElement("div");
       timeCol.className = "timeCol";
-      for(let h=START_HOUR; h<END_HOUR; h++){
+      for(let hh=START_HOUR; hh<END_HOUR; hh++){
         const t = document.createElement("div");
         t.className = "timeSlot";
-        t.textContent = `${pad(h)}:00`;
+        t.textContent = `${pad(hh)}:00`;
         timeCol.appendChild(t);
       }
       body.appendChild(timeCol);
 
-      // Day columns with hour lines
+      // Day columns
       for(let i=0;i<7;i++){
         const col = document.createElement("div");
         col.className = "dayCol";
         col.dataset.dayIndex = String(i);
 
+        // lines
         for(let r=0; r<HOURS; r++){
           const line = document.createElement("div");
           line.className = "hourLine";
           line.style.top = (r * SLOT_H) + "px";
           col.appendChild(line);
         }
+
+        // click vuoto => create
+        col.addEventListener("click", (ev) => {
+          // se clicchi su evento, lascia gestire all'evento
+          if(ev.target.closest(".event")) return;
+
+          const rect = col.getBoundingClientRect();
+          const y = ev.clientY - rect.top;
+
+          const minutes = roundTo15((y / SLOT_H) * 60) + (START_HOUR * 60);
+          const hh = Math.floor(minutes / 60);
+          const mm = minutes % 60;
+
+          const date = addDays(weekStart, i);
+          openCreateModal({
+            dateISO: toISODate(date),
+            timeHHMM: `${pad(hh)}:${pad(mm)}`,
+            email: meUser.email || ""
+          });
+        });
+
         body.appendChild(col);
       }
     }
 
-    // -------- PARSE APPOINTMENT RECORD (compatibile) --------
+    // ---------- APPOINTMENT PARSE ----------
     function pick(v, ...keys){
       for(const k of keys){
         if(v && v[k] != null && v[k] !== "") return v[k];
       }
       return "";
     }
-
     function parseAppointment(r){
       const start = pick(r, "start", "inizio", "startAt", "Data e ora INIZIO");
       const end   = pick(r, "end", "fine", "endAt", "Data e ora FINE");
       const durata = pick(r, "durata", "Durata");
       const email = pick(r, "email", "Email");
       const patientId = pick(r, "patientId", "PazienteId", "pazienteId", "patient");
-
       return { start, end, durata, email, patientId, raw: r };
     }
 
@@ -578,14 +657,40 @@
       const mins = d.getHours()*60 + d.getMinutes();
       return mins - (START_HOUR*60);
     }
-
     function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
 
-    // -------- RENDER EVENTS --------
-    function clearEvents(){
+    // ---------- COLORI STABILI PER EMAIL (OsteoEasy-like) ----------
+    // palette (scura, coerente) - NON fisso colori per chart, ma qui sono UI e serve
+    const PALETTE = [
+      { bg:"rgba(0,255,210,.14)", br:"rgba(0,255,210,.30)" },
+      { bg:"rgba(80,150,255,.14)", br:"rgba(80,150,255,.30)" },
+      { bg:"rgba(255,140,0,.14)", br:"rgba(255,140,0,.30)" },
+      { bg:"rgba(160,90,255,.14)", br:"rgba(160,90,255,.30)" },
+      { bg:"rgba(255,80,80,.14)", br:"rgba(255,80,80,.30)" },
+      { bg:"rgba(120,255,120,.14)", br:"rgba(120,255,120,.30)" },
+      { bg:"rgba(255,255,120,.12)", br:"rgba(255,255,120,.26)" },
+      { bg:"rgba(120,200,255,.14)", br:"rgba(120,200,255,.30)" },
+    ];
+
+    function hashStr(s){
+      let h = 2166136261;
+      for(let i=0;i<s.length;i++){
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0);
+    }
+
+    function colorForEmail(email){
+      const e = (email || "").toLowerCase().trim();
+      const idx = hashStr(e || "x") % PALETTE.length;
+      return PALETTE[idx];
+    }
+
+    // ---------- RENDER ----------
+    function clearEventsAndNowLine(){
       document.querySelectorAll(".dayCol").forEach(c => {
-        // rimuovo solo i .event
-        c.querySelectorAll(".event").forEach(e => e.remove());
+        c.querySelectorAll(".event, .nowLine").forEach(e => e.remove());
       });
     }
 
@@ -598,11 +703,9 @@
       return full || "—";
     }
 
-    function initialsFromEmail(email){
-      const x = (email || "").split("@")[0] || "";
-      const parts = x.split(/[.\-_]/).filter(Boolean);
-      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-      return (x.slice(0,2) || "??").toUpperCase();
+    function hhmm(iso){
+      const d = new Date(iso);
+      return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
     }
 
     function renderEvent(dayIndex, ap){
@@ -612,11 +715,10 @@
       const startM = minutesFromStart(ap.start);
       const endM = minutesFromStart(ap.end);
 
-      // se fuori dalla finestra oraria (08-20), non lo disegno
       const maxM = HOURS * 60;
       const topM = clamp(startM, 0, maxM);
       const botM = clamp(endM, 0, maxM);
-      const durM = Math.max(15, botM - topM); // minimo 15 min visivo
+      const durM = Math.max(15, botM - topM);
 
       const topPx = (topM / 60) * SLOT_H;
       const heightPx = (durM / 60) * SLOT_H;
@@ -626,11 +728,11 @@
       ev.style.top = `${topPx + 6}px`;
       ev.style.height = `${Math.max(34, heightPx - 8)}px`;
 
+      const colr = colorForEmail(ap.email);
+      ev.style.background = colr.bg;
+      ev.style.borderColor = colr.br;
+
       const pName = ap.patientId ? patientName(ap.patientId) : "—";
-      const hhmm = (iso) => {
-        const d = new Date(iso);
-        return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
-      };
 
       ev.innerHTML = `
         <div class="eventTop">
@@ -641,7 +743,6 @@
         <div class="eventBot">${ap.email || ""}</div>
       `;
 
-      // click => paziente.html
       if(ap.patientId){
         ev.onclick = () => location.href = `/pages/paziente.html?id=${encodeURIComponent(ap.patientId)}`;
       } else {
@@ -651,36 +752,54 @@
       col.appendChild(ev);
     }
 
-    // -------- LOAD WEEK DATA --------
+    // ---------- LINEA ORA ATTUALE ----------
+    function renderNowLine(){
+      const now = new Date();
+      const todayISO = toISODate(now);
+
+      for(let i=0;i<7;i++){
+        const d = addDays(weekStart, i);
+        if(toISODate(d) !== todayISO) continue;
+
+        const col = document.querySelector(`.dayCol[data-day-index="${i}"]`);
+        if(!col) return;
+
+        const mins = (now.getHours()*60 + now.getMinutes()) - (START_HOUR*60);
+        if(mins < 0 || mins > HOURS*60) return;
+
+        const topPx = (mins/60) * SLOT_H;
+
+        const line = document.createElement("div");
+        line.className = "nowLine";
+        line.style.top = `${topPx}px`;
+        line.innerHTML = `<div class="nowDot"></div>`;
+        col.appendChild(line);
+      }
+    }
+
+    // ---------- LOAD WEEK ----------
     async function loadWeek(){
       hideErr();
-      clearEvents();
+      clearEventsAndNowLine();
 
       document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
 
-      // 1) carico 7 giorni di appuntamenti
+      // 1) 7 giorni -> /api/appointments?date=YYYY-MM-DD
       const all = [];
       for(let i=0;i<7;i++){
         const d = addDays(weekStart, i);
         const iso = toISODate(d);
 
-        let data;
-        try{
-          data = await apiGet(`/api/appointments?date=${encodeURIComponent(iso)}`);
-        }catch(e){
-          // Se ti arriva "airtable_error" lo vediamo qui
-          throw new Error(e.message || "airtable_error");
-        }
-
+        const data = await apiGet(`/api/appointments?date=${encodeURIComponent(iso)}`);
         const recs = data.records || data.appointments || [];
+
         for(const r of recs){
           const ap = parseAppointment(r);
-          // aggiungo info giorno
           all.push({ ...ap, dayISO: iso });
         }
       }
 
-      // 2) batch pazienti (se presenti)
+      // 2) pazienti batch
       const patientIds = Array.from(new Set(all.map(x => x.patientId).filter(Boolean)));
       patientsMap = {};
       if(patientIds.length){
@@ -691,41 +810,68 @@
         }
       }
 
-      // 3) chip “collaboratori” (come i cerchi in alto di OsteoEasy)
+      // 3) chips “collaboratori”
       renderChips(all);
 
-      // 4) render eventi in griglia
+      // 4) render eventi
       for(const ap of all){
-        // day index 0..6
-        let idx = -1;
-        for(let i=0;i<7;i++){
-          if(ap.dayISO === toISODate(addDays(weekStart, i))) { idx = i; break; }
-        }
-        if(idx >= 0 && ap.start && ap.end){
-          renderEvent(idx, ap);
-        }
+        if(!ap.start || !ap.end) continue;
+        const dayIdx = dayIndexFromISO(ap.dayISO);
+        if(dayIdx >= 0) renderEvent(dayIdx, ap);
       }
+
+      // 5) linea ora attuale
+      renderNowLine();
+    }
+
+    function dayIndexFromISO(iso){
+      for(let i=0;i<7;i++){
+        if(toISODate(addDays(weekStart, i)) === iso) return i;
+      }
+      return -1;
+    }
+
+    function initialsFromEmail(email){
+      const x = (email || "").split("@")[0] || "";
+      const parts = x.split(/[.\-_]/).filter(Boolean);
+      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return (x.slice(0,2) || "??").toUpperCase();
     }
 
     function renderChips(all){
       const chips = document.getElementById("chips");
       const emails = Array.from(new Set(all.map(x => (x.email||"").toLowerCase()).filter(Boolean)));
 
+      chips.innerHTML = `<span style="opacity:.75;font-weight:950;">Collaboratori:</span>`;
       if(!emails.length){
-        chips.innerHTML = `<span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span> <span class="muted">Nessun appuntamento in settimana</span>`;
+        const s = document.createElement("span");
+        s.style.opacity = ".75";
+        s.style.fontWeight = "850";
+        s.textContent = "Nessun appuntamento in settimana";
+        chips.appendChild(s);
         return;
       }
 
-      // max 10 chips visibili
-      const view = emails.slice(0,10);
-
-      chips.innerHTML = `<span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span>`;
+      const view = emails.slice(0, 12);
       for(const em of view){
+        const c = colorForEmail(em);
         const el = document.createElement("span");
         el.className = "chip";
-        el.innerHTML = `<span class="dot">${initialsFromEmail(em)}</span><span>${em}</span>`;
+
+        const d = document.createElement("span");
+        d.className = "dot";
+        d.textContent = initialsFromEmail(em);
+        d.style.background = c.bg;
+        d.style.borderColor = c.br;
+
+        const t = document.createElement("span");
+        t.textContent = em;
+
+        el.appendChild(d);
+        el.appendChild(t);
         chips.appendChild(el);
       }
+
       if(emails.length > view.length){
         const more = document.createElement("span");
         more.className = "chip";
@@ -734,11 +880,81 @@
       }
     }
 
-    // -------- INIT --------
+    // ---------- SCROLL: porta la vista vicino alle 09:00 come OsteoEasy ----------
+    function scrollToHour(hour){
+      const sc = document.getElementById("calScroller");
+      const h = Math.max(START_HOUR, Math.min(END_HOUR, hour));
+      const px = (h - START_HOUR) * SLOT_H;
+      sc.scrollTop = px;
+    }
+
+    // ---------- MODAL CREAZIONE ----------
+    const modal = document.getElementById("modal");
+    function openCreateModal({ dateISO, timeHHMM, email }){
+      document.getElementById("mDate").value = dateISO;
+      document.getElementById("mStart").value = timeHHMM;
+      document.getElementById("mDur").value = "60";
+      document.getElementById("mEmail").value = email || "";
+      document.getElementById("mPatientId").value = "";
+
+      document.getElementById("mHint").textContent =
+        "Per ora “Crea” stampa i dati. Nel prossimo step lo colleghiamo a una API di creazione su Airtable.";
+
+      modal.classList.add("open");
+    }
+    function closeModal(){ modal.classList.remove("open"); }
+
+    function addMinutesToHHMM(hhmm, mins){
+      const [h,m] = hhmm.split(":").map(x => parseInt(x,10));
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      d.setMinutes(d.getMinutes() + mins);
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    document.getElementById("modalClose").onclick = closeModal;
+    document.getElementById("mCancel").onclick = closeModal;
+    modal.addEventListener("click", (e) => { if(e.target === modal) closeModal(); });
+
+    document.getElementById("mCreate").onclick = () => {
+      const dateISO = document.getElementById("mDate").value;
+      const startHHMM = document.getElementById("mStart").value;
+      const dur = parseInt(document.getElementById("mDur").value || "60", 10);
+      const email = document.getElementById("mEmail").value.trim();
+      const patientId = document.getElementById("mPatientId").value.trim();
+
+      const endHHMM = addMinutesToHHMM(startHHMM, dur);
+
+      // ISO locale: costruiamo "YYYY-MM-DDTHH:MM:00"
+      const startISO = `${dateISO}T${startHHMM}:00`;
+      const endISO = `${dateISO}T${endHHMM}:00`;
+
+      const payload = {
+        Email: email,
+        "Data e ora INIZIO": startISO,
+        "Data e ora FINE": endISO,
+        Durata: dur,
+        Paziente: patientId ? [patientId] : [] // Airtable link in genere è array di recordId
+      };
+
+      // per ora debug
+      console.log("CREATE_PAYLOAD", payload);
+      document.getElementById("mHint").textContent =
+        "Payload stampato in Console (F12). Nel prossimo step lo inviamo ad Airtable con /api/appointments-create.";
+
+      // qui dopo collegheremo una POST vera
+      // await apiPost("/api/appointments-create", payload)
+
+      closeModal();
+    };
+
+    // ---------- INIT ----------
     async function init(){
       const me = await apiGet("/api/auth-me");
-      const email = me.email || "—";
-      const role  = me.role  || "—";
+      meUser = { email: me.email || "", role: me.role || "" };
+
+      const email = meUser.email || "—";
+      const role  = meUser.role || "—";
       document.getElementById("who").textContent = `${email} · ${role}`;
       document.getElementById("sbUser").textContent = `${email} · ${role}`;
 
@@ -746,38 +962,49 @@
       document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
 
       await loadWeek();
+
+      // come OsteoEasy: ti porta verso 09:00
+      scrollToHour(9);
+
+      // aggiorna linea ora ogni 60s
+      setInterval(() => {
+        // ricostruisco solo la nowline (pulizia già inclusa nel renderNowLine se richiamata dopo clear)
+        document.querySelectorAll(".dayCol .nowLine").forEach(x => x.remove());
+        renderNowLine();
+      }, 60000);
     }
 
-    // -------- BUTTONS --------
+    // ---------- BUTTONS ----------
     document.getElementById("btnToday").onclick = () => {
       weekStart = startOfWeek(new Date());
       buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
+      loadWeek().then(() => scrollToHour(9)).catch(e => showErr(e.message));
     };
-
     document.getElementById("btnPrev").onclick = () => {
       weekStart = addDays(weekStart, -7);
       buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
+      loadWeek().then(() => scrollToHour(9)).catch(e => showErr(e.message));
     };
-
     document.getElementById("btnNext").onclick = () => {
       weekStart = addDays(weekStart, 7);
       buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
+      loadWeek().then(() => scrollToHour(9)).catch(e => showErr(e.message));
     };
-
     document.getElementById("btnRefresh").onclick = () => {
       buildCalendarSkeleton();
-      loadWeek().catch(e => showErr(e.message));
+      loadWeek().then(() => scrollToHour(9)).catch(e => showErr(e.message));
     };
-
     document.getElementById("btnLogout").onclick = async () => {
       try { await fetch("/api/auth-logout", { method:"POST", credentials:"include" }); } catch {}
       location.href = "/";
     };
 
-    document.getElementById("btnNew").onclick = () => alert("Step dopo: form creazione appuntamento");
+    document.getElementById("btnNew").onclick = () => {
+      // default: oggi alle 09:00
+      const d = new Date();
+      openCreateModal({ dateISO: toISODate(d), timeHHMM: "09:00", email: meUser.email || "" });
+    };
+
     document.getElementById("btnExport").onclick = () => alert("Step dopo: export CSV");
 
     init().catch(e => showErr(e.message || "Errore nel caricamento agenda."));
