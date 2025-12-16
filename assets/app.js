@@ -1,20 +1,18 @@
 // =====================
 // AUTH + ROLE GUARDS
 // =====================
-function getToken() {
-  return localStorage.getItem("token") || "";
-}
-function getCachedUser() {
-  try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
-}
+function getToken() { return localStorage.getItem("token") || ""; }
 
 async function api(path, opts = {}) {
   const token = getToken();
   const headers = { ...(opts.headers || {}) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+
   const res = await fetch(path, { ...opts, headers });
-  const data = await res.json().catch(() => ({}));
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
@@ -22,15 +20,13 @@ async function api(path, opts = {}) {
 async function ensureAuth() {
   const isLoginPage = location.pathname.endsWith("/pages/login.html");
   const token = getToken();
-  if (!token) {
-    if (!isLoginPage) location.href = "/pages/login.html";
-    return null;
-  }
+  if (!token) { if (!isLoginPage) location.href = "/pages/login.html"; return null; }
+
   try {
     const { user } = await api("/api/auth-me");
     localStorage.setItem("user", JSON.stringify(user));
     return user;
-  } catch (e) {
+  } catch {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     if (!isLoginPage) location.href = "/pages/login.html";
@@ -40,8 +36,7 @@ async function ensureAuth() {
 
 function roleGuard(role) {
   document.querySelectorAll("[data-role]").forEach(el => {
-    const allowed = (el.getAttribute("data-role") || "")
-      .split(",").map(s => s.trim()).filter(Boolean);
+    const allowed = (el.getAttribute("data-role") || "").split(",").map(s=>s.trim()).filter(Boolean);
     if (allowed.length && !allowed.includes(role)) el.style.display = "none";
   });
 }
@@ -64,96 +59,20 @@ function toast(msg){
 }
 
 // =====================
-// TABS
-// =====================
-function initTabs() {
-  const tabs = document.querySelectorAll("[data-tabbtn]");
-  if (!tabs.length) return;
-
-  const show = (key) => {
-    document.querySelectorAll("[data-tabpanel]").forEach(p => {
-      p.style.display = (p.getAttribute("data-tabpanel") === key) ? "" : "none";
-    });
-    tabs.forEach(t => t.classList.toggle("active", t.getAttribute("data-tabbtn") === key));
-  };
-
-  const firstVisible = Array.from(tabs).find(t => t.style.display !== "none");
-  if (firstVisible) show(firstVisible.getAttribute("data-tabbtn"));
-
-  tabs.forEach(t => t.addEventListener("click", () => {
-    if (t.style.display === "none") return;
-    show(t.getAttribute("data-tabbtn"));
-  }));
-}
-
-// =====================
-// SEARCH FILTER TABLE
-// =====================
-function initSearch() {
-  const input = document.querySelector("[data-search]");
-  const table = document.querySelector("[data-table]");
-  if (!input || !table) return;
-
-  input.addEventListener("input", () => {
-    const q = input.value.trim().toLowerCase();
-    table.querySelectorAll("tbody tr").forEach(tr => {
-      const text = tr.innerText.toLowerCase();
-      tr.style.display = text.includes(q) ? "" : "none";
-    });
-  });
-}
-
-// =====================
-// CASES LIST RENDER (se presente)
-// =====================
-function renderCasesLocalDemo() {
-  const el = document.querySelector("[data-cases-tbody]");
-  if (!el) return;
-
-  const cases = JSON.parse(localStorage.getItem("cases") || "[]");
-  const patients = JSON.parse(localStorage.getItem("patients") || "[]");
-  const pmap = Object.fromEntries(patients.map(p => [p.id, p]));
-
-  el.innerHTML = cases
-    .sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0))
-    .map(c=>{
-      const p = pmap[c.patientId] || {nome:"—", cognome:"—"};
-      const d = new Date(c.updatedAt || Date.now()).toLocaleString("it-IT");
-      return `
-        <tr style="cursor:pointer" onclick="location.href='caso-nuovo.html?id=${encodeURIComponent(c.id)}'">
-          <td><div class="rowlink">${c.id}</div><div class="subcell">${d}</div></td>
-          <td>${p.nome} ${p.cognome}</td>
-          <td>${c.titolo || ""}</td>
-          <td><span class="chip">${c.stato || "Bozza"}</span></td>
-          <td>${c.note ? c.note.slice(0,60) : ""}</td>
-        </tr>
-      `;
-    }).join("");
-}
-
-// =====================
-// AGENDA (vero calendario: hover + modal)
+// AGENDA (OsteoEasy-like)
 // =====================
 function isAgendaPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/agenda.html") || p.endsWith("/agenda.html");
 }
-
 function pad2(n){ return String(n).padStart(2,"0"); }
-
-function toISODate(d){
-  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-}
-
+function toISODate(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
 function parseISODate(s){
-  // s: YYYY-MM-DD
   const [y,m,d] = (s||"").split("-").map(Number);
-  if (!y || !m || !d) return null;
-  const dt = new Date(y, m-1, d, 0, 0, 0, 0);
-  if (isNaN(dt.getTime())) return null;
-  return dt;
+  if (!y||!m||!d) return null;
+  const dt = new Date(y, m-1, d, 0,0,0,0);
+  return isNaN(dt.getTime()) ? null : dt;
 }
-
 function startOfWeekMonday(d){
   const x = new Date(d);
   const day = x.getDay(); // 0=dom
@@ -162,34 +81,21 @@ function startOfWeekMonday(d){
   x.setHours(0,0,0,0);
   return x;
 }
-
-function addDays(d, n){
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function fmtDay(d){
+  const days = ["DOM","LUN","MAR","MER","GIO","VEN","SAB"];
+  return `${days[d.getDay()]} ${d.getDate()}`;
 }
-
+function fmtMonth(d){
+  try { return d.toLocaleDateString("it-IT", { month:"long", year:"numeric" }); } catch { return "Agenda"; }
+}
 function fmtTime(iso){
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
-  } catch { return ""; }
+  try { const d=new Date(iso); return d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"}); } catch { return ""; }
 }
+function minutesOfDay(dt){ return dt.getHours()*60 + dt.getMinutes(); }
+function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
 
-function fmtDayLabel(d){
-  const giorni = ["DOM","LUN","MAR","MER","GIO","VEN","SAB"];
-  return `${giorni[d.getDay()]} ${d.getDate()}`;
-}
-
-function fmtMonthLabel(d){
-  try {
-    return d.toLocaleDateString("it-IT", { month:"long", year:"numeric" });
-  } catch {
-    return "Agenda";
-  }
-}
-
-// ---- Hover Card DOM
+// Hover card
 function buildHoverCard() {
   const el = document.createElement("div");
   el.className = "oe-hovercard";
@@ -211,11 +117,9 @@ function buildHoverCard() {
   document.body.appendChild(el);
   return el;
 }
-
 function showHoverCard(card, appt, x, y) {
   card.style.left = (x + 12) + "px";
   card.style.top = (y + 12) + "px";
-
   card.querySelector("[data-hc-title]").textContent = appt.patient_name || "Paziente";
   card.querySelector("[data-hc-time]").textContent = fmtTime(appt.start_at);
 
@@ -224,31 +128,23 @@ function showHoverCard(card, appt, x, y) {
   const therRow = card.querySelector("[data-hc-ther-row]");
   const noteEl = card.querySelector("[data-hc-note]");
 
-  if (appt.status) {
-    statusRow.style.display = "";
-    card.querySelector("[data-hc-status]").textContent = appt.status;
-  } else statusRow.style.display = "none";
+  if (appt.status) { statusRow.style.display=""; card.querySelector("[data-hc-status]").textContent=appt.status; }
+  else statusRow.style.display="none";
 
-  if (appt.service_name) {
-    serviceRow.style.display = "";
-    card.querySelector("[data-hc-service]").textContent = appt.service_name;
-  } else serviceRow.style.display = "none";
+  if (appt.service_name) { serviceRow.style.display=""; card.querySelector("[data-hc-service]").textContent=appt.service_name; }
+  else serviceRow.style.display="none";
 
-  if (appt.therapist_name) {
-    therRow.style.display = "";
-    card.querySelector("[data-hc-ther]").textContent = appt.therapist_name;
-  } else therRow.style.display = "none";
+  if (appt.therapist_name) { therRow.style.display=""; card.querySelector("[data-hc-ther]").textContent=appt.therapist_name; }
+  else therRow.style.display="none";
 
-  if (appt.internal_note) {
-    noteEl.style.display = "";
-    noteEl.textContent = appt.internal_note;
-  } else noteEl.style.display = "none";
+  if (appt.internal_note) { noteEl.style.display=""; noteEl.textContent=appt.internal_note; }
+  else noteEl.style.display="none";
 
-  card.style.display = "block";
+  card.style.display="block";
 }
-function hideHoverCard(card){ card.style.display = "none"; }
+function hideHoverCard(card){ card.style.display="none"; }
 
-// ---- Modal DOM
+// Modal
 function buildModal() {
   const wrap = document.createElement("div");
   wrap.className = "oe-modal__backdrop";
@@ -267,35 +163,12 @@ function buildModal() {
         </div>
 
         <div class="oe-grid">
-          <label class="oe-field">
-            <span>Stato</span>
-            <input data-f-status placeholder="Es. Non ancora eseguito"/>
-          </label>
-
-          <label class="oe-field">
-            <span>Prestazione</span>
-            <input data-f-service placeholder="Es. FASDAC"/>
-          </label>
-
-          <label class="oe-field">
-            <span>Durata</span>
-            <input data-f-duration placeholder="Es. 1 ora"/>
-          </label>
-
-          <label class="oe-field">
-            <span>Operatore</span>
-            <input data-f-ther placeholder="Es. Andrea Franceschelli"/>
-          </label>
-
-          <label class="oe-field oe-field--wide">
-            <span>Nota rapida (interna)</span>
-            <textarea data-f-internal maxlength="255"></textarea>
-          </label>
-
-          <label class="oe-field oe-field--wide">
-            <span>Note</span>
-            <textarea data-f-patient maxlength="255"></textarea>
-          </label>
+          <label class="oe-field"><span>Stato</span><input data-f-status /></label>
+          <label class="oe-field"><span>Prestazione</span><input data-f-service /></label>
+          <label class="oe-field"><span>Durata</span><input data-f-duration /></label>
+          <label class="oe-field"><span>Operatore</span><input data-f-ther /></label>
+          <label class="oe-field oe-field--wide"><span>Nota rapida (interna)</span><textarea data-f-internal maxlength="255"></textarea></label>
+          <label class="oe-field oe-field--wide"><span>Note</span><textarea data-f-patient maxlength="255"></textarea></label>
         </div>
       </div>
 
@@ -313,9 +186,7 @@ function openModal(modal, appt, onSaved) {
   modal.__current = appt;
 
   modal.querySelector("[data-pname]").textContent = appt.patient_name || "Paziente";
-  const link = modal.querySelector("[data-plink]");
-  const pid = appt.patient_id || "";
-  link.href = `/pages/paziente.html?id=${encodeURIComponent(pid)}`;
+  modal.querySelector("[data-plink]").href = `/pages/paziente.html?id=${encodeURIComponent(appt.patient_id || "")}`;
 
   modal.querySelector("[data-f-status]").value = appt.status || "";
   modal.querySelector("[data-f-service]").value = appt.service_name || "";
@@ -325,7 +196,6 @@ function openModal(modal, appt, onSaved) {
   modal.querySelector("[data-f-patient]").value = appt.patient_note || "";
 
   const close = () => { modal.style.display = "none"; };
-
   modal.querySelector("[data-close]").onclick = close;
   modal.querySelector("[data-cancel]").onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
@@ -366,146 +236,150 @@ function openModal(modal, appt, onSaved) {
   modal.style.display = "flex";
 }
 
-// ---- Render calendario (8:00 - 20:00)
-function minutesOfDay(d){
-  return d.getHours()*60 + d.getMinutes();
+// Sidebars collapse
+function initSidebars() {
+  const leftBtn = document.querySelector("[data-toggle-left]");
+  const rightBtn = document.querySelector("[data-toggle-right]");
+  if (leftBtn) leftBtn.onclick = () => document.body.classList.toggle("oe-hide-left");
+  if (rightBtn) rightBtn.onclick = () => document.body.classList.toggle("oe-hide-right");
 }
 
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+function buildTimeUI(timeCol, linesEl, startMin, endMin, slotMin, slotPx) {
+  timeCol.innerHTML = "";
+  linesEl.innerHTML = "";
 
-function buildTimeCol(timeColEl, startMin, endMin, stepMin){
-  timeColEl.innerHTML = "";
-  for (let m = startMin; m <= endMin; m += 120) {
+  const totalSlots = Math.ceil((endMin - startMin) / slotMin);
+  const heightPx = totalSlots * slotPx;
+
+  timeCol.style.height = heightPx + "px";
+  linesEl.style.height = heightPx + "px";
+
+  // labels ogni ora
+  for (let m = startMin; m <= endMin; m += 60) {
     const hh = pad2(Math.floor(m/60));
     const mm = pad2(m%60);
-    const div = document.createElement("div");
-    div.textContent = `${hh}:${mm}`;
-    timeColEl.appendChild(div);
+    const label = document.createElement("div");
+    label.className = "oe-time";
+    label.style.top = ((m - startMin) / slotMin) * slotPx + "px";
+    label.textContent = `${hh}:${mm}`;
+    timeCol.appendChild(label);
   }
+
+  // linee slot
+  for (let i = 0; i <= totalSlots; i++) {
+    const y = i * slotPx;
+    const line = document.createElement("div");
+    line.className = "oe-line";
+    line.style.top = y + "px";
+    linesEl.appendChild(line);
+  }
+
+  return heightPx;
 }
 
-function clearDayCols(){
+function clearCols() {
   document.querySelectorAll("[data-day-col]").forEach(col => col.innerHTML = "");
 }
 
-function renderAppointmentsInWeek(appointments, weekStart, hoverCard, modal, setAppointments){
+function renderWeek(appointments, weekStart, hoverCard, modal, setAppointments) {
   const startMin = 8*60;
   const endMin = 20*60;
-  const range = endMin - startMin;
+  const slotMin = 15;
+  const slotPx = 18;
 
-  clearDayCols();
+  const timeCol = document.querySelector("[data-time-col]");
+  const linesEl = document.querySelector("[data-time-lines]");
+  const grid = document.querySelector(".oe-cal__grid");
+  if (!timeCol || !linesEl || !grid) return;
 
-  // piccolo aiuto: raggruppo per giorno
+  const heightPx = buildTimeUI(timeCol, linesEl, startMin, endMin, slotMin, slotPx);
+
+  // altezza colonne
+  document.querySelectorAll("[data-day-col]").forEach(col => {
+    col.style.height = heightPx + "px";
+  });
+
+  clearCols();
+
   appointments.forEach(appt => {
     if (!appt.start_at) return;
     const dt = new Date(appt.start_at);
     if (isNaN(dt.getTime())) return;
 
-    // index giorno (0..6) rispetto al lunedì
-    const dayIndex = Math.floor((dt.setHours(0,0,0,0) - weekStart.getTime()) / (24*60*60*1000));
+    const day0 = new Date(weekStart);
+    const dayIndex = Math.floor((new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime() - day0.getTime()) / 86400000);
     if (dayIndex < 0 || dayIndex > 6) return;
 
-    const startDT = new Date(appt.start_at);
-    const st = minutesOfDay(startDT);
-
-    // Durata: se non abbiamo end_at, usiamo duration_label (es "1 ora" oppure "60")
+    const st = minutesOfDay(new Date(appt.start_at));
     let durMin = 60;
+
     if (appt.end_at) {
       const endDT = new Date(appt.end_at);
       if (!isNaN(endDT.getTime())) durMin = Math.max(15, minutesOfDay(endDT) - st);
     } else if (appt.duration_label) {
       const s = String(appt.duration_label).toLowerCase();
       const n = parseInt(s.replace(/[^\d]/g,""), 10);
-      if (!isNaN(n) && n > 0) {
-        if (s.includes("ora")) durMin = n * 60;
-        else durMin = n; // minuti
-      }
+      if (!isNaN(n) && n > 0) durMin = s.includes("ora") ? n*60 : n;
     }
 
-    // posizionamento in colonna (top/height in percent)
-    const topPct = ((clamp(st, startMin, endMin) - startMin) / range) * 100;
-    const endMinAppt = clamp(st + durMin, startMin, endMin);
-    const heightPct = Math.max(3, ((endMinAppt - clamp(st, startMin, endMin)) / range) * 100);
+    const top = ((clamp(st, startMin, endMin) - startMin) / slotMin) * slotPx;
+    const endM = clamp(st + durMin, startMin, endMin);
+    const height = Math.max(slotPx*2, ((endM - clamp(st, startMin, endMin)) / slotMin) * slotPx);
 
     const col = document.querySelector(`[data-day-col="${dayIndex}"]`);
     if (!col) return;
 
-    const block = document.createElement("div");
-    block.className = "chip";
-    block.style.position = "absolute";
-    block.style.left = "10px";
-    block.style.right = "10px";
-    block.style.top = `calc(${topPct}% + 6px)`;
-    block.style.height = `calc(${heightPct}% - 6px)`;
-    block.style.display = "flex";
-    block.style.flexDirection = "column";
-    block.style.alignItems = "flex-start";
-    block.style.justifyContent = "center";
-    block.style.gap = "6px";
-    block.style.cursor = "pointer";
-    block.style.padding = "10px";
+    const ev = document.createElement("div");
+    ev.className = "oe-event";
+    ev.style.top = top + "px";
+    ev.style.height = height + "px";
 
-    // testo stile “OsteoEasy”: nome + ora + prestazione
-    const t1 = document.createElement("div");
-    t1.style.fontWeight = "800";
-    t1.style.whiteSpace = "nowrap";
-    t1.style.overflow = "hidden";
-    t1.style.textOverflow = "ellipsis";
-    t1.textContent = appt.patient_name || "Paziente";
+    ev.innerHTML = `
+      <div class="oe-event__title">${(appt.patient_name || "Paziente")}</div>
+      <div class="oe-event__meta">${fmtTime(appt.start_at)}${appt.service_name ? " • " + appt.service_name : ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}</div>
+    `;
 
-    const t2 = document.createElement("div");
-    t2.style.opacity = ".85";
-    t2.style.fontSize = "12px";
-    t2.textContent = `${fmtTime(appt.start_at)}${appt.service_name ? " • " + appt.service_name : ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}`;
-
-    block.appendChild(t1);
-    block.appendChild(t2);
-
-    // Hover
-    block.addEventListener("mousemove", (e) => {
+    ev.addEventListener("mousemove", (e) => {
       if (modal.style.display !== "none") return;
       showHoverCard(hoverCard, appt, e.clientX, e.clientY);
     });
-    block.addEventListener("mouseleave", () => hideHoverCard(hoverCard));
-
-    // Click -> modal
-    block.addEventListener("click", (e) => {
+    ev.addEventListener("mouseleave", () => hideHoverCard(hoverCard));
+    ev.addEventListener("click", (e) => {
       e.preventDefault();
       hideHoverCard(hoverCard);
       openModal(modal, appt, (updated) => {
-        // aggiorno lista in memoria e re-render
         const next = appointments.map(x => x.id === updated.id ? updated : x);
         setAppointments(next);
-        renderAppointmentsInWeek(next, weekStart, hoverCard, modal, setAppointments);
+        renderWeek(next, weekStart, hoverCard, modal, setAppointments);
       });
     });
 
-    col.appendChild(block);
+    col.appendChild(ev);
   });
 }
 
 async function initAgenda() {
   if (!isAgendaPage()) return;
 
-  const mount = document.querySelector("[data-agenda-mount]");
-  const timeCol = document.querySelector("[data-time-col]");
-  if (!mount || !timeCol) return;
+  initSidebars();
 
-  // settimana corrente da URL (?date=YYYY-MM-DD) o oggi
+  const mount = document.querySelector("[data-agenda-mount]");
+  if (!mount) return;
+
   const url = new URL(location.href);
   const qDate = url.searchParams.get("date");
   const base = parseISODate(qDate) || new Date();
   const weekStart = startOfWeekMonday(base);
 
   // header giorni
-  for (let i = 0; i < 7; i++) {
+  for (let i=0;i<7;i++){
     const d = addDays(weekStart, i);
-    const head = document.querySelector(`[data-day-head="${i}"]`);
-    if (head) head.textContent = fmtDayLabel(d);
+    const el = document.querySelector(`[data-day-head="${i}"]`);
+    if (el) el.textContent = fmtDay(d);
   }
 
   const monthLabel = document.querySelector("[data-month-label]");
-  if (monthLabel) monthLabel.textContent = fmtMonthLabel(weekStart);
+  if (monthLabel) monthLabel.textContent = fmtMonth(weekStart);
 
   const weekLabel = document.querySelector("[data-week-label]");
   if (weekLabel) {
@@ -513,7 +387,7 @@ async function initAgenda() {
     weekLabel.textContent = `${weekStart.getDate()}/${weekStart.getMonth()+1} - ${end.getDate()}/${end.getMonth()+1}`;
   }
 
-  // bottoni navigazione
+  // nav week
   const btnToday = document.querySelector("[data-agenda-today]");
   const btnPrev = document.querySelector("[data-agenda-prev]");
   const btnNext = document.querySelector("[data-agenda-next]");
@@ -534,19 +408,11 @@ async function initAgenda() {
     location.href = u.toString();
   };
 
-  // colonna ore
-  buildTimeCol(timeCol, 8*60, 20*60, 30);
-
-  // hover + modal globali
   const hoverCard = buildHoverCard();
   const modal = buildModal();
 
-  // Carico appuntamenti (filtrati settimana)
-  // Passo start/end all'API se la tua GET li gestisce, altrimenti li ignora e torna tutto.
-  const startISO = new Date(weekStart);
-  startISO.setHours(0,0,0,0);
-  const endISO = new Date(addDays(weekStart, 7));
-  endISO.setHours(0,0,0,0);
+  const startISO = new Date(weekStart); startISO.setHours(0,0,0,0);
+  const endISO = new Date(addDays(weekStart, 7)); endISO.setHours(0,0,0,0);
 
   let appointments = [];
   try {
@@ -554,13 +420,12 @@ async function initAgenda() {
     appointments = data.appointments || [];
   } catch (e) {
     console.error(e);
-    alert("Errore caricamento appuntamenti. Controlla /api/appointments");
+    alert("Errore caricamento appuntamenti: controlla /api/appointments");
     return;
   }
 
   const setAppointments = (arr) => { appointments = arr; };
-
-  renderAppointmentsInWeek(appointments, weekStart, hoverCard, modal, setAppointments);
+  renderWeek(appointments, weekStart, hoverCard, modal, setAppointments);
 }
 
 // =====================
@@ -570,13 +435,7 @@ async function initAgenda() {
   const user = await ensureAuth();
   if (!user) return;
 
-  const badge = document.querySelector("[data-user-badge]");
-  if (badge) badge.textContent = `${user.name} • ${user.role}`;
-
   roleGuard(user.role);
   activeNav();
-  initTabs();
-  initSearch();
-  renderCasesLocalDemo();
   await initAgenda();
 })();
