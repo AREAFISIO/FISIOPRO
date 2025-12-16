@@ -8,6 +8,7 @@ const {
   APPOINTMENTS_START_FIELD = "Data e ora INIZIO",
   APPOINTMENTS_END_FIELD = "Data e ora FINE",
   APPOINTMENTS_DURATION_FIELD = "Durata",
+  APPOINTMENTS_PATIENT_FIELD = "Paziente",
 } = process.env;
 
 function send(res, status, data) {
@@ -17,11 +18,9 @@ function send(res, status, data) {
 }
 
 function isoDayStart(dateStr) {
-  // YYYY-MM-DD -> inizio giornata (UTC)
   return `${dateStr}T00:00:00.000Z`;
 }
 function isoDayEnd(dateStr) {
-  // YYYY-MM-DD -> fine giornata (UTC)
   return `${dateStr}T23:59:59.999Z`;
 }
 
@@ -38,8 +37,8 @@ export default async function handler(req, res) {
     const email = String(session.email || "").trim().toLowerCase();
 
     const urlObj = new URL(req.url, `https://${req.headers.host}`);
-    const from = urlObj.searchParams.get("from"); // YYYY-MM-DD (opzionale)
-    const to = urlObj.searchParams.get("to");     // YYYY-MM-DD (opzionale)
+    const from = urlObj.searchParams.get("from");
+    const to = urlObj.searchParams.get("to");
     const limit = Math.min(parseInt(urlObj.searchParams.get("limit") || "200", 10), 500);
 
     const clauses = [];
@@ -49,7 +48,7 @@ export default async function handler(req, res) {
       clauses.push(`LOWER({${APPOINTMENTS_FISIO_EMAIL_FIELD}}) = "${email}"`);
     }
 
-    // Filtro date: consideriamo l'INIZIO
+    // filtro date sulla DATA INIZIO
     if (from) clauses.push(`IS_AFTER({${APPOINTMENTS_START_FIELD}}, "${isoDayStart(from)}")`);
     if (to) clauses.push(`IS_BEFORE({${APPOINTMENTS_START_FIELD}}, "${isoDayEnd(to)}")`);
 
@@ -58,7 +57,6 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(AIRTABLE_APPOINTMENTS_TABLE);
     const filterParam = filterFormula ? `&filterByFormula=${encodeURIComponent(filterFormula)}` : "";
 
-    // Nota: sort per INIZIO
     const apiUrl =
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}` +
       `?pageSize=${limit}` +
@@ -77,16 +75,19 @@ export default async function handler(req, res) {
 
     const data = await r.json();
 
-    // Normalizzo i record con i campi che ci servono
     const records = (data.records || []).map((rec) => {
       const f = rec.fields || {};
+      const patientVal = f[APPOINTMENTS_PATIENT_FIELD];
+      const patientIds = Array.isArray(patientVal) ? patientVal : (patientVal ? [patientVal] : []);
+
       return {
         id: rec.id,
         email: f[APPOINTMENTS_FISIO_EMAIL_FIELD] || null,
         start: f[APPOINTMENTS_START_FIELD] || null,
         end: f[APPOINTMENTS_END_FIELD] || null,
         durata: f[APPOINTMENTS_DURATION_FIELD] || null,
-        fields: f, // lascio tutto per UI
+        patientIds,
+        fields: f,
       };
     });
 
