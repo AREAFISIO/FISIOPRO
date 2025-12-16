@@ -24,8 +24,6 @@
       --slotH: 34px;        /* 30 min */
       --timeColW: 86px;
       --eventPadX: 10px;
-
-      --modalBg: rgba(0,0,0,.55);
     }
 
     body{ margin:0; }
@@ -124,6 +122,9 @@
       grid-template-columns: var(--timeColW) repeat(7, 1fr);
       border-bottom: 1px solid var(--border);
       background: rgba(255,255,255,.04);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
     .calHeader .corner{
       padding: 12px;
@@ -149,6 +150,7 @@
       height: 70vh;          /* scroll vero */
       overflow-y: auto;
       scroll-behavior: smooth;
+      position: relative;
     }
 
     .calBody{
@@ -162,7 +164,7 @@
       background: rgba(255,255,255,.03);
       position: sticky;
       left: 0;
-      z-index: 3;
+      z-index: 9;
     }
     .timeSlot{
       height: var(--slotH);
@@ -184,6 +186,7 @@
       position: relative;
       border-left: 1px solid var(--border);
       user-select:none;
+      cursor: crosshair;
     }
 
     .gridRow{
@@ -207,7 +210,7 @@
       border-radius: 10px;
       background: rgba(255,255,255,.08);
       border: 1px solid rgba(255,255,255,.14);
-      z-index: 4;
+      z-index: 6;
       pointer-events:none;
     }
     .slotSelect{
@@ -219,7 +222,7 @@
     .popover{
       position: fixed;
       z-index: 60;
-      min-width: 210px;
+      min-width: 240px;
       padding: 10px 12px;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,.14);
@@ -255,7 +258,7 @@
       padding: 10px 10px;
       cursor: pointer;
       overflow:hidden;
-      z-index: 2;
+      z-index: 5;
     }
     .event:hover{ filter: brightness(1.05); border-color: rgba(255,255,255,.22); }
 
@@ -298,9 +301,90 @@
     .rbCard .h{ font-weight: 950; margin-bottom: 6px; }
     .rbCard .m{ opacity:.75; font-size: 13px; line-height:1.25; }
 
+    /* ---------- MODAL "Nuovo appuntamento" ---------- */
+    .modal{
+      position: fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:flex-start;
+      justify-content:center;
+      z-index: 80;
+      padding: 18px;
+      overflow:auto;
+    }
+    .modal.open{ display:flex; }
+
+    .modalCard{
+      width: min(980px, 100%);
+      border-radius: 22px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 30px 90px rgba(0,0,0,.45);
+      padding: 16px;
+      margin-top: 24px;
+    }
+    .modalTop{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .modalTitle{ font-size: 22px; font-weight: 950; display:flex; align-items:center; gap:10px; }
+    .xbtn{
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      font-weight: 950;
+    }
+    .xbtn:hover{ background: rgba(255,255,255,.10); }
+
+    .modalRowHead{
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 12px;
+      padding: 14px 2px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      margin-bottom: 12px;
+    }
+    .whenLine{ font-size: 22px; font-weight: 950; opacity:.95; }
+
+    .btn.ghost{
+      border-color: rgba(255,140,0,.35);
+      background: rgba(255,140,0,.10);
+    }
+    .btn.ghost:hover{ background: rgba(255,140,0,.14); }
+
+    .formGrid3{
+      display:grid;
+      grid-template-columns: 1fr 1fr 220px;
+      gap: 12px;
+    }
+    .field{ display:flex; flex-direction:column; gap: 6px; }
+    .label{ font-size: 12px; opacity:.78; font-weight: 900; letter-spacing:.04em; text-transform:uppercase; }
+    .input{
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: inherit;
+      font-weight: 800;
+      font-size: 15px;
+      outline:none;
+    }
+    .input:focus{ border-color: rgba(0,255,210,.25); }
+
+    .checks{
+      display:flex; gap:14px; flex-wrap:wrap;
+      padding: 10px 10px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+    }
+    .ck{ display:flex; align-items:center; gap:8px; font-weight: 850; opacity:.85; }
+
+    .modalActions{ display:flex; gap: 10px; justify-content:flex-end; margin-top: 14px; }
+
     @media (max-width: 1100px){
       .shell{ grid-template-columns: 0 1fr 0; }
       .sidebar, .rightbar{ display:none; }
+      .formGrid3{ grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -382,13 +466,20 @@
 
       <div class="rbBody">
         <div class="rbCard">
+          <div class="h">Azioni</div>
+          <button class="btn primary" style="width:100%;" id="btnPlus">+ Appuntamento</button>
+        </div>
+
+        <div class="rbCard">
           <div class="h">Incaricati</div>
           <div class="m">(Step dopo: dropdown collaboratori)</div>
         </div>
+
         <div class="rbCard">
           <div class="h">Prestazioni</div>
           <div class="m">(Step dopo: tipi visita)</div>
         </div>
+
         <div class="rbCard">
           <div class="h">Stati</div>
           <div class="m">(Step dopo: confermato / da confermare)</div>
@@ -406,14 +497,84 @@
     </div>
   </div>
 
+  <!-- MODAL: Nuovo appuntamento -->
+  <div class="modal" id="apptModal" aria-hidden="true">
+    <div class="modalCard">
+      <div class="modalTop">
+        <div class="modalTitle"><span>📅</span> Nuovo appuntamento</div>
+        <button class="xbtn" id="apptClose">✕</button>
+      </div>
+
+      <div class="modalRowHead">
+        <div id="apptWhen" class="whenLine">—</div>
+        <button class="btn ghost" id="apptRepeat">RIPETI ↻</button>
+      </div>
+
+      <div class="formGrid3">
+        <div class="field">
+          <div class="label">Tipologia</div>
+          <select class="input" id="apptType">
+            <option value="Appuntamento paziente">Appuntamento paziente</option>
+            <option value="Prima visita">Prima visita</option>
+            <option value="Controllo">Controllo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="label">Paziente</div>
+          <input class="input" id="apptPatient" placeholder="Nome paziente o recordId Airtable" />
+        </div>
+
+        <div class="field">
+          <div class="label">Durata</div>
+          <select class="input" id="apptDur">
+            <option value="30">30 minuti</option>
+            <option value="60">60 minuti</option>
+            <option value="90">90 minuti</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="label">Agenda (incaricato)</div>
+          <input class="input" id="apptEmail" type="email" placeholder="email fisioterapista" />
+        </div>
+
+        <div class="field" style="grid-column: 1 / -1;">
+          <div class="checks">
+            <label class="ck"><input type="checkbox" id="ckAbsentEmail"> Assente (email)</label>
+            <label class="ck"><input type="checkbox" id="ckAbsentSms"> Assente (sms)</label>
+            <label class="ck"><input type="checkbox" id="ckAbsentWa"> Assente (whatsapp)</label>
+            <label class="ck"><input type="checkbox" id="ckNotify"> Notifica incaricato</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label">Note interne</div>
+          <input class="input" id="apptNoteIn" maxlength="255" placeholder="0 / 255" />
+        </div>
+
+        <div class="field">
+          <div class="label">Note visibili al paziente</div>
+          <input class="input" id="apptNoteOut" maxlength="255" placeholder="0 / 255" />
+        </div>
+      </div>
+
+      <div class="modalActions">
+        <button class="btn" id="apptCancel">ANNULLA</button>
+        <button class="btn primary" id="apptSave">SALVA</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ---- CONFIG ----
     const START_HOUR = 7;
-    const END_HOUR = 21;
+    const END_HOUR_INCLUSIVE = 21;
     const STEP_MIN = 30;
 
     const SLOT_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--slotH')) || 34;
-    const SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MIN; // 28
+    const TOTAL_MIN = (END_HOUR_INCLUSIVE - START_HOUR) * 60; // fino alle 21:00
+    const SLOTS = (TOTAL_MIN / STEP_MIN) + 1; // include riga 21:00
     const PX_PER_MIN = SLOT_H / STEP_MIN;
 
     // ---- STATE ----
@@ -421,12 +582,11 @@
     let patientsMap = {};
     let meUser = { email:"", role:"" };
 
-    // selection state
-    let hovered = null;  // { dayIndex, slotIndex, isoDate, hhmm }
-    let selected = null; // same
+    let hovered = null;
+    let selected = null;
     let lastMouse = { x: 0, y: 0 };
 
-    // ---- API helpers ----
+    // ---- API ----
     async function apiGet(url){
       const res = await fetch(url, { credentials:"include" });
       const data = await res.json().catch(()=> ({}));
@@ -445,7 +605,7 @@
       return data;
     }
 
-    // ---- UI err ----
+    // ---- UI ----
     function showErr(msg){
       const b = document.getElementById("errBox");
       b.style.display = "block";
@@ -480,7 +640,7 @@
       return `${m} • ${pad(ws.getDate())}/${pad(ws.getMonth()+1)} → ${pad(we.getDate())}/${pad(we.getMonth()+1)}`;
     }
 
-    // ---- Airtable record parsing (compat) ----
+    // ---- parsing records ----
     function pick(v, ...keys){
       for(const k of keys){
         if(v && v[k] != null && v[k] !== "") return v[k];
@@ -506,7 +666,7 @@
       return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
     }
 
-    // ---- stable colors by email ----
+    // ---- colors ----
     const PALETTE = [
       { bg:"rgba(0,255,210,.14)", br:"rgba(0,255,210,.30)" },
       { bg:"rgba(80,150,255,.14)", br:"rgba(80,150,255,.30)" },
@@ -530,6 +690,12 @@
       const idx = hashStr(e || "x") % PALETTE.length;
       return PALETTE[idx];
     }
+    function initialsFromEmail(email){
+      const x = (email || "").split("@")[0] || "";
+      const parts = x.split(/[.\-_]/).filter(Boolean);
+      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return (x.slice(0,2) || "??").toUpperCase();
+    }
 
     // ---- patient name ----
     function patientName(patientId){
@@ -540,7 +706,7 @@
       return (nome + " " + cogn).trim() || "—";
     }
 
-    // ---- build skeleton ----
+    // ---- calendar skeleton ----
     function buildCalendarSkeleton(){
       const header = document.getElementById("calHeader");
       header.innerHTML = "";
@@ -565,7 +731,6 @@
       body.innerHTML = "";
       body.style.height = (SLOTS * SLOT_H) + "px";
 
-      // time col
       const timeCol = document.createElement("div");
       timeCol.className = "timeCol";
       for(let s=0;s<SLOTS;s++){
@@ -580,34 +745,26 @@
       }
       body.appendChild(timeCol);
 
-      // day columns
       for(let i=0;i<7;i++){
         const col = document.createElement("div");
         col.className = "dayCol";
         col.dataset.dayIndex = String(i);
 
-        // grid lines
         for(let s=0;s<SLOTS;s++){
           const line = document.createElement("div");
-          line.className = "gridRow" + ((s % 2 === 0) ? " hour" : ""); // ogni 2 slot = 1 ora
+          line.className = "gridRow" + ((s % 2 === 0) ? " hour" : "");
           line.style.top = (s * SLOT_H) + "px";
           col.appendChild(line);
         }
 
-        // mouse move => hover slot
         col.addEventListener("mousemove", (ev) => {
           lastMouse = { x: ev.clientX, y: ev.clientY };
           const info = slotFromEvent(col, ev);
           setHover(info);
         });
+        col.addEventListener("mouseleave", () => clearHover());
 
-        col.addEventListener("mouseleave", () => {
-          clearHover();
-        });
-
-        // click => select slot + popover
         col.addEventListener("click", (ev) => {
-          // se click su evento -> lo gestisce evento
           if(ev.target.closest(".event")) return;
           const info = slotFromEvent(col, ev);
           setSelected(info);
@@ -620,6 +777,7 @@
       clearHover();
       clearSelected();
       closePopover();
+      closeApptModal();
     }
 
     function slotFromEvent(col, ev){
@@ -679,24 +837,22 @@
     // ---- popover ----
     const pop = document.getElementById("popover");
     function openPopoverAt(x,y){
-      // offset per non coprire il puntatore
-      const left = Math.min(window.innerWidth - 240, x + 12);
-      const top  = Math.min(window.innerHeight - 140, y + 12);
+      const left = Math.min(window.innerWidth - 260, x + 12);
+      const top  = Math.min(window.innerHeight - 170, y + 12);
       pop.style.left = left + "px";
       pop.style.top = top + "px";
       pop.classList.add("open");
     }
-    function closePopover(){
-      pop.classList.remove("open");
-    }
+    function closePopover(){ pop.classList.remove("open"); }
+
     window.addEventListener("keydown", (e) => {
       if(e.key === "Escape"){
         closePopover();
         clearSelected();
+        closeApptModal();
       }
     });
     window.addEventListener("click", (e) => {
-      // click fuori popover e fuori griglia => chiudi
       if(pop.classList.contains("open")){
         if(!e.target.closest(".popover") && !e.target.closest(".dayCol")){
           closePopover();
@@ -717,7 +873,7 @@
       const startM = minutesFromStart(ap.start);
       const endM = minutesFromStart(ap.end);
 
-      const maxM = (END_HOUR - START_HOUR) * 60;
+      const maxM = TOTAL_MIN; // fino alle 21:00
       const topM = clamp(startM, 0, maxM);
       const botM = clamp(endM, 0, maxM);
       const durM = Math.max(15, botM - topM);
@@ -763,7 +919,6 @@
 
       document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
 
-      // 7 chiamate giornaliere
       const all = [];
       for(let i=0;i<7;i++){
         const d = addDays(weekStart, i);
@@ -778,7 +933,6 @@
         }
       }
 
-      // pazienti batch
       const patientIds = Array.from(new Set(all.map(x => x.patientId).filter(Boolean)));
       patientsMap = {};
       if(patientIds.length){
@@ -797,7 +951,6 @@
         if(dayIdx >= 0) renderEvent(dayIdx, ap);
       }
 
-      // scroll a 09:00
       scrollToHour(9);
     }
 
@@ -806,13 +959,6 @@
         if(toISODate(addDays(weekStart, i)) === iso) return i;
       }
       return -1;
-    }
-
-    function initialsFromEmail(email){
-      const x = (email || "").split("@")[0] || "";
-      const parts = x.split(/[.\-_]/).filter(Boolean);
-      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-      return (x.slice(0,2) || "??").toUpperCase();
     }
 
     function renderChips(all){
@@ -858,12 +1004,76 @@
 
     function scrollToHour(hour){
       const sc = document.getElementById("calScroller");
-      const h = Math.max(START_HOUR, Math.min(END_HOUR, hour));
+      const h = Math.max(START_HOUR, Math.min(END_HOUR_INCLUSIVE, hour));
       const mins = (h - START_HOUR) * 60;
       sc.scrollTop = mins * PX_PER_MIN;
     }
 
+    // ---- MODAL: nuovo appuntamento ----
+    const apptModal = document.getElementById("apptModal");
+
+    function openApptModalFromSlot(slot){
+      const when = `${slot.isoDate} ${slot.hhmm}`;
+      document.getElementById("apptWhen").textContent = when;
+
+      document.getElementById("apptType").value = "Appuntamento paziente";
+      document.getElementById("apptDur").value = "30";
+      document.getElementById("apptEmail").value = meUser.email || "";
+      document.getElementById("apptPatient").value = "";
+      document.getElementById("apptNoteIn").value = "";
+      document.getElementById("apptNoteOut").value = "";
+      document.getElementById("ckAbsentEmail").checked = false;
+      document.getElementById("ckAbsentSms").checked = false;
+      document.getElementById("ckAbsentWa").checked = false;
+      document.getElementById("ckNotify").checked = false;
+
+      apptModal.classList.add("open");
+    }
+
+    function closeApptModal(){
+      apptModal.classList.remove("open");
+    }
+
+    document.getElementById("apptClose").onclick = closeApptModal;
+    document.getElementById("apptCancel").onclick = closeApptModal;
+    apptModal.addEventListener("click", (e) => { if(e.target === apptModal) closeApptModal(); });
+
+    document.getElementById("apptRepeat").onclick = () => alert("Step dopo: ripetizione appuntamento");
+
+    document.getElementById("apptSave").onclick = () => {
+      const payload = {
+        tipologia: document.getElementById("apptType").value,
+        paziente: document.getElementById("apptPatient").value.trim(),
+        durataMin: parseInt(document.getElementById("apptDur").value, 10),
+        email: document.getElementById("apptEmail").value.trim(),
+        assenteEmail: document.getElementById("ckAbsentEmail").checked,
+        assenteSms: document.getElementById("ckAbsentSms").checked,
+        assenteWhatsapp: document.getElementById("ckAbsentWa").checked,
+        notificaIncaricato: document.getElementById("ckNotify").checked,
+        noteInterne: document.getElementById("apptNoteIn").value.trim(),
+        notePaziente: document.getElementById("apptNoteOut").value.trim(),
+        data: selected?.isoDate || "",
+        ora: selected?.hhmm || ""
+      };
+      console.log("APPT_SAVE_PAYLOAD", payload);
+      closeApptModal();
+    };
+
     // ---- buttons ----
+    document.getElementById("popCreate").onclick = () => {
+      if(!selected) return;
+      closePopover();
+      openApptModalFromSlot(selected);
+    };
+
+    document.getElementById("btnPlus").onclick = () => {
+      // Se non hai selezionato uno slot: apriamo oggi alle 09:00
+      const d = new Date();
+      const isoDate = toISODate(d);
+      selected = { isoDate, hhmm: "09:00", dayIndex: 0, slotIndex: 0 };
+      openApptModalFromSlot(selected);
+    };
+
     document.getElementById("btnToday").onclick = () => {
       weekStart = startOfWeek(new Date());
       buildCalendarSkeleton();
@@ -888,19 +1098,11 @@
       location.href = "/";
     };
 
-    // popover create (per ora: semplice prefill e redirect, poi lo colleghiamo alla creazione vera)
-    document.getElementById("popCreate").onclick = () => {
-      if(!selected) return;
-      // Per ora: apriamo paziente.html vuoto? No: non hai sede e non hai form.
-      // Quindi: ti lascio in console i dati selezionati (nel prossimo step apriamo il modal di creazione vero).
-      console.log("SLOT_SELECTED", selected);
-      closePopover();
-    };
-
     // ---- init ----
     async function init(){
       const me = await apiGet("/api/auth-me");
       meUser = { email: me.email || "", role: me.role || "" };
+
       document.getElementById("who").textContent = `${meUser.email || "—"} · ${meUser.role || "—"}`;
       document.getElementById("sbUser").textContent = `${meUser.email || "—"} · ${meUser.role || "—"}`;
 
