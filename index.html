@@ -4,37 +4,49 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FisioPro - Login</title>
+
+  <!-- STESSO CSS DEL GESTIONALE -->
+  <link rel="stylesheet" href="/assets/app.css" />
+
   <style>
-    body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background:#f7f7f8; }
-    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .card { width:420px; background:#fff; border-radius:18px; padding:20px; box-shadow: 0 10px 30px rgba(0,0,0,.06); }
-    h1 { margin:0; font-size:22px; }
-    p { margin:8px 0 18px; color:#666; }
-    label { display:block; font-weight:700; margin-top:12px; }
-    input { width:100%; padding:12px; border-radius:12px; border:1px solid #e5e7eb; margin-top:6px; font-size:15px; }
-    button { width:100%; padding:12px; border-radius:14px; border:0; font-weight:800; margin-top:16px; cursor:pointer; }
-    .err { display:none; margin-top:12px; padding:10px; border-radius:12px; background:#fff5f5; border:1px solid #fed7d7; }
+    /* Solo mini layout: il resto viene da app.css */
+    .fp-login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .fp-login-card { width: 420px; max-width: 95vw; }
+    .fp-login-title { font-size: 22px; font-weight: 800; margin: 0; }
+    .fp-login-sub { opacity: .7; margin: 8px 0 16px; }
+    .fp-field { display:flex; flex-direction:column; gap:6px; margin-top: 12px; }
+    .fp-err { display:none; margin-top:12px; padding:10px; border-radius:12px; background:#fff5f5; border:1px solid #fed7d7; }
+    .fp-btn { width:100%; margin-top:16px; }
   </style>
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>FisioPro</h1>
-      <p>Accedi con Email e Codice accesso (da Airtable COLLABORATORI).</p>
+  <div class="fp-login-wrap">
+    <!-- Se nel gestionale usi una "card" class specifica, mettila qui -->
+    <div class="fp-login-card">
+      <h1 class="fp-login-title">FisioPro</h1>
+      <div class="fp-login-sub">Accedi con Email e Codice accesso.</div>
 
       <form id="loginForm">
-        <label>Email</label>
-        <input id="email" type="email" placeholder="nome@dominio.it" required />
+        <div class="fp-field">
+          <label for="email"><b>Email</b></label>
+          <input id="email" type="email" placeholder="nome@dominio.it" required />
+        </div>
 
-        <label>Codice accesso</label>
-        <input id="codice" type="password" placeholder="••••••••" required />
+        <div class="fp-field">
+          <label for="codice"><b>Codice accesso</b></label>
+          <input id="codice" type="password" placeholder="••••••••" required />
+        </div>
 
-        <div id="errBox" class="err">Credenziali non valide o utente non attivo.</div>
+        <div id="errBox" class="fp-err">Credenziali non valide o utente non attivo.</div>
 
-        <button id="loginBtn" type="submit">Accedi</button>
+        <button id="loginBtn" class="fp-btn" type="submit">Accedi</button>
       </form>
     </div>
   </div>
+
+  <!-- Se nel gestionale hai JS globale, puoi caricarlo anche qui -->
+  <script src="/assets/app.js"></script>
 
   <script>
     const form = document.querySelector("#loginForm");
@@ -66,7 +78,6 @@
           return;
         }
 
-        // SUCCESSO -> vai all'agenda
         window.location.href = "/pages/agenda.html";
       } catch (err) {
         errBox.style.display = "block";
