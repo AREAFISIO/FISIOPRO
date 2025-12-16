@@ -1,7 +1,9 @@
-import { getAuth } from "./_auth.js";
+import { requireSession } from "./_auth.js";
 
 export default async function handler(req, res) {
-  const { user } = getAuth(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-  res.status(200).json({ user: { email: user.email, role: user.role, name: user.name } });
+  const session = requireSession(req);
+
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify({ ok: Boolean(session), session: session || null }));
 }
