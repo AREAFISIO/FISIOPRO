@@ -584,4 +584,10 @@ body.oe-hide-left .sidebar *{ display:none !important; }
 
 body.oe-hide-right .rightbar{ width: 0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; }
 body.oe-hide-right .rightbar *{ display:none !important; }
+html { font-size: 18px; }
+body { font-size: 18px; }
+h1 { font-size: 28px; }
+h2 { font-size: 22px; }
+label, button, input { font-size: 18px; }
+
 
