@@ -5,18 +5,24 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro – Agenda</title>
   <link rel="stylesheet" href="/assets/app.css" />
-
   <script src="/assets/auth-guard.js"></script>
   <script src="/assets/session-timeout.js"></script>
 
   <style>
-    /* Layout stile “come prima”: sidebar sx + contenuto + sidebar dx */
     :root{
-      --leftW: 270px;
-      --rightW: 320px;
+      --leftW: 220px;   /* più stretta */
+      --rightW: 260px;  /* più stretta */
       --radius: 18px;
       --border: rgba(255,255,255,.10);
-      --bgCard: rgba(255,255,255,.05);
+      --card: rgba(255,255,255,.05);
+      --card2: rgba(255,255,255,.04);
+      --soft: rgba(255,255,255,.06);
+      --soft2: rgba(255,255,255,.08);
+      --accent: rgba(0,255,210,.10);
+      --accentB: rgba(0,255,210,.28);
+      --gridLine: rgba(255,255,255,.06);
+      --textMuted: rgba(255,255,255,.72);
+      --slotH: 52px; /* altezza di 1 ora, simile a OsteoEasy */
     }
 
     body { margin:0; }
@@ -28,166 +34,301 @@
     }
 
     .sidebar, .rightbar{
-      border-right: 1px solid var(--border);
       background: rgba(255,255,255,.03);
       backdrop-filter: blur(10px);
     }
-    .rightbar{
-      border-right: none;
-      border-left: 1px solid var(--border);
-    }
-
-    .main{
-      padding: 18px;
-      overflow:auto;
-    }
+    .sidebar{ border-right: 1px solid var(--border); }
+    .rightbar{ border-left: 1px solid var(--border); }
 
     .brand{
-      display:flex; gap:12px; align-items:center;
-      padding: 18px;
+      display:flex; gap:10px; align-items:center;
+      padding: 16px;
       border-bottom: 1px solid var(--border);
     }
     .logo{
-      width:42px; height:42px; border-radius: 14px;
+      width:38px; height:38px; border-radius: 14px;
       background: linear-gradient(135deg, rgba(0,255,210,.8), rgba(80,150,255,.8));
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      flex: 0 0 auto;
     }
-    .brand h2{ margin:0; font-size:18px; }
-    .brand .sub{ opacity:.75; font-size:13px; margin-top:2px; }
+    .brand h2{ margin:0; font-size:16px; }
+    .brand .sub{ margin-top:2px; font-size:12px; opacity:.75; }
 
-    .menu{
-      padding: 14px;
-    }
+    .menu{ padding: 12px; }
     .menu h4{
       margin: 14px 8px 8px;
       opacity:.7;
-      font-size:12px;
+      font-size:11px;
       letter-spacing:.08em;
       text-transform:uppercase;
     }
     .nav a{
       display:flex; align-items:center; gap:10px;
-      padding: 12px 12px;
+      padding: 11px 12px;
       margin: 6px 6px;
       border-radius: 14px;
       text-decoration:none;
       border: 1px solid transparent;
       color: inherit;
-      background: transparent;
     }
     .nav a.active{
-      background: rgba(0,255,210,.08);
-      border-color: rgba(0,255,210,.25);
+      background: var(--accent);
+      border-color: var(--accentB);
     }
     .nav a:hover{
       background: rgba(255,255,255,.05);
       border-color: rgba(255,255,255,.10);
     }
 
+    .main{
+      padding: 16px;
+      overflow:auto;
+    }
+
     .topbar{
-      display:flex; justify-content:space-between; align-items:center;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 14px;
       padding: 14px 16px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: var(--bgCard);
+      background: var(--card);
     }
-    .topbar .title{
+    .topLeft .title{
       font-size: 28px;
-      font-weight: 800;
+      font-weight: 850;
       margin:0;
-      line-height: 1.05;
+      line-height:1.05;
     }
-    .topbar .who{
-      opacity:.8;
+    .topLeft .who{
       margin-top:6px;
+      opacity:.8;
       font-size: 14px;
     }
-    .topbar .actions{
-      display:flex; gap:10px; align-items:center;
-    }
 
+    .actions{ display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
     .btn{
       padding: 10px 14px;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
       cursor:pointer;
-      font-weight: 650;
+      font-weight: 700;
+      user-select:none;
     }
     .btn:hover{ background: rgba(255,255,255,.10); }
-
     .btn.primary{
       border-color: rgba(0,255,210,.28);
       background: rgba(0,255,210,.10);
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-      margin-top: 14px;
-    }
-
-    .card{
+    .pillRow{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: var(--bgCard);
-      padding: 14px;
+      background: var(--card2);
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .dot{
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.25);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 12px;
+      font-weight: 900;
     }
 
     .alert{
+      margin-top: 12px;
       border-radius: var(--radius);
-      padding: 14px;
+      padding: 12px 14px;
       border: 1px solid rgba(255,80,80,.35);
       background: rgba(255,80,80,.10);
       color: rgba(255,255,255,.92);
     }
 
-    .sectionHead{
-      display:flex; justify-content:space-between; align-items:center;
-      margin-bottom: 10px;
-    }
-    .sectionHead h3{ margin:0; font-size: 20px; }
-    .muted{ opacity:.75; }
-
-    .table{ width:100%; border-collapse: collapse; }
-    .table th, .table td{
-      padding: 12px 10px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
-      text-align:left;
-      font-size: 16px;
-      vertical-align: middle;
+    /* ---------- CALENDARIO SETTIMANA (stile OsteoEasy) ---------- */
+    .calendarWrap{
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      overflow: hidden;
     }
 
-    .pill{
+    .calHeader{
+      display:grid;
+      grid-template-columns: 88px repeat(7, 1fr);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+    }
+    .calHeader .corner{
+      padding: 12px;
+      font-weight: 800;
+      opacity:.8;
+    }
+    .dayHead{
+      padding: 10px 12px;
+      border-left: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 8px;
+    }
+    .dayHead .dname{ font-weight: 900; letter-spacing:.02em; }
+    .dayHead .dnum{
       display:inline-flex;
-      padding: 6px 10px;
+      align-items:center;
+      justify-content:center;
+      width: 32px;
+      height: 32px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
-      font-weight: 700;
+      font-weight: 900;
+    }
+
+    .calBody{
+      position: relative;
+      display:grid;
+      grid-template-columns: 88px repeat(7, 1fr);
+      height: calc(var(--slotH) * 12); /* 12 ore visibili (08-20) */
+    }
+
+    .timeCol{
+      border-right: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+    }
+    .timeSlot{
+      height: var(--slotH);
+      border-bottom: 1px solid var(--gridLine);
+      padding: 10px 10px;
+      font-weight: 800;
+      color: var(--textMuted);
       font-size: 14px;
     }
 
-    /* Collassa sidebar */
-    .collapsed-left .shell{ grid-template-columns: 0 1fr var(--rightW); }
-    .collapsed-left .sidebar{ display:none; }
+    .dayCol{
+      position: relative;
+      border-left: 1px solid var(--border);
+    }
+    .hourLine{
+      position:absolute;
+      left:0; right:0;
+      height: var(--slotH);
+      border-bottom: 1px solid var(--gridLine);
+      box-sizing:border-box;
+    }
 
-    .collapsed-right .shell{ grid-template-columns: var(--leftW) 1fr 0; }
-    .collapsed-right .rightbar{ display:none; }
+    .event{
+      position:absolute;
+      left: 10px;
+      right: 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.07);
+      box-shadow: 0 10px 24px rgba(0,0,0,.20);
+      padding: 10px 10px;
+      cursor: pointer;
+      overflow:hidden;
+    }
+    .event:hover{
+      background: rgba(255,255,255,.10);
+      border-color: rgba(0,255,210,.22);
+    }
 
-    /* Mobile */
-    @media (max-width: 1050px){
+    .eventTop{
+      display:flex;
+      justify-content:space-between;
+      gap: 10px;
+      align-items:center;
+      font-weight: 900;
+      font-size: 14px;
+    }
+    .eventMid{
+      margin-top: 6px;
+      font-size: 14px;
+      opacity:.90;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .eventBot{
+      margin-top: 6px;
+      font-size: 12px;
+      opacity:.75;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Rightbar */
+    .rbHead{
+      padding: 16px;
+      border-bottom:1px solid var(--border);
+    }
+    .rbHead .t1{
+      font-size: 12px;
+      opacity:.75;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .rbHead .t2{
+      margin-top: 8px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .rbBody{ padding: 12px; }
+    .rbCard{
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card2);
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .rbCard .h{
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+    .rbCard .m{
+      opacity:.75;
+      font-size: 13px;
+      line-height:1.25;
+    }
+
+    @media (max-width: 1100px){
       .shell{ grid-template-columns: 0 1fr 0; }
       .sidebar, .rightbar{ display:none; }
-      .topbar{ gap: 12px; }
+      .calHeader{ grid-template-columns: 72px repeat(7, 1fr); }
+      .calBody{ grid-template-columns: 72px repeat(7, 1fr); }
     }
   </style>
 </head>
 
 <body>
   <div class="shell">
-    <!-- SIDEBAR SINISTRA -->
+    <!-- SINISTRA -->
     <aside class="sidebar">
       <div class="brand">
         <div class="logo"></div>
@@ -216,80 +357,68 @@
         <nav class="nav">
           <a href="/pages/configurazione.html"><span>⚙️</span> Configurazione</a>
         </nav>
-
-        <div style="padding:10px 6px;">
-          <button class="btn" id="btnToggleLeft" style="width:100%;">Chiudi menu sinistra</button>
-        </div>
       </div>
     </aside>
 
-    <!-- CONTENUTO CENTRALE -->
+    <!-- CENTRO -->
     <main class="main">
       <div class="topbar">
-        <div>
+        <div class="topLeft">
           <div class="title">Agenda</div>
           <div class="who" id="who">—</div>
         </div>
 
         <div class="actions">
-          <input id="day" type="date" class="btn" style="padding:10px 12px;" />
+          <button class="btn" id="btnToday">Oggi</button>
+          <button class="btn" id="btnPrev">‹</button>
+          <button class="btn" id="btnNext">›</button>
+          <div class="btn" id="weekLabel" style="cursor:default;">—</div>
           <button class="btn primary" id="btnRefresh">Aggiorna</button>
           <button class="btn" id="btnLogout">Logout</button>
-          <button class="btn" id="btnToggleRight">Filtri ▸</button>
         </div>
       </div>
 
-      <div class="grid">
-        <div id="errBox" class="alert" style="display:none;"></div>
+      <div class="pillRow" id="chips">
+        <span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span>
+        <span class="muted">Caricamento…</span>
+      </div>
 
-        <div class="card">
-          <div class="sectionHead">
-            <h3>Appuntamenti</h3>
-            <div class="muted" id="count">—</div>
-          </div>
+      <div id="errBox" class="alert" style="display:none;"></div>
 
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Orario</th>
-                <th>Durata</th>
-                <th>Paziente</th>
-                <th class="muted">Fisio</th>
-              </tr>
-            </thead>
-            <tbody id="rows">
-              <tr><td colspan="4" class="muted">Caricamento…</td></tr>
-            </tbody>
-          </table>
+      <div class="calendarWrap">
+        <div class="calHeader" id="calHeader">
+          <!-- generato via JS -->
+        </div>
+
+        <div class="calBody" id="calBody">
+          <!-- timeCol + 7 dayCol generati via JS -->
         </div>
       </div>
     </main>
 
-    <!-- SIDEBAR DESTRA -->
+    <!-- DESTRA -->
     <aside class="rightbar">
-      <div style="padding:18px; border-bottom:1px solid var(--border);">
-        <div style="font-size:14px; opacity:.75; letter-spacing:.08em; text-transform:uppercase;">Filtri agenda</div>
-        <div style="font-size:20px; font-weight:800; margin-top:8px;">Filtri</div>
+      <div class="rbHead">
+        <div class="t1">Filtri agenda</div>
+        <div class="t2">Filtri</div>
       </div>
 
-      <div style="padding:16px;">
-        <div class="card" style="margin-bottom:12px;">
-          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Incaricati</div>
-          <div class="muted" style="font-size:14px;">(Step dopo: dropdown collaboratori)</div>
+      <div class="rbBody">
+        <div class="rbCard">
+          <div class="h">Incaricati</div>
+          <div class="m">(Step dopo: dropdown collaboratori)</div>
+        </div>
+        <div class="rbCard">
+          <div class="h">Prestazioni</div>
+          <div class="m">(Step dopo: tipi visita)</div>
+        </div>
+        <div class="rbCard">
+          <div class="h">Stati</div>
+          <div class="m">(Step dopo: confermato / da confermare)</div>
         </div>
 
-        <div class="card" style="margin-bottom:12px;">
-          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Prestazioni</div>
-          <div class="muted" style="font-size:14px;">(Step dopo: tipi visita)</div>
-        </div>
-
-        <div class="card" style="margin-bottom:12px;">
-          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Stati</div>
-          <div class="muted" style="font-size:14px;">(Step dopo: confermato / da confermare)</div>
-        </div>
-
-        <div class="card">
-          <div style="font-weight:800; font-size:16px; margin-bottom:10px;">Azioni</div>
+        <div class="rbCard">
+          <div class="h">Azioni</div>
           <button class="btn primary" style="width:100%; margin-bottom:10px;" id="btnNew">+ Appuntamento</button>
           <button class="btn" style="width:100%;" id="btnExport">Export</button>
         </div>
@@ -298,7 +427,70 @@
   </div>
 
   <script>
-    // ---------- helpers ----------
+    // -------- CONFIG VISTA (08:00 - 20:00) --------
+    const START_HOUR = 8;
+    const END_HOUR = 20;
+    const HOURS = END_HOUR - START_HOUR; // 12
+    const SLOT_H = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--slotH')) || 52;
+
+    // -------- STATE --------
+    let weekStart = startOfWeek(new Date()); // lunedì
+    let patientsMap = {}; // patientId -> {Nome,Cognome,...}
+
+    // -------- HELPERS DATE --------
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function toISODate(d){
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    function startOfWeek(d){
+      const x = new Date(d);
+      const day = (x.getDay() + 6) % 7; // lun=0 ... dom=6
+      x.setHours(0,0,0,0);
+      x.setDate(x.getDate() - day);
+      return x;
+    }
+    function addDays(d, n){
+      const x = new Date(d);
+      x.setDate(x.getDate()+n);
+      return x;
+    }
+    function sameISO(a,b){ return toISODate(a) === toISODate(b); }
+
+    function fmtWeekLabel(ws){
+      const we = addDays(ws, 6);
+      const opt = { month:"long", year:"numeric" };
+      const mid = addDays(ws, 3);
+      const m = mid.toLocaleDateString("it-IT", opt);
+      return `${m} • ${pad(ws.getDate())}/${pad(ws.getMonth()+1)} → ${pad(we.getDate())}/${pad(we.getMonth()+1)}`;
+    }
+
+    function dayNameShort(d){
+      const names = ["LUN","MAR","MER","GIO","VEN","SAB","DOM"];
+      const idx = (d.getDay()+6)%7;
+      return names[idx];
+    }
+
+    // -------- API --------
+    async function apiGet(url){
+      const res = await fetch(url, { credentials:"include" });
+      const data = await res.json().catch(()=> ({}));
+      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
+      return data;
+    }
+
+    async function apiPost(url, body){
+      const res = await fetch(url, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        credentials:"include",
+        body: JSON.stringify(body || {})
+      });
+      const data = await res.json().catch(()=> ({}));
+      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
+      return data;
+    }
+
+    // -------- UI ERR --------
     function showErr(msg){
       const b = document.getElementById("errBox");
       b.style.display = "block";
@@ -310,140 +502,279 @@
       b.textContent = "";
     }
 
-    function toISODate(d){
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth()+1).padStart(2,"0");
-      const dd = String(d.getDate()).padStart(2,"0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
+    // -------- BUILD CALENDAR SKELETON --------
+    function buildCalendarSkeleton(){
+      // Header
+      const h = document.getElementById("calHeader");
+      h.innerHTML = "";
 
-    function fmtTime(iso){
-      if(!iso) return "";
-      try{
-        const d = new Date(iso);
-        return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
-      }catch{ return iso; }
-    }
+      const corner = document.createElement("div");
+      corner.className = "corner";
+      corner.textContent = "Ore";
+      h.appendChild(corner);
 
-    async function apiGet(url){
-      const res = await fetch(url, { credentials:"include" });
-      const data = await res.json().catch(()=> ({}));
-      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
-      return data;
-    }
-
-    // ---------- load agenda ----------
-    async function loadAgenda(){
-      hideErr();
-      const tbody = document.getElementById("rows");
-      tbody.innerHTML = `<tr><td colspan="4" class="muted">Caricamento…</td></tr>`;
-      document.getElementById("count").textContent = "—";
-
-      const day = document.getElementById("day").value;
-
-      // 1) appuntamenti
-      // supporto: /api/appointments?date=YYYY-MM-DD  (se la tua API usa un altro parametro, dimmelo e te lo adatto)
-      const a = await apiGet(`/api/appointments?date=${encodeURIComponent(day)}`);
-
-      // compatibilità: alcune versioni potrebbero restituire {records:[]} o {appointments:[]}
-      const records = a.records || a.appointments || [];
-
-      // 2) estraggo patientIds (link Airtable)
-      const patientIds = [];
-      for(const r of records){
-        const pid = r.patientId || r.PazienteId || r.pazienteId || r.patient || null;
-        if(pid) patientIds.push(pid);
+      for(let i=0;i<7;i++){
+        const d = addDays(weekStart, i);
+        const dh = document.createElement("div");
+        dh.className = "dayHead";
+        dh.innerHTML = `
+          <div class="dname">${dayNameShort(d)}</div>
+          <div class="dnum">${pad(d.getDate())}</div>
+        `;
+        h.appendChild(dh);
       }
 
-      // 3) batch pazienti
-      let mapPatients = {};
-      if(patientIds.length){
-        const pb = await fetch("/api/patients-batch", {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          credentials:"include",
-          body: JSON.stringify({ recordIds: Array.from(new Set(patientIds)) })
-        });
-        const pdata = await pb.json().catch(()=> ({}));
-        if(!pb.ok) throw new Error(pdata.error || "Errore pazienti-batch");
+      // Body
+      const body = document.getElementById("calBody");
+      body.innerHTML = "";
 
-        // mi aspetto [{id, Nome, Cognome, ...}] o simile
-        const list = pdata.records || pdata.patients || pdata || [];
-        for(const p of list){
-          mapPatients[p.id] = p;
+      // Time column
+      const timeCol = document.createElement("div");
+      timeCol.className = "timeCol";
+      for(let h=START_HOUR; h<END_HOUR; h++){
+        const t = document.createElement("div");
+        t.className = "timeSlot";
+        t.textContent = `${pad(h)}:00`;
+        timeCol.appendChild(t);
+      }
+      body.appendChild(timeCol);
+
+      // Day columns with hour lines
+      for(let i=0;i<7;i++){
+        const col = document.createElement("div");
+        col.className = "dayCol";
+        col.dataset.dayIndex = String(i);
+
+        for(let r=0; r<HOURS; r++){
+          const line = document.createElement("div");
+          line.className = "hourLine";
+          line.style.top = (r * SLOT_H) + "px";
+          col.appendChild(line);
+        }
+        body.appendChild(col);
+      }
+    }
+
+    // -------- PARSE APPOINTMENT RECORD (compatibile) --------
+    function pick(v, ...keys){
+      for(const k of keys){
+        if(v && v[k] != null && v[k] !== "") return v[k];
+      }
+      return "";
+    }
+
+    function parseAppointment(r){
+      const start = pick(r, "start", "inizio", "startAt", "Data e ora INIZIO");
+      const end   = pick(r, "end", "fine", "endAt", "Data e ora FINE");
+      const durata = pick(r, "durata", "Durata");
+      const email = pick(r, "email", "Email");
+      const patientId = pick(r, "patientId", "PazienteId", "pazienteId", "patient");
+
+      return { start, end, durata, email, patientId, raw: r };
+    }
+
+    function minutesFromStart(iso){
+      const d = new Date(iso);
+      const mins = d.getHours()*60 + d.getMinutes();
+      return mins - (START_HOUR*60);
+    }
+
+    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+    // -------- RENDER EVENTS --------
+    function clearEvents(){
+      document.querySelectorAll(".dayCol").forEach(c => {
+        // rimuovo solo i .event
+        c.querySelectorAll(".event").forEach(e => e.remove());
+      });
+    }
+
+    function patientName(patientId){
+      const p = patientsMap[patientId];
+      if(!p) return "—";
+      const nome = (p.Nome || p.nome || "").trim();
+      const cogn = (p.Cognome || p.cognome || "").trim();
+      const full = (nome + " " + cogn).trim();
+      return full || "—";
+    }
+
+    function initialsFromEmail(email){
+      const x = (email || "").split("@")[0] || "";
+      const parts = x.split(/[.\-_]/).filter(Boolean);
+      if(parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return (x.slice(0,2) || "??").toUpperCase();
+    }
+
+    function renderEvent(dayIndex, ap){
+      const col = document.querySelector(`.dayCol[data-day-index="${dayIndex}"]`);
+      if(!col) return;
+
+      const startM = minutesFromStart(ap.start);
+      const endM = minutesFromStart(ap.end);
+
+      // se fuori dalla finestra oraria (08-20), non lo disegno
+      const maxM = HOURS * 60;
+      const topM = clamp(startM, 0, maxM);
+      const botM = clamp(endM, 0, maxM);
+      const durM = Math.max(15, botM - topM); // minimo 15 min visivo
+
+      const topPx = (topM / 60) * SLOT_H;
+      const heightPx = (durM / 60) * SLOT_H;
+
+      const ev = document.createElement("div");
+      ev.className = "event";
+      ev.style.top = `${topPx + 6}px`;
+      ev.style.height = `${Math.max(34, heightPx - 8)}px`;
+
+      const pName = ap.patientId ? patientName(ap.patientId) : "—";
+      const hhmm = (iso) => {
+        const d = new Date(iso);
+        return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
+      };
+
+      ev.innerHTML = `
+        <div class="eventTop">
+          <div>${hhmm(ap.start)}–${hhmm(ap.end)}</div>
+          <div style="opacity:.85;">${ap.durata || ""}</div>
+        </div>
+        <div class="eventMid">${pName}</div>
+        <div class="eventBot">${ap.email || ""}</div>
+      `;
+
+      // click => paziente.html
+      if(ap.patientId){
+        ev.onclick = () => location.href = `/pages/paziente.html?id=${encodeURIComponent(ap.patientId)}`;
+      } else {
+        ev.style.cursor = "default";
+      }
+
+      col.appendChild(ev);
+    }
+
+    // -------- LOAD WEEK DATA --------
+    async function loadWeek(){
+      hideErr();
+      clearEvents();
+
+      document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
+
+      // 1) carico 7 giorni di appuntamenti
+      const all = [];
+      for(let i=0;i<7;i++){
+        const d = addDays(weekStart, i);
+        const iso = toISODate(d);
+
+        let data;
+        try{
+          data = await apiGet(`/api/appointments?date=${encodeURIComponent(iso)}`);
+        }catch(e){
+          // Se ti arriva "airtable_error" lo vediamo qui
+          throw new Error(e.message || "airtable_error");
+        }
+
+        const recs = data.records || data.appointments || [];
+        for(const r of recs){
+          const ap = parseAppointment(r);
+          // aggiungo info giorno
+          all.push({ ...ap, dayISO: iso });
         }
       }
 
-      // 4) render
-      tbody.innerHTML = "";
-      if(!records.length){
-        tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun appuntamento per questa data.</td></tr>`;
-        document.getElementById("count").textContent = "0";
-        return;
+      // 2) batch pazienti (se presenti)
+      const patientIds = Array.from(new Set(all.map(x => x.patientId).filter(Boolean)));
+      patientsMap = {};
+      if(patientIds.length){
+        const pb = await apiPost("/api/patients-batch", { recordIds: patientIds });
+        const list = pb.records || pb.patients || pb || [];
+        for(const p of list){
+          patientsMap[p.id] = p;
+        }
       }
 
-      document.getElementById("count").textContent = String(records.length);
+      // 3) chip “collaboratori” (come i cerchi in alto di OsteoEasy)
+      renderChips(all);
 
-      for(const r of records){
-        const start = r.start || r["Data e ora INIZIO"] || r.inizio || r.startAt || "";
-        const end   = r.end   || r["Data e ora FINE"]   || r.fine   || r.endAt   || "";
-        const durata= (r.durata ?? r.Durata ?? "");
-        const email = r.email || r.Email || "";
-
-        const pid = r.patientId || r.PazienteId || r.pazienteId || r.patient || null;
-        const p = pid ? mapPatients[pid] : null;
-
-        const nome = (p && (p.Nome || p.nome)) ? (p.Nome || p.nome) : "";
-        const cogn = (p && (p.Cognome || p.cognome)) ? (p.Cognome || p.cognome) : "";
-        const full = (nome + " " + cogn).trim() || "—";
-
-        const tr = document.createElement("tr");
-
-        // click su riga => paziente.html?id=PID (se esiste)
-        tr.style.cursor = pid ? "pointer" : "default";
-        tr.onclick = () => {
-          if(pid) location.href = `/pages/paziente.html?id=${encodeURIComponent(pid)}`;
-        };
-
-        tr.innerHTML = `
-          <td><span class="pill">${fmtTime(start)}–${fmtTime(end)}</span></td>
-          <td>${durata}</td>
-          <td><strong>${full}</strong></td>
-          <td class="muted">${email}</td>
-        `;
-        tbody.appendChild(tr);
+      // 4) render eventi in griglia
+      for(const ap of all){
+        // day index 0..6
+        let idx = -1;
+        for(let i=0;i<7;i++){
+          if(ap.dayISO === toISODate(addDays(weekStart, i))) { idx = i; break; }
+        }
+        if(idx >= 0 && ap.start && ap.end){
+          renderEvent(idx, ap);
+        }
       }
     }
 
+    function renderChips(all){
+      const chips = document.getElementById("chips");
+      const emails = Array.from(new Set(all.map(x => (x.email||"").toLowerCase()).filter(Boolean)));
+
+      if(!emails.length){
+        chips.innerHTML = `<span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span> <span class="muted">Nessun appuntamento in settimana</span>`;
+        return;
+      }
+
+      // max 10 chips visibili
+      const view = emails.slice(0,10);
+
+      chips.innerHTML = `<span class="muted" style="opacity:.75;font-weight:800;">Collaboratori:</span>`;
+      for(const em of view){
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.innerHTML = `<span class="dot">${initialsFromEmail(em)}</span><span>${em}</span>`;
+        chips.appendChild(el);
+      }
+      if(emails.length > view.length){
+        const more = document.createElement("span");
+        more.className = "chip";
+        more.textContent = `+${emails.length - view.length}`;
+        chips.appendChild(more);
+      }
+    }
+
+    // -------- INIT --------
     async function init(){
-      // session info top
       const me = await apiGet("/api/auth-me");
       const email = me.email || "—";
       const role  = me.role  || "—";
       document.getElementById("who").textContent = `${email} · ${role}`;
       document.getElementById("sbUser").textContent = `${email} · ${role}`;
 
-      // default: oggi
-      document.getElementById("day").value = toISODate(new Date());
+      buildCalendarSkeleton();
+      document.getElementById("weekLabel").textContent = fmtWeekLabel(weekStart);
 
-      await loadAgenda();
+      await loadWeek();
     }
 
-    // ---------- UI actions ----------
-    document.getElementById("btnRefresh").onclick = () => loadAgenda().catch(e => showErr(e.message));
-    document.getElementById("day").onchange = () => loadAgenda().catch(e => showErr(e.message));
+    // -------- BUTTONS --------
+    document.getElementById("btnToday").onclick = () => {
+      weekStart = startOfWeek(new Date());
+      buildCalendarSkeleton();
+      loadWeek().catch(e => showErr(e.message));
+    };
+
+    document.getElementById("btnPrev").onclick = () => {
+      weekStart = addDays(weekStart, -7);
+      buildCalendarSkeleton();
+      loadWeek().catch(e => showErr(e.message));
+    };
+
+    document.getElementById("btnNext").onclick = () => {
+      weekStart = addDays(weekStart, 7);
+      buildCalendarSkeleton();
+      loadWeek().catch(e => showErr(e.message));
+    };
+
+    document.getElementById("btnRefresh").onclick = () => {
+      buildCalendarSkeleton();
+      loadWeek().catch(e => showErr(e.message));
+    };
 
     document.getElementById("btnLogout").onclick = async () => {
       try { await fetch("/api/auth-logout", { method:"POST", credentials:"include" }); } catch {}
       location.href = "/";
-    };
-
-    document.getElementById("btnToggleLeft").onclick = () => {
-      document.body.classList.toggle("collapsed-left");
-    };
-
-    document.getElementById("btnToggleRight").onclick = () => {
-      document.body.classList.toggle("collapsed-right");
     };
 
     document.getElementById("btnNew").onclick = () => alert("Step dopo: form creazione appuntamento");
