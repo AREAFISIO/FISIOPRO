@@ -2,302 +2,454 @@
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro – Agenda</title>
-
-  <!-- STESSO CSS DEL GESTIONALE -->
   <link rel="stylesheet" href="/assets/app.css" />
 
-  <!-- SICUREZZA -->
   <script src="/assets/auth-guard.js"></script>
   <script src="/assets/session-timeout.js"></script>
 
   <style>
-    body { font-size: 18px; }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 900;
-      margin: 0;
+    /* Layout stile “come prima”: sidebar sx + contenuto + sidebar dx */
+    :root{
+      --leftW: 270px;
+      --rightW: 320px;
+      --radius: 18px;
+      --border: rgba(255,255,255,.10);
+      --bgCard: rgba(255,255,255,.05);
     }
 
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      padding: 16px;
+    body { margin:0; }
+
+    .shell{
+      display:grid;
+      grid-template-columns: var(--leftW) 1fr var(--rightW);
+      min-height: 100vh;
     }
 
-    .user {
-      font-size: 15px;
-      opacity: .75;
+    .sidebar, .rightbar{
+      border-right: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      backdrop-filter: blur(10px);
+    }
+    .rightbar{
+      border-right: none;
+      border-left: 1px solid var(--border);
     }
 
-    .controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
+    .main{
+      padding: 18px;
+      overflow:auto;
     }
 
-    input[type="date"] {
-      padding: 10px 14px;
-      font-size: 16px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(0,0,0,.15);
-      color: inherit;
-      font-weight: 700;
+    .brand{
+      display:flex; gap:12px; align-items:center;
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
     }
-
-    button {
-      padding: 10px 14px;
-      font-size: 16px;
-      font-weight: 800;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(0,0,0,.2);
-      cursor: pointer;
+    .logo{
+      width:42px; height:42px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0,255,210,.8), rgba(80,150,255,.8));
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
     }
+    .brand h2{ margin:0; font-size:18px; }
+    .brand .sub{ opacity:.75; font-size:13px; margin-top:2px; }
 
-    button:disabled {
-      opacity: .6;
-      cursor: not-allowed;
-    }
-
-    .wrap {
-      padding: 0 16px 24px;
-    }
-
-    .card {
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 16px;
+    .menu{
       padding: 14px;
     }
-
-    .headerline {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      font-weight: 900;
+    .menu h4{
+      margin: 14px 8px 8px;
+      opacity:.7;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
     }
-
-    .muted {
-      opacity: .7;
-    }
-
-    .list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px;
+    .nav a{
+      display:flex; align-items:center; gap:10px;
+      padding: 12px 12px;
+      margin: 6px 6px;
       border-radius: 14px;
-      cursor: pointer;
+      text-decoration:none;
+      border: 1px solid transparent;
+      color: inherit;
+      background: transparent;
+    }
+    .nav a.active{
+      background: rgba(0,255,210,.08);
+      border-color: rgba(0,255,210,.25);
+    }
+    .nav a:hover{
+      background: rgba(255,255,255,.05);
+      border-color: rgba(255,255,255,.10);
     }
 
-    .row:hover {
-      background: rgba(255,255,255,.08);
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bgCard);
     }
-
-    .time {
-      font-weight: 900;
-      font-size: 18px;
+    .topbar .title{
+      font-size: 28px;
+      font-weight: 800;
+      margin:0;
+      line-height: 1.05;
     }
-
-    .patient {
-      opacity: .85;
-      font-size: 16px;
-    }
-
-    .pill {
-      padding: 6px 12px;
-      border-radius: 999px;
+    .topbar .who{
+      opacity:.8;
+      margin-top:6px;
       font-size: 14px;
-      font-weight: 900;
-      border: 1px solid rgba(255,255,255,.25);
+    }
+    .topbar .actions{
+      display:flex; gap:10px; align-items:center;
     }
 
-    .error {
-      display: none;
-      margin-bottom: 14px;
-      padding: 12px;
-      border-radius: 12px;
-      background: #fff5f5;
-      border: 1px solid #fed7d7;
-      color: #7a1b1b;
+    .btn{
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      font-weight: 650;
+    }
+    .btn:hover{ background: rgba(255,255,255,.10); }
+
+    .btn.primary{
+      border-color: rgba(0,255,210,.28);
+      background: rgba(0,255,210,.10);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .card{
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bgCard);
+      padding: 14px;
+    }
+
+    .alert{
+      border-radius: var(--radius);
+      padding: 14px;
+      border: 1px solid rgba(255,80,80,.35);
+      background: rgba(255,80,80,.10);
+      color: rgba(255,255,255,.92);
+    }
+
+    .sectionHead{
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom: 10px;
+    }
+    .sectionHead h3{ margin:0; font-size: 20px; }
+    .muted{ opacity:.75; }
+
+    .table{ width:100%; border-collapse: collapse; }
+    .table th, .table td{
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      text-align:left;
+      font-size: 16px;
+      vertical-align: middle;
+    }
+
+    .pill{
+      display:inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
       font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Collassa sidebar */
+    .collapsed-left .shell{ grid-template-columns: 0 1fr var(--rightW); }
+    .collapsed-left .sidebar{ display:none; }
+
+    .collapsed-right .shell{ grid-template-columns: var(--leftW) 1fr 0; }
+    .collapsed-right .rightbar{ display:none; }
+
+    /* Mobile */
+    @media (max-width: 1050px){
+      .shell{ grid-template-columns: 0 1fr 0; }
+      .sidebar, .rightbar{ display:none; }
+      .topbar{ gap: 12px; }
     }
   </style>
 </head>
 
 <body>
-
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div>
-      <h1>Agenda</h1>
-      <div id="whoami" class="user">Caricamento sessione…</div>
-    </div>
-
-    <div class="controls">
-      <input id="datePick" type="date" />
-      <button id="refreshBtn">Aggiorna</button>
-      <button id="logoutBtn">Logout</button>
-    </div>
-  </div>
-
-  <!-- CONTENT -->
-  <div class="wrap">
-    <div id="errorBox" class="error"></div>
-
-    <div class="card">
-      <div class="headerline">
-        <div>Appuntamenti</div>
-        <div id="countBox" class="muted">—</div>
+  <div class="shell">
+    <!-- SIDEBAR SINISTRA -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h2>FISIOPRO</h2>
+          <div class="sub" id="sbUser">—</div>
+        </div>
       </div>
 
-      <div id="list" class="list">
-        <div class="muted">Caricamento agenda…</div>
+      <div class="menu">
+        <h4>Generale</h4>
+        <nav class="nav">
+          <a href="/pages/pazienti.html"><span>👥</span> Pazienti</a>
+          <a class="active" href="/pages/agenda.html"><span>🗓️</span> Agenda</a>
+          <a href="/pages/casi-clinici.html"><span>🧠</span> Casi clinici</a>
+        </nav>
+
+        <h4>Operativo</h4>
+        <nav class="nav">
+          <a href="/pages/lista-attesa.html"><span>⏳</span> Lista d’attesa</a>
+          <a href="/pages/file-caricati.html"><span>📎</span> File caricati</a>
+          <a href="/pages/notifiche.html"><span>🔔</span> Notifiche</a>
+        </nav>
+
+        <h4>Setup</h4>
+        <nav class="nav">
+          <a href="/pages/configurazione.html"><span>⚙️</span> Configurazione</a>
+        </nav>
+
+        <div style="padding:10px 6px;">
+          <button class="btn" id="btnToggleLeft" style="width:100%;">Chiudi menu sinistra</button>
+        </div>
       </div>
-    </div>
+    </aside>
+
+    <!-- CONTENUTO CENTRALE -->
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <div class="title">Agenda</div>
+          <div class="who" id="who">—</div>
+        </div>
+
+        <div class="actions">
+          <input id="day" type="date" class="btn" style="padding:10px 12px;" />
+          <button class="btn primary" id="btnRefresh">Aggiorna</button>
+          <button class="btn" id="btnLogout">Logout</button>
+          <button class="btn" id="btnToggleRight">Filtri ▸</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div id="errBox" class="alert" style="display:none;"></div>
+
+        <div class="card">
+          <div class="sectionHead">
+            <h3>Appuntamenti</h3>
+            <div class="muted" id="count">—</div>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Orario</th>
+                <th>Durata</th>
+                <th>Paziente</th>
+                <th class="muted">Fisio</th>
+              </tr>
+            </thead>
+            <tbody id="rows">
+              <tr><td colspan="4" class="muted">Caricamento…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- SIDEBAR DESTRA -->
+    <aside class="rightbar">
+      <div style="padding:18px; border-bottom:1px solid var(--border);">
+        <div style="font-size:14px; opacity:.75; letter-spacing:.08em; text-transform:uppercase;">Filtri agenda</div>
+        <div style="font-size:20px; font-weight:800; margin-top:8px;">Filtri</div>
+      </div>
+
+      <div style="padding:16px;">
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Incaricati</div>
+          <div class="muted" style="font-size:14px;">(Step dopo: dropdown collaboratori)</div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Prestazioni</div>
+          <div class="muted" style="font-size:14px;">(Step dopo: tipi visita)</div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;">
+          <div style="font-weight:800; font-size:16px; margin-bottom:8px;">Stati</div>
+          <div class="muted" style="font-size:14px;">(Step dopo: confermato / da confermare)</div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:800; font-size:16px; margin-bottom:10px;">Azioni</div>
+          <button class="btn primary" style="width:100%; margin-bottom:10px;" id="btnNew">+ Appuntamento</button>
+          <button class="btn" style="width:100%;" id="btnExport">Export</button>
+        </div>
+      </div>
+    </aside>
   </div>
 
   <script>
-    const $ = (s) => document.querySelector(s);
-
-    function formatTime(iso) {
-      const d = new Date(iso);
-      return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    // ---------- helpers ----------
+    function showErr(msg){
+      const b = document.getElementById("errBox");
+      b.style.display = "block";
+      b.textContent = msg || "Errore nel caricamento agenda.";
+    }
+    function hideErr(){
+      const b = document.getElementById("errBox");
+      b.style.display = "none";
+      b.textContent = "";
     }
 
-    function todayISO() {
-      const d = new Date();
-      return d.toISOString().slice(0, 10);
+    function toISODate(d){
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${yyyy}-${mm}-${dd}`;
     }
 
-    function showError(msg) {
-      $("#errorBox").textContent = msg;
-      $("#errorBox").style.display = "block";
+    function fmtTime(iso){
+      if(!iso) return "";
+      try{
+        const d = new Date(iso);
+        return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
+      }catch{ return iso; }
     }
 
-    function clearError() {
-      $("#errorBox").style.display = "none";
-      $("#errorBox").textContent = "";
+    async function apiGet(url){
+      const res = await fetch(url, { credentials:"include" });
+      const data = await res.json().catch(()=> ({}));
+      if(!res.ok) throw new Error(data.error || ("Errore " + res.status));
+      return data;
     }
 
-    // LOGOUT
-    $("#logoutBtn").addEventListener("click", async () => {
-      await fetch("/api/auth-logout", { method: "POST" });
-      window.location.href = "/";
-    });
+    // ---------- load agenda ----------
+    async function loadAgenda(){
+      hideErr();
+      const tbody = document.getElementById("rows");
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">Caricamento…</td></tr>`;
+      document.getElementById("count").textContent = "—";
 
-    // ATTENDO SESSIONE (da auth-guard.js)
-    function waitSession() {
-      return new Promise((resolve) => {
-        let tries = 0;
-        const t = setInterval(() => {
-          tries++;
-          if (window.FP_SESSION) {
-            clearInterval(t);
-            resolve(window.FP_SESSION);
-          }
-          if (tries > 100) {
-            clearInterval(t);
-            resolve(null);
-          }
-        }, 50);
-      });
-    }
+      const day = document.getElementById("day").value;
 
-    async function loadAgenda(date) {
-      clearError();
-      $("#refreshBtn").disabled = true;
-      $("#list").innerHTML = `<div class="muted">Caricamento…</div>`;
+      // 1) appuntamenti
+      // supporto: /api/appointments?date=YYYY-MM-DD  (se la tua API usa un altro parametro, dimmelo e te lo adatto)
+      const a = await apiGet(`/api/appointments?date=${encodeURIComponent(day)}`);
 
-      try {
-        // 1) Appuntamenti (filtrati dal backend per ruolo)
-        const rA = await fetch(`/api/appointments?from=${date}&to=${date}`);
-        const a = await rA.json();
-        if (!a.ok) throw new Error("Errore appuntamenti");
+      // compatibilità: alcune versioni potrebbero restituire {records:[]} o {appointments:[]}
+      const records = a.records || a.appointments || [];
 
-        // 2) ID pazienti
-        const ids = [...new Set(a.records.flatMap(r => r.patientIds || []))];
+      // 2) estraggo patientIds (link Airtable)
+      const patientIds = [];
+      for(const r of records){
+        const pid = r.patientId || r.PazienteId || r.pazienteId || r.patient || null;
+        if(pid) patientIds.push(pid);
+      }
 
-        // 3) Carico anagrafica
-        let patients = {};
-        if (ids.length) {
-          const rP = await fetch(`/api/patients-batch?ids=${ids.join(",")}`);
-          const p = await rP.json();
-          if (p.ok) {
-            p.records.forEach(r => patients[r.id] = r.fields);
-          }
-        }
-
-        $("#countBox").textContent = `${a.records.length} appuntamenti`;
-
-        if (!a.records.length) {
-          $("#list").innerHTML = `<div class="muted">Nessun appuntamento</div>`;
-          return;
-        }
-
-        // 4) Render
-        $("#list").innerHTML = a.records.map(ap => {
-          const pid = ap.patientIds?.[0] || "";
-          const pf = patients[pid] || {};
-          const nome = `${pf.Nome || ""} ${pf.Cognome || ""}`.trim() || "Paziente";
-
-          return `
-            <div class="row" data-patient="${pid}">
-              <div>
-                <div class="time">
-                  ${formatTime(ap.start)} – ${formatTime(ap.end)}
-                  <span class="muted">(${ap.durata || ""} min)</span>
-                </div>
-                <div class="patient">${nome}</div>
-              </div>
-              <div class="pill">Apri</div>
-            </div>
-          `;
-        }).join("");
-
-        // 5) Click → scheda paziente
-        document.querySelectorAll(".row").forEach(row => {
-          row.addEventListener("click", () => {
-            const id = row.dataset.patient;
-            if (id) window.location.href = `/pages/paziente.html?id=${id}`;
-          });
+      // 3) batch pazienti
+      let mapPatients = {};
+      if(patientIds.length){
+        const pb = await fetch("/api/patients-batch", {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          credentials:"include",
+          body: JSON.stringify({ recordIds: Array.from(new Set(patientIds)) })
         });
+        const pdata = await pb.json().catch(()=> ({}));
+        if(!pb.ok) throw new Error(pdata.error || "Errore pazienti-batch");
 
-      } catch (e) {
-        showError("Errore nel caricamento agenda.");
-        $("#list").innerHTML = "";
-      } finally {
-        $("#refreshBtn").disabled = false;
+        // mi aspetto [{id, Nome, Cognome, ...}] o simile
+        const list = pdata.records || pdata.patients || pdata || [];
+        for(const p of list){
+          mapPatients[p.id] = p;
+        }
+      }
+
+      // 4) render
+      tbody.innerHTML = "";
+      if(!records.length){
+        tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun appuntamento per questa data.</td></tr>`;
+        document.getElementById("count").textContent = "0";
+        return;
+      }
+
+      document.getElementById("count").textContent = String(records.length);
+
+      for(const r of records){
+        const start = r.start || r["Data e ora INIZIO"] || r.inizio || r.startAt || "";
+        const end   = r.end   || r["Data e ora FINE"]   || r.fine   || r.endAt   || "";
+        const durata= (r.durata ?? r.Durata ?? "");
+        const email = r.email || r.Email || "";
+
+        const pid = r.patientId || r.PazienteId || r.pazienteId || r.patient || null;
+        const p = pid ? mapPatients[pid] : null;
+
+        const nome = (p && (p.Nome || p.nome)) ? (p.Nome || p.nome) : "";
+        const cogn = (p && (p.Cognome || p.cognome)) ? (p.Cognome || p.cognome) : "";
+        const full = (nome + " " + cogn).trim() || "—";
+
+        const tr = document.createElement("tr");
+
+        // click su riga => paziente.html?id=PID (se esiste)
+        tr.style.cursor = pid ? "pointer" : "default";
+        tr.onclick = () => {
+          if(pid) location.href = `/pages/paziente.html?id=${encodeURIComponent(pid)}`;
+        };
+
+        tr.innerHTML = `
+          <td><span class="pill">${fmtTime(start)}–${fmtTime(end)}</span></td>
+          <td>${durata}</td>
+          <td><strong>${full}</strong></td>
+          <td class="muted">${email}</td>
+        `;
+        tbody.appendChild(tr);
       }
     }
 
-    // INIT
-    (async () => {
-      const session = await waitSession();
-      if (session) {
-        $("#whoami").textContent =
-          `${session.nome || ""} ${session.email} • ${session.role}`;
-      }
+    async function init(){
+      // session info top
+      const me = await apiGet("/api/auth-me");
+      const email = me.email || "—";
+      const role  = me.role  || "—";
+      document.getElementById("who").textContent = `${email} · ${role}`;
+      document.getElementById("sbUser").textContent = `${email} · ${role}`;
 
-      $("#datePick").value = todayISO();
-      $("#refreshBtn").addEventListener("click", () => loadAgenda($("#datePick").value));
-      $("#datePick").addEventListener("change", () => loadAgenda($("#datePick").value));
+      // default: oggi
+      document.getElementById("day").value = toISODate(new Date());
 
-      loadAgenda(todayISO());
-    })();
+      await loadAgenda();
+    }
+
+    // ---------- UI actions ----------
+    document.getElementById("btnRefresh").onclick = () => loadAgenda().catch(e => showErr(e.message));
+    document.getElementById("day").onchange = () => loadAgenda().catch(e => showErr(e.message));
+
+    document.getElementById("btnLogout").onclick = async () => {
+      try { await fetch("/api/auth-logout", { method:"POST", credentials:"include" }); } catch {}
+      location.href = "/";
+    };
+
+    document.getElementById("btnToggleLeft").onclick = () => {
+      document.body.classList.toggle("collapsed-left");
+    };
+
+    document.getElementById("btnToggleRight").onclick = () => {
+      document.body.classList.toggle("collapsed-right");
+    };
+
+    document.getElementById("btnNew").onclick = () => alert("Step dopo: form creazione appuntamento");
+    document.getElementById("btnExport").onclick = () => alert("Step dopo: export CSV");
+
+    init().catch(e => showErr(e.message || "Errore nel caricamento agenda."));
   </script>
 </body>
 </html>
