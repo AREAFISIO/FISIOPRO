@@ -1,156 +1,97 @@
-// api/appointments.js  (COMMONJS - compatibile Vercel Functions)
+import { requireSession } from "./_auth.js";
 
-module.exports = async function handler(req, res) {
-  try {
-    const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
-    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-    const TABLE = process.env.AIRTABLE_TABLE_APPOINTMENTS || "APPUNTAMENTI";
+const {
+  AIRTABLE_TOKEN,
+  AIRTABLE_BASE_ID,
+  AIRTABLE_APPOINTMENTS_TABLE = "APPUNTAMENTI",
+  APPOINTMENTS_FISIO_EMAIL_FIELD = "Email",
+  APPOINTMENTS_START_FIELD = "Data e ora INIZIO",
+  APPOINTMENTS_END_FIELD = "Data e ora FINE",
+  APPOINTMENTS_DURATION_FIELD = "Durata",
+} = process.env;
 
-    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
-      return res.status(500).json({
-        error: "Missing environment variables",
-        missing: {
-          AIRTABLE_TOKEN: !AIRTABLE_TOKEN,
-          AIRTABLE_BASE_ID: !AIRTABLE_BASE_ID,
-        },
-      });
-    }
+function send(res, status, data) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(data));
+}
 
-    // -------------------------
-    // GET: lista appuntamenti
-    // /api/appointments?start=ISO&end=ISO
-    // -------------------------
-    if (req.method === "GET") {
-      const { start, end, maxRecords } = req.query || {};
+function isoDayStart(dateStr) {
+  // YYYY-MM-DD -> inizio giornata (UTC)
+  return `${dateStr}T00:00:00.000Z`;
+}
+function isoDayEnd(dateStr) {
+  // YYYY-MM-DD -> fine giornata (UTC)
+  return `${dateStr}T23:59:59.999Z`;
+}
 
-      const params = new URLSearchParams();
-      params.set("pageSize", "100");
-      if (maxRecords) params.set("maxRecords", String(maxRecords));
-      params.set("sort[0][field]", "Data");
-      params.set("sort[0][direction]", "asc");
+export default async function handler(req, res) {
+  const session = requireSession(req);
+  if (!session) return send(res, 401, { ok: false, error: "unauthorized" });
 
-      if (start && end) {
-        // IMPORTANT: niente multilinea (evita sorprese)
-        const formula =
-          `AND(IS_AFTER({Data}, DATETIME_PARSE("${start}")),` +
-          `IS_BEFORE({Data}, DATETIME_PARSE("${end}")))`;
-        params.set("filterByFormula", formula);
-      }
-
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE)}?${params.toString()}`;
-
-      const r = await fetch(url, {
-        headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
-      });
-
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        return res.status(r.status).json({ error: "Airtable error (GET)", details: data });
-      }
-
-      const out = (data.records || []).map((rec) => {
-        const f = rec.fields || {};
-
-        const patientName =
-          Array.isArray(f["Paziente"]) ? (f["Paziente"][0] || "") : (f["Paziente"] || "");
-
-        const patientId =
-          Array.isArray(f["ANAGRAFICA"]) ? (f["ANAGRAFICA"][0] || "") : (f["ANAGRAFICA"] || "");
-
-        const therapist =
-          Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || "");
-
-        return {
-          id: rec.id,
-          patient_id: patientId,
-          patient_name: patientName,
-          start_at: f["Data"] || "",
-          end_at: "",
-          status: f["Stato"] || "",
-          service_name: f["Prestazione"] || "",
-          duration_label: f["Durata"] || "",
-          therapist_name: therapist,
-          location_name: "",
-          internal_note: f["Nota rapida"] || "",
-          patient_note: f["Note"] || "",
-        };
-      });
-
-      return res.status(200).json({ appointments: out });
-    }
-
-    // -------------------------
-    // PATCH: aggiorna 1 appuntamento
-    // /api/appointments?id=recXXXX
-    // -------------------------
-    if (req.method === "PATCH") {
-      const { id } = req.query || {};
-      if (!id) return res.status(400).json({ error: "Missing query param: id (Airtable recordId)" });
-
-      let payload = req.body;
-      if (typeof payload === "string") {
-        try { payload = JSON.parse(payload || "{}"); } catch { payload = {}; }
-      }
-      if (!payload || typeof payload !== "object") payload = {};
-
-      const fields = {};
-      if ("status" in payload) fields["Stato"] = payload.status ?? "";
-      if ("service_name" in payload) fields["Prestazione"] = payload.service_name ?? "";
-      if ("duration_label" in payload) fields["Durata"] = payload.duration_label ?? "";
-      if ("therapist_name" in payload) fields["Operatore"] = payload.therapist_name ?? "";
-      if ("internal_note" in payload) fields["Nota rapida"] = payload.internal_note ?? "";
-      if ("patient_note" in payload) fields["Note"] = payload.patient_note ?? "";
-
-      if (Object.keys(fields).length === 0) {
-        return res.status(400).json({ error: "No fields to update" });
-      }
-
-      const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(TABLE)}/${id}`;
-
-      const r = await fetch(url, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${AIRTABLE_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fields }),
-      });
-
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        return res.status(r.status).json({ error: "Airtable error (PATCH)", details: data });
-      }
-
-      const f = data.fields || {};
-      const patientName =
-        Array.isArray(f["Paziente"]) ? (f["Paziente"][0] || "") : (f["Paziente"] || "");
-      const patientId =
-        Array.isArray(f["ANAGRAFICA"]) ? (f["ANAGRAFICA"][0] || "") : (f["ANAGRAFICA"] || "");
-      const therapist =
-        Array.isArray(f["Operatore"]) ? (f["Operatore"][0] || "") : (f["Operatore"] || "");
-
-      return res.status(200).json({
-        id: data.id,
-        patient_id: patientId,
-        patient_name: patientName,
-        start_at: f["Data"] || "",
-        end_at: "",
-        status: f["Stato"] || "",
-        service_name: f["Prestazione"] || "",
-        duration_label: f["Durata"] || "",
-        therapist_name: therapist,
-        location_name: "",
-        internal_note: f["Nota rapida"] || "",
-        patient_note: f["Note"] || "",
-      });
-    }
-
-    return res.status(405).json({ error: "Method not allowed" });
-  } catch (e) {
-    console.error("appointments.js crash:", e);
-    return res.status(500).json({
-      error: "Function crashed",
-      details: String(e && (e.stack || e.message) || e),
-    });
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
+    return send(res, 500, { ok: false, error: "missing_env_airtable" });
   }
-};
+
+  try {
+    const role = String(session.role || "");
+    const email = String(session.email || "").trim().toLowerCase();
+
+    const urlObj = new URL(req.url, `https://${req.headers.host}`);
+    const from = urlObj.searchParams.get("from"); // YYYY-MM-DD (opzionale)
+    const to = urlObj.searchParams.get("to");     // YYYY-MM-DD (opzionale)
+    const limit = Math.min(parseInt(urlObj.searchParams.get("limit") || "200", 10), 500);
+
+    const clauses = [];
+
+    // RBAC: Fisioterapista vede solo i suoi
+    if (role === "Fisioterapista") {
+      clauses.push(`LOWER({${APPOINTMENTS_FISIO_EMAIL_FIELD}}) = "${email}"`);
+    }
+
+    // Filtro date: consideriamo l'INIZIO
+    if (from) clauses.push(`IS_AFTER({${APPOINTMENTS_START_FIELD}}, "${isoDayStart(from)}")`);
+    if (to) clauses.push(`IS_BEFORE({${APPOINTMENTS_START_FIELD}}, "${isoDayEnd(to)}")`);
+
+    const filterFormula = clauses.length ? `AND(${clauses.join(",")})` : "";
+
+    const table = encodeURIComponent(AIRTABLE_APPOINTMENTS_TABLE);
+    const filterParam = filterFormula ? `&filterByFormula=${encodeURIComponent(filterFormula)}` : "";
+
+    // Nota: sort per INIZIO
+    const apiUrl =
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}` +
+      `?pageSize=${limit}` +
+      `&sort%5B0%5D%5Bfield%5D=${encodeURIComponent(APPOINTMENTS_START_FIELD)}` +
+      `&sort%5B0%5D%5Bdirection%5D=asc` +
+      filterParam;
+
+    const r = await fetch(apiUrl, {
+      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
+    });
+
+    if (!r.ok) {
+      const t = await r.text();
+      return send(res, 500, { ok: false, error: "airtable_error", detail: t });
+    }
+
+    const data = await r.json();
+
+    // Normalizzo i record con i campi che ci servono
+    const records = (data.records || []).map((rec) => {
+      const f = rec.fields || {};
+      return {
+        id: rec.id,
+        email: f[APPOINTMENTS_FISIO_EMAIL_FIELD] || null,
+        start: f[APPOINTMENTS_START_FIELD] || null,
+        end: f[APPOINTMENTS_END_FIELD] || null,
+        durata: f[APPOINTMENTS_DURATION_FIELD] || null,
+        fields: f, // lascio tutto per UI
+      };
+    });
+
+    return send(res, 200, { ok: true, role, email, records });
+  } catch (e) {
+    return send(res, 500, { ok: false, error: "server_error" });
+  }
+}
