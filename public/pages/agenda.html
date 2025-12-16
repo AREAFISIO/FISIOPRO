@@ -1,174 +1,303 @@
 <!doctype html>
 <html lang="it">
-<script src="/assets/auth-guard.js"></script>
-<script src="/assets/session-timeout.js"></script>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FisioClinik • Agenda</title>
-  <link rel="stylesheet" href="../assets/app.css" />
-</head>
-  <script>
-(async () => {
-  // OGGI (YYYY-MM-DD)
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const today = `${yyyy}-${mm}-${dd}`;
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FisioPro – Agenda</title>
 
-  // 1) Appuntamenti di oggi
-  const rA = await fetch(`/api/appointments?from=${today}&to=${today}`);
-  const a = await rA.json();
-  if (!a.ok) {
-    console.log("appointments error", a);
-    return;
-  }
+  <!-- STESSO CSS DEL GESTIONALE -->
+  <link rel="stylesheet" href="/assets/app.css" />
 
-  // 2) Prendo tutti i patientIds unici
-  const ids = [...new Set(a.records.flatMap(x => Array.isArray(x.patientIds) ? x.patientIds : []))];
+  <!-- SICUREZZA -->
+  <script src="/assets/auth-guard.js"></script>
+  <script src="/assets/session-timeout.js"></script>
 
-  // 3) Carico pazienti in batch
-  let patientsMap = {};
-  if (ids.length) {
-    const rP = await fetch(`/api/patients-batch?ids=${encodeURIComponent(ids.join(","))}`);
-    const p = await rP.json();
-    if (p.ok) {
-      p.records.forEach(rec => { patientsMap[rec.id] = rec.fields; });
+  <style>
+    body { font-size: 18px; }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 900;
+      margin: 0;
     }
-  }
 
-  // 4) Output pronto per UI
-  const enriched = a.records.map(ap => {
-    const pid = (ap.patientIds && ap.patientIds[0]) ? ap.patientIds[0] : null;
-    const patient = pid ? (patientsMap[pid] || null) : null;
-    return {
-      id: ap.id,
-      start: ap.start,
-      end: ap.end,
-      durata: ap.durata,
-      patientId: pid,
-      patientFields: patient,
-    };
-  });
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+    }
 
-  console.log("AGENDA ENRICHED:", enriched);
-})();
-</script>
+    .user {
+      font-size: 15px;
+      opacity: .75;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    input[type="date"] {
+      padding: 10px 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(0,0,0,.15);
+      color: inherit;
+      font-weight: 700;
+    }
+
+    button {
+      padding: 10px 14px;
+      font-size: 16px;
+      font-weight: 800;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.2);
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .wrap {
+      padding: 0 16px 24px;
+    }
+
+    .card {
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .headerline {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: 900;
+    }
+
+    .muted {
+      opacity: .7;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px;
+      border-radius: 14px;
+      cursor: pointer;
+    }
+
+    .row:hover {
+      background: rgba(255,255,255,.08);
+    }
+
+    .time {
+      font-weight: 900;
+      font-size: 18px;
+    }
+
+    .patient {
+      opacity: .85;
+      font-size: 16px;
+    }
+
+    .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 900;
+      border: 1px solid rgba(255,255,255,.25);
+    }
+
+    .error {
+      display: none;
+      margin-bottom: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      color: #7a1b1b;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
 <body>
-<div class="app">
 
-  <aside class="sidebar" data-sidebar-left>
-    <div class="brand">
-      <div class="dot"></div>
-      <div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div>
+      <h1>Agenda</h1>
+      <div id="whoami" class="user">Caricamento sessione…</div>
     </div>
 
-    <nav class="nav">
-      <div class="section">Generale</div>
-      <a data-nav href="index.html">👥 Pazienti</a>
-      <a data-nav href="agenda.html" class="active">🗓️ Agenda</a>
-      <a data-nav href="casi-clinici.html">🧠 Casi clinici</a>
+    <div class="controls">
+      <input id="datePick" type="date" />
+      <button id="refreshBtn">Aggiorna</button>
+      <button id="logoutBtn">Logout</button>
+    </div>
+  </div>
 
-      <div class="section">Operativo</div>
-      <a data-nav href="lista-attesa.html">⏳ Lista d’attesa</a>
-      <a data-nav href="file-caricati.html">📎 File caricati</a>
-      <a data-nav href="notifiche.html">🔔 Notifiche</a>
+  <!-- CONTENT -->
+  <div class="wrap">
+    <div id="errorBox" class="error"></div>
 
-      <div class="section">Setup</div>
-      <a data-nav href="impostazioni.html">⚙️ Configurazione</a>
-    </nav>
-  </aside>
+    <div class="card">
+      <div class="headerline">
+        <div>Appuntamenti</div>
+        <div id="countBox" class="muted">—</div>
+      </div>
 
-  <main class="main">
-    <div class="topbar">
-      <div class="toprow">
-        <div class="h1">
-          Agenda
-          <span class="pill" data-week-label>Settimana</span>
-        </div>
-
-        <div class="actions">
-          <!-- TOGGLE SIDEBARS -->
-          <button class="btn" data-toggle-left title="Chiudi/Apri menu">☰</button>
-          <button class="btn" data-toggle-right title="Chiudi/Apri filtri">⫶</button>
-
-          <button class="btn" data-agenda-today>Oggi</button>
-          <button class="btn" data-agenda-prev>‹</button>
-          <button class="btn" data-agenda-next>›</button>
-
-          <button class="btn primary" onclick="location.href='caso-nuovo.html'">＋ Crea caso</button>
-        </div>
+      <div id="list" class="list">
+        <div class="muted">Caricamento agenda…</div>
       </div>
     </div>
+  </div>
 
-    <section class="card">
-      <div class="head">
-        <h2 data-month-label>Agenda</h2>
-        <span class="chip">Vista: Settimana</span>
-      </div>
+  <script>
+    const $ = (s) => document.querySelector(s);
 
-      <div class="body">
-        <!-- AGENDA VERA -->
-        <div class="oe-cal" data-agenda-mount>
-          <!-- header giorni -->
-          <div class="oe-cal__header">
-            <div class="oe-cal__corner">Ore</div>
-            <div class="oe-cal__day" data-day-head="0"></div>
-            <div class="oe-cal__day" data-day-head="1"></div>
-            <div class="oe-cal__day" data-day-head="2"></div>
-            <div class="oe-cal__day" data-day-head="3"></div>
-            <div class="oe-cal__day" data-day-head="4"></div>
-            <div class="oe-cal__day" data-day-head="5"></div>
-            <div class="oe-cal__day" data-day-head="6"></div>
-          </div>
+    function formatTime(iso) {
+      const d = new Date(iso);
+      return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    }
 
-          <!-- corpo scrollabile -->
-          <div class="oe-cal__body">
-            <div class="oe-cal__timecol" data-time-col></div>
+    function todayISO() {
+      const d = new Date();
+      return d.toISOString().slice(0, 10);
+    }
 
-            <div class="oe-cal__grid">
-              <div class="oe-cal__col" data-day-col="0"></div>
-              <div class="oe-cal__col" data-day-col="1"></div>
-              <div class="oe-cal__col" data-day-col="2"></div>
-              <div class="oe-cal__col" data-day-col="3"></div>
-              <div class="oe-cal__col" data-day-col="4"></div>
-              <div class="oe-cal__col" data-day-col="5"></div>
-              <div class="oe-cal__col" data-day-col="6"></div>
+    function showError(msg) {
+      $("#errorBox").textContent = msg;
+      $("#errorBox").style.display = "block";
+    }
 
-              <!-- layer linee orarie -->
-              <div class="oe-cal__lines" data-time-lines></div>
+    function clearError() {
+      $("#errorBox").style.display = "none";
+      $("#errorBox").textContent = "";
+    }
+
+    // LOGOUT
+    $("#logoutBtn").addEventListener("click", async () => {
+      await fetch("/api/auth-logout", { method: "POST" });
+      window.location.href = "/";
+    });
+
+    // ATTENDO SESSIONE (da auth-guard.js)
+    function waitSession() {
+      return new Promise((resolve) => {
+        let tries = 0;
+        const t = setInterval(() => {
+          tries++;
+          if (window.FP_SESSION) {
+            clearInterval(t);
+            resolve(window.FP_SESSION);
+          }
+          if (tries > 100) {
+            clearInterval(t);
+            resolve(null);
+          }
+        }, 50);
+      });
+    }
+
+    async function loadAgenda(date) {
+      clearError();
+      $("#refreshBtn").disabled = true;
+      $("#list").innerHTML = `<div class="muted">Caricamento…</div>`;
+
+      try {
+        // 1) Appuntamenti (filtrati dal backend per ruolo)
+        const rA = await fetch(`/api/appointments?from=${date}&to=${date}`);
+        const a = await rA.json();
+        if (!a.ok) throw new Error("Errore appuntamenti");
+
+        // 2) ID pazienti
+        const ids = [...new Set(a.records.flatMap(r => r.patientIds || []))];
+
+        // 3) Carico anagrafica
+        let patients = {};
+        if (ids.length) {
+          const rP = await fetch(`/api/patients-batch?ids=${ids.join(",")}`);
+          const p = await rP.json();
+          if (p.ok) {
+            p.records.forEach(r => patients[r.id] = r.fields);
+          }
+        }
+
+        $("#countBox").textContent = `${a.records.length} appuntamenti`;
+
+        if (!a.records.length) {
+          $("#list").innerHTML = `<div class="muted">Nessun appuntamento</div>`;
+          return;
+        }
+
+        // 4) Render
+        $("#list").innerHTML = a.records.map(ap => {
+          const pid = ap.patientIds?.[0] || "";
+          const pf = patients[pid] || {};
+          const nome = `${pf.Nome || ""} ${pf.Cognome || ""}`.trim() || "Paziente";
+
+          return `
+            <div class="row" data-patient="${pid}">
+              <div>
+                <div class="time">
+                  ${formatTime(ap.start)} – ${formatTime(ap.end)}
+                  <span class="muted">(${ap.durata || ""} min)</span>
+                </div>
+                <div class="patient">${nome}</div>
+              </div>
+              <div class="pill">Apri</div>
             </div>
-          </div>
+          `;
+        }).join("");
 
-          <div class="oe-cal__hint">
-            Hover su appuntamento = preview • Click = modifica • Click paziente = scheda paziente
-          </div>
-        </div>
+        // 5) Click → scheda paziente
+        document.querySelectorAll(".row").forEach(row => {
+          row.addEventListener("click", () => {
+            const id = row.dataset.patient;
+            if (id) window.location.href = `/pages/paziente.html?id=${id}`;
+          });
+        });
 
-        <div class="oe-debug" data-agenda-debug style="display:none;"></div>
-      </div>
-    </section>
-  </main>
+      } catch (e) {
+        showError("Errore nel caricamento agenda.");
+        $("#list").innerHTML = "";
+      } finally {
+        $("#refreshBtn").disabled = false;
+      }
+    }
 
-  <aside class="rightbar" data-sidebar-right>
-    <div class="righttitle">Filtri agenda</div>
-    <div class="rlist">
-      <a href="#">Incaricati <span>›</span></a>
-      <a href="#">Prestazioni <span>›</span></a>
-      <a href="#">Stati <span>›</span></a>
-    </div>
+    // INIT
+    (async () => {
+      const session = await waitSession();
+      if (session) {
+        $("#whoami").textContent =
+          `${session.nome || ""} ${session.email} • ${session.role}`;
+      }
 
-    <div class="righttitle" style="margin-top:16px;">Azioni</div>
-    <div class="card" style="padding:14px;">
-      <button class="btn primary" style="width:100%;">＋ Appuntamento</button>
-      <button class="btn" style="width:100%; margin-top:10px;">⬇︎ Export</button>
-    </div>
-  </aside>
+      $("#datePick").value = todayISO();
+      $("#refreshBtn").addEventListener("click", () => loadAgenda($("#datePick").value));
+      $("#datePick").addEventListener("change", () => loadAgenda($("#datePick").value));
 
-</div>
-
-<div class="toast"></div>
-<script src="../assets/app.js"></script>
+      loadAgenda(todayISO());
+    })();
+  </script>
 </body>
 </html>
