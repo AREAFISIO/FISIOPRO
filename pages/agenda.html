@@ -9,7 +9,7 @@
 <body>
 <div class="app">
 
-  <aside class="sidebar">
+  <aside class="sidebar" data-sidebar-left>
     <div class="brand">
       <div class="dot"></div>
       <div><div class="title">FISIOCLINIK</div><div class="sub">SRL STP • Admin</div></div>
@@ -38,10 +38,16 @@
           Agenda
           <span class="pill" data-week-label>Settimana</span>
         </div>
+
         <div class="actions">
+          <!-- TOGGLE SIDEBARS -->
+          <button class="btn" data-toggle-left title="Chiudi/Apri menu">☰</button>
+          <button class="btn" data-toggle-right title="Chiudi/Apri filtri">⫶</button>
+
           <button class="btn" data-agenda-today>Oggi</button>
           <button class="btn" data-agenda-prev>‹</button>
           <button class="btn" data-agenda-next>›</button>
+
           <button class="btn primary" onclick="location.href='caso-nuovo.html'">＋ Crea caso</button>
         </div>
       </div>
@@ -54,46 +60,49 @@
       </div>
 
       <div class="body">
-        <!-- CONTENITORE AGENDA VERA -->
-        <div data-agenda-mount>
-
-          <!-- Header giorni -->
-          <div style="display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; align-items:center;">
-            <div style="color:var(--muted); padding-top:6px;">Ore</div>
-            <div class="chip" data-day-head="0">LUN</div>
-            <div class="chip" data-day-head="1">MAR</div>
-            <div class="chip" data-day-head="2">MER</div>
-            <div class="chip" data-day-head="3">GIO</div>
-            <div class="chip" data-day-head="4">VEN</div>
-            <div class="chip" data-day-head="5">SAB</div>
-            <div class="chip" data-day-head="6">DOM</div>
+        <!-- AGENDA VERA -->
+        <div class="oe-cal" data-agenda-mount>
+          <!-- header giorni -->
+          <div class="oe-cal__header">
+            <div class="oe-cal__corner">Ore</div>
+            <div class="oe-cal__day" data-day-head="0"></div>
+            <div class="oe-cal__day" data-day-head="1"></div>
+            <div class="oe-cal__day" data-day-head="2"></div>
+            <div class="oe-cal__day" data-day-head="3"></div>
+            <div class="oe-cal__day" data-day-head="4"></div>
+            <div class="oe-cal__day" data-day-head="5"></div>
+            <div class="oe-cal__day" data-day-head="6"></div>
           </div>
 
-          <!-- Corpo: colonna ore + 7 colonne giorno (contenitori vuoti che riempie JS) -->
-          <div style="margin-top:10px; display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; min-height:620px;">
-            <!-- Colonna ore (riempita da JS) -->
-            <div data-time-col style="display:flex; flex-direction:column; gap:14px; padding-top:6px; color:var(--muted);"></div>
+          <!-- corpo scrollabile -->
+          <div class="oe-cal__body">
+            <div class="oe-cal__timecol" data-time-col></div>
 
-            <!-- 7 colonne giorni -->
-            <div class="card" data-day-col="0" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="1" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="2" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="3" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="4" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="5" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
-            <div class="card" data-day-col="6" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="oe-cal__grid">
+              <div class="oe-cal__col" data-day-col="0"></div>
+              <div class="oe-cal__col" data-day-col="1"></div>
+              <div class="oe-cal__col" data-day-col="2"></div>
+              <div class="oe-cal__col" data-day-col="3"></div>
+              <div class="oe-cal__col" data-day-col="4"></div>
+              <div class="oe-cal__col" data-day-col="5"></div>
+              <div class="oe-cal__col" data-day-col="6"></div>
+
+              <!-- layer linee orarie -->
+              <div class="oe-cal__lines" data-time-lines></div>
+            </div>
           </div>
 
+          <div class="oe-cal__hint">
+            Hover su appuntamento = preview • Click = modifica • Click paziente = scheda paziente
+          </div>
         </div>
 
-        <div style="margin-top:12px; color:var(--muted); font-size:13px;">
-          Calendario vero: hover per preview, click per modificare, click sul paziente per aprire la scheda.
-        </div>
+        <div class="oe-debug" data-agenda-debug style="display:none;"></div>
       </div>
     </section>
   </main>
 
-  <aside class="rightbar">
+  <aside class="rightbar" data-sidebar-right>
     <div class="righttitle">Filtri agenda</div>
     <div class="rlist">
       <a href="#">Incaricati <span>›</span></a>
