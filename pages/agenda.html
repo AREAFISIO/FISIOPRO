@@ -34,65 +34,60 @@
   <main class="main">
     <div class="topbar">
       <div class="toprow">
-        <div class="h1">Agenda <span class="pill">Settimana • Mock</span></div>
+        <div class="h1">
+          Agenda
+          <span class="pill" data-week-label>Settimana</span>
+        </div>
         <div class="actions">
-          <button class="btn">Oggi</button>
-          <button class="btn">‹</button>
-          <button class="btn">›</button>
+          <button class="btn" data-agenda-today>Oggi</button>
+          <button class="btn" data-agenda-prev>‹</button>
+          <button class="btn" data-agenda-next>›</button>
           <button class="btn primary" onclick="location.href='caso-nuovo.html'">＋ Crea caso</button>
         </div>
       </div>
     </div>
 
     <section class="card">
-      <div class="head"><h2>Dicembre 2025</h2><span class="chip">Vista: Settimana</span></div>
+      <div class="head">
+        <h2 data-month-label>Agenda</h2>
+        <span class="chip">Vista: Settimana</span>
+      </div>
+
       <div class="body">
-        <div style="display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; min-height:520px;">
-          <div style="color:var(--muted); padding-top:6px;">Ore</div>
-          <div class="chip">LUN 15</div><div class="chip">MAR 16</div><div class="chip">MER 17</div>
-          <div class="chip">GIO 18</div><div class="chip">VEN 19</div><div class="chip">SAB 20</div><div class="chip">DOM 21</div>
+        <!-- CONTENITORE AGENDA VERA -->
+        <div data-agenda-mount>
 
-          <div style="display:flex; flex-direction:column; gap:14px; padding-top:6px; color:var(--muted);">
-            <div>08:00</div><div>10:00</div><div>12:00</div><div>14:00</div><div>16:00</div><div>18:00</div>
+          <!-- Header giorni -->
+          <div style="display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; align-items:center;">
+            <div style="color:var(--muted); padding-top:6px;">Ore</div>
+            <div class="chip" data-day-head="0">LUN</div>
+            <div class="chip" data-day-head="1">MAR</div>
+            <div class="chip" data-day-head="2">MER</div>
+            <div class="chip" data-day-head="3">GIO</div>
+            <div class="chip" data-day-head="4">VEN</div>
+            <div class="chip" data-day-head="5">SAB</div>
+            <div class="chip" data-day-head="6">DOM</div>
           </div>
 
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip" style="display:inline-flex;">TS • 09:00</div>
-            <div style="margin-top:10px;" class="chip">AF • 11:00</div>
-            <div style="margin-top:10px;" class="chip">JM • 16:00</div>
+          <!-- Corpo: colonna ore + 7 colonne giorno (contenitori vuoti che riempie JS) -->
+          <div style="margin-top:10px; display:grid; grid-template-columns: 90px repeat(7, 1fr); gap:10px; min-height:620px;">
+            <!-- Colonna ore (riempita da JS) -->
+            <div data-time-col style="display:flex; flex-direction:column; gap:14px; padding-top:6px; color:var(--muted);"></div>
+
+            <!-- 7 colonne giorni -->
+            <div class="card" data-day-col="0" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="1" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="2" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="3" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="4" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="5" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
+            <div class="card" data-day-col="6" style="position:relative; background:rgba(255,255,255,.03); border-radius:14px; padding:10px; overflow:hidden;"></div>
           </div>
 
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">LC • 10:00</div>
-            <div style="margin-top:10px;" class="chip">TC • 15:00</div>
-          </div>
-
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">MM • 09:00</div>
-            <div style="margin-top:10px;" class="chip">S2 • 17:00</div>
-          </div>
-
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">AF • 12:00</div>
-            <div style="margin-top:10px;" class="chip">LC • 18:00</div>
-          </div>
-
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">TC • 08:00</div>
-            <div style="margin-top:10px;" class="chip">JM • 14:00</div>
-          </div>
-
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">—</div>
-          </div>
-
-          <div class="card" style="background:rgba(255,255,255,.03); border-radius:14px; padding:10px;">
-            <div class="chip">—</div>
-          </div>
         </div>
 
         <div style="margin-top:12px; color:var(--muted); font-size:13px;">
-          Mock agenda: nel prossimo step la trasformiamo in calendario vero (drag&drop).
+          Calendario vero: hover per preview, click per modificare, click sul paziente per aprire la scheda.
         </div>
       </div>
     </section>
