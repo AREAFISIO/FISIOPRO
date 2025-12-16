@@ -39,7 +39,6 @@ async function ensureAuth() {
 }
 
 function roleGuard(role) {
-  // Nasconde elementi non autorizzati: data-role="front,manager"
   document.querySelectorAll("[data-role]").forEach(el => {
     const allowed = (el.getAttribute("data-role") || "")
       .split(",").map(s => s.trim()).filter(Boolean);
@@ -133,20 +132,64 @@ function renderCasesLocalDemo() {
 }
 
 // =====================
-// AGENDA (Hover + Modal stile OsteoEasy)
+// AGENDA (vero calendario: hover + modal)
 // =====================
 function isAgendaPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/agenda.html") || p.endsWith("/agenda.html");
 }
 
-function fmtTime(iso) {
+function pad2(n){ return String(n).padStart(2,"0"); }
+
+function toISODate(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+
+function parseISODate(s){
+  // s: YYYY-MM-DD
+  const [y,m,d] = (s||"").split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m-1, d, 0, 0, 0, 0);
+  if (isNaN(dt.getTime())) return null;
+  return dt;
+}
+
+function startOfWeekMonday(d){
+  const x = new Date(d);
+  const day = x.getDay(); // 0=dom
+  const diff = (day === 0 ? -6 : 1 - day);
+  x.setDate(x.getDate() + diff);
+  x.setHours(0,0,0,0);
+  return x;
+}
+
+function addDays(d, n){
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function fmtTime(iso){
   try {
     const d = new Date(iso);
-    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" });
   } catch { return ""; }
 }
 
+function fmtDayLabel(d){
+  const giorni = ["DOM","LUN","MAR","MER","GIO","VEN","SAB"];
+  return `${giorni[d.getDay()]} ${d.getDate()}`;
+}
+
+function fmtMonthLabel(d){
+  try {
+    return d.toLocaleDateString("it-IT", { month:"long", year:"numeric" });
+  } catch {
+    return "Agenda";
+  }
+}
+
+// ---- Hover Card DOM
 function buildHoverCard() {
   const el = document.createElement("div");
   el.className = "oe-hovercard";
@@ -170,7 +213,6 @@ function buildHoverCard() {
 }
 
 function showHoverCard(card, appt, x, y) {
-  if (!card) return;
   card.style.left = (x + 12) + "px";
   card.style.top = (y + 12) + "px";
 
@@ -204,12 +246,9 @@ function showHoverCard(card, appt, x, y) {
 
   card.style.display = "block";
 }
+function hideHoverCard(card){ card.style.display = "none"; }
 
-function hideHoverCard(card) {
-  if (!card) return;
-  card.style.display = "none";
-}
-
+// ---- Modal DOM
 function buildModal() {
   const wrap = document.createElement("div");
   wrap.className = "oe-modal__backdrop";
@@ -270,7 +309,7 @@ function buildModal() {
   return wrap;
 }
 
-function openModal(modal, appt, onSave) {
+function openModal(modal, appt, onSaved) {
   modal.__current = appt;
 
   modal.querySelector("[data-pname]").textContent = appt.patient_name || "Paziente";
@@ -285,16 +324,11 @@ function openModal(modal, appt, onSave) {
   modal.querySelector("[data-f-internal]").value = appt.internal_note || "";
   modal.querySelector("[data-f-patient]").value = appt.patient_note || "";
 
-  modal.style.display = "flex";
-
   const close = () => { modal.style.display = "none"; };
 
   modal.querySelector("[data-close]").onclick = close;
   modal.querySelector("[data-cancel]").onclick = close;
-
-  modal.onclick = (e) => {
-    if (e.target === modal) close();
-  };
+  modal.onclick = (e) => { if (e.target === modal) close(); };
 
   modal.querySelector("[data-save]").onclick = async () => {
     const a = modal.__current;
@@ -310,14 +344,17 @@ function openModal(modal, appt, onSave) {
     };
 
     try {
-      modal.querySelector("[data-save]").disabled = true;
+      const btn = modal.querySelector("[data-save]");
+      btn.disabled = true;
+
       const updated = await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
+
       toast("Salvato");
       close();
-      if (typeof onSave === "function") onSave(updated);
+      if (typeof onSaved === "function") onSaved(updated);
     } catch (err) {
       console.error(err);
       alert("Errore salvataggio su Airtable. Controlla Console/Network.");
@@ -325,69 +362,195 @@ function openModal(modal, appt, onSave) {
       modal.querySelector("[data-save]").disabled = false;
     }
   };
+
+  modal.style.display = "flex";
 }
 
-function renderAgendaUI(appointments) {
-  // Provo a trovare un “punto” dove inserire la lista senza toccare HTML.
-  const mount =
-    document.querySelector("[data-agenda-mount]") ||
-    document.querySelector("#agendaMount") ||
-    document.querySelector("main") ||
-    document.body;
+// ---- Render calendario (8:00 - 20:00)
+function minutesOfDay(d){
+  return d.getHours()*60 + d.getMinutes();
+}
 
-  // Se esiste già il contenitore, non lo ricreo
-  let box = mount.querySelector(".agenda-simple");
-  if (!box) {
-    box = document.createElement("div");
-    box.className = "agenda-simple";
-    box.style.padding = "12px";
-    box.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
-        <div style="font-weight:800; font-size:18px;">Agenda</div>
-        <button class="btn" data-refresh>Ricarica</button>
-      </div>
-      <div data-agenda-list></div>
-    `;
-    mount.appendChild(box);
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function buildTimeCol(timeColEl, startMin, endMin, stepMin){
+  timeColEl.innerHTML = "";
+  for (let m = startMin; m <= endMin; m += 120) {
+    const hh = pad2(Math.floor(m/60));
+    const mm = pad2(m%60);
+    const div = document.createElement("div");
+    div.textContent = `${hh}:${mm}`;
+    timeColEl.appendChild(div);
   }
+}
 
-  const list = box.querySelector("[data-agenda-list]");
-  list.innerHTML = "";
+function clearDayCols(){
+  document.querySelectorAll("[data-day-col]").forEach(col => col.innerHTML = "");
+}
 
+function renderAppointmentsInWeek(appointments, weekStart, hoverCard, modal, setAppointments){
+  const startMin = 8*60;
+  const endMin = 20*60;
+  const range = endMin - startMin;
+
+  clearDayCols();
+
+  // piccolo aiuto: raggruppo per giorno
   appointments.forEach(appt => {
-    const row = document.createElement("div");
-    row.className = "appointment";
-    row.style.cursor = "pointer";
-    row.style.marginBottom = "10px";
-    row.style.padding = "10px";
-    row.style.borderRadius = "10px";
-    row.style.border = "1px solid rgba(0,0,0,.08)";
-    row.innerHTML = `
-      <div style="display:flex; justify-content:space-between; gap:12px;">
-        <div style="font-weight:800;">${appt.patient_name || "Paziente"}</div>
-        <div style="opacity:.8;">${fmtTime(appt.start_at)}</div>
-      </div>
-      <div style="opacity:.85; font-size:13px; margin-top:4px;">
-        ${appt.status ? appt.status + " • " : ""}${appt.service_name || ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}
-      </div>
-    `;
+    if (!appt.start_at) return;
+    const dt = new Date(appt.start_at);
+    if (isNaN(dt.getTime())) return;
 
-    row.__appt = appt;
-    list.appendChild(row);
+    // index giorno (0..6) rispetto al lunedì
+    const dayIndex = Math.floor((dt.setHours(0,0,0,0) - weekStart.getTime()) / (24*60*60*1000));
+    if (dayIndex < 0 || dayIndex > 6) return;
+
+    const startDT = new Date(appt.start_at);
+    const st = minutesOfDay(startDT);
+
+    // Durata: se non abbiamo end_at, usiamo duration_label (es "1 ora" oppure "60")
+    let durMin = 60;
+    if (appt.end_at) {
+      const endDT = new Date(appt.end_at);
+      if (!isNaN(endDT.getTime())) durMin = Math.max(15, minutesOfDay(endDT) - st);
+    } else if (appt.duration_label) {
+      const s = String(appt.duration_label).toLowerCase();
+      const n = parseInt(s.replace(/[^\d]/g,""), 10);
+      if (!isNaN(n) && n > 0) {
+        if (s.includes("ora")) durMin = n * 60;
+        else durMin = n; // minuti
+      }
+    }
+
+    // posizionamento in colonna (top/height in percent)
+    const topPct = ((clamp(st, startMin, endMin) - startMin) / range) * 100;
+    const endMinAppt = clamp(st + durMin, startMin, endMin);
+    const heightPct = Math.max(3, ((endMinAppt - clamp(st, startMin, endMin)) / range) * 100);
+
+    const col = document.querySelector(`[data-day-col="${dayIndex}"]`);
+    if (!col) return;
+
+    const block = document.createElement("div");
+    block.className = "chip";
+    block.style.position = "absolute";
+    block.style.left = "10px";
+    block.style.right = "10px";
+    block.style.top = `calc(${topPct}% + 6px)`;
+    block.style.height = `calc(${heightPct}% - 6px)`;
+    block.style.display = "flex";
+    block.style.flexDirection = "column";
+    block.style.alignItems = "flex-start";
+    block.style.justifyContent = "center";
+    block.style.gap = "6px";
+    block.style.cursor = "pointer";
+    block.style.padding = "10px";
+
+    // testo stile “OsteoEasy”: nome + ora + prestazione
+    const t1 = document.createElement("div");
+    t1.style.fontWeight = "800";
+    t1.style.whiteSpace = "nowrap";
+    t1.style.overflow = "hidden";
+    t1.style.textOverflow = "ellipsis";
+    t1.textContent = appt.patient_name || "Paziente";
+
+    const t2 = document.createElement("div");
+    t2.style.opacity = ".85";
+    t2.style.fontSize = "12px";
+    t2.textContent = `${fmtTime(appt.start_at)}${appt.service_name ? " • " + appt.service_name : ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}`;
+
+    block.appendChild(t1);
+    block.appendChild(t2);
+
+    // Hover
+    block.addEventListener("mousemove", (e) => {
+      if (modal.style.display !== "none") return;
+      showHoverCard(hoverCard, appt, e.clientX, e.clientY);
+    });
+    block.addEventListener("mouseleave", () => hideHoverCard(hoverCard));
+
+    // Click -> modal
+    block.addEventListener("click", (e) => {
+      e.preventDefault();
+      hideHoverCard(hoverCard);
+      openModal(modal, appt, (updated) => {
+        // aggiorno lista in memoria e re-render
+        const next = appointments.map(x => x.id === updated.id ? updated : x);
+        setAppointments(next);
+        renderAppointmentsInWeek(next, weekStart, hoverCard, modal, setAppointments);
+      });
+    });
+
+    col.appendChild(block);
   });
-
-  return box;
 }
 
 async function initAgenda() {
   if (!isAgendaPage()) return;
 
+  const mount = document.querySelector("[data-agenda-mount]");
+  const timeCol = document.querySelector("[data-time-col]");
+  if (!mount || !timeCol) return;
+
+  // settimana corrente da URL (?date=YYYY-MM-DD) o oggi
+  const url = new URL(location.href);
+  const qDate = url.searchParams.get("date");
+  const base = parseISODate(qDate) || new Date();
+  const weekStart = startOfWeekMonday(base);
+
+  // header giorni
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(weekStart, i);
+    const head = document.querySelector(`[data-day-head="${i}"]`);
+    if (head) head.textContent = fmtDayLabel(d);
+  }
+
+  const monthLabel = document.querySelector("[data-month-label]");
+  if (monthLabel) monthLabel.textContent = fmtMonthLabel(weekStart);
+
+  const weekLabel = document.querySelector("[data-week-label]");
+  if (weekLabel) {
+    const end = addDays(weekStart, 6);
+    weekLabel.textContent = `${weekStart.getDate()}/${weekStart.getMonth()+1} - ${end.getDate()}/${end.getMonth()+1}`;
+  }
+
+  // bottoni navigazione
+  const btnToday = document.querySelector("[data-agenda-today]");
+  const btnPrev = document.querySelector("[data-agenda-prev]");
+  const btnNext = document.querySelector("[data-agenda-next]");
+
+  if (btnToday) btnToday.onclick = () => {
+    const u = new URL(location.href);
+    u.searchParams.set("date", toISODate(new Date()));
+    location.href = u.toString();
+  };
+  if (btnPrev) btnPrev.onclick = () => {
+    const u = new URL(location.href);
+    u.searchParams.set("date", toISODate(addDays(weekStart, -7)));
+    location.href = u.toString();
+  };
+  if (btnNext) btnNext.onclick = () => {
+    const u = new URL(location.href);
+    u.searchParams.set("date", toISODate(addDays(weekStart, 7)));
+    location.href = u.toString();
+  };
+
+  // colonna ore
+  buildTimeCol(timeCol, 8*60, 20*60, 30);
+
+  // hover + modal globali
   const hoverCard = buildHoverCard();
   const modal = buildModal();
 
+  // Carico appuntamenti (filtrati settimana)
+  // Passo start/end all'API se la tua GET li gestisce, altrimenti li ignora e torna tutto.
+  const startISO = new Date(weekStart);
+  startISO.setHours(0,0,0,0);
+  const endISO = new Date(addDays(weekStart, 7));
+  endISO.setHours(0,0,0,0);
+
   let appointments = [];
   try {
-    const data = await api("/api/appointments");
+    const data = await api(`/api/appointments?start=${encodeURIComponent(startISO.toISOString())}&end=${encodeURIComponent(endISO.toISOString())}`);
     appointments = data.appointments || [];
   } catch (e) {
     console.error(e);
@@ -395,45 +558,9 @@ async function initAgenda() {
     return;
   }
 
-  const box = renderAgendaUI(appointments);
+  const setAppointments = (arr) => { appointments = arr; };
 
-  // Hover + click stile OsteoEasy sui “blocchi” creati
-  const rows = box.querySelectorAll(".appointment");
-  rows.forEach(row => {
-    const appt = row.__appt;
-
-    row.addEventListener("mouseenter", () => {
-      hideHoverCard(hoverCard); // pulizia
-    });
-
-    row.addEventListener("mousemove", (e) => {
-      // se modale aperto, non mostra hover
-      if (modal.style.display !== "none") return;
-      showHoverCard(hoverCard, appt, e.clientX, e.clientY);
-    });
-
-    row.addEventListener("mouseleave", () => {
-      hideHoverCard(hoverCard);
-    });
-
-    row.addEventListener("click", (e) => {
-      e.preventDefault();
-      hideHoverCard(hoverCard);
-      openModal(modal, appt, (updated) => {
-        // aggiorno in memoria e re-render
-        appointments = appointments.map(x => x.id === updated.id ? updated : x);
-        const newBox = renderAgendaUI(appointments);
-        // re-inizializzo eventi
-        // (semplice e robusto, non ti rompe nulla)
-        initAgenda();
-      });
-    });
-  });
-
-  const refreshBtn = box.querySelector("[data-refresh]");
-  if (refreshBtn) {
-    refreshBtn.onclick = () => location.reload();
-  }
+  renderAppointmentsInWeek(appointments, weekStart, hoverCard, modal, setAppointments);
 }
 
 // =====================
