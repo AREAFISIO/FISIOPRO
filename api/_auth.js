@@ -35,6 +35,35 @@ export function verifySession(token) {
 
 export function requireSession(req) {
   const token = getCookie(req, "fp_session");
-  const session = token ? verifySession(token) : null;
-  return session;
+  return token ? verifySession(token) : null;
+}
+
+export function setJson(res, status, data, cookie) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  if (cookie) res.setHeader("Set-Cookie", cookie);
+  res.end(JSON.stringify(data));
+}
+
+export function makeSessionCookie(token, maxAgeSeconds = 60 * 60 * 8) {
+  // 8 ore (meglio per sanità)
+  return [
+    `fp_session=${token}`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSeconds}`,
+  ].join("; ");
+}
+
+export function clearSessionCookie() {
+  return [
+    "fp_session=",
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    "Max-Age=0",
+  ].join("; ");
 }
