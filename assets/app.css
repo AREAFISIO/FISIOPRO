@@ -480,4 +480,108 @@ td{ font-size: var(--fs-base); }
 @media (max-width: 860px){
   .oe-grid{ grid-template-columns: 1fr; }
 }
+/* ===== Agenda stile OsteoEasy + sidebars collassabili ===== */
+
+.oe-cal { display:flex; flex-direction:column; gap:10px; }
+.oe-cal__header{
+  display:grid;
+  grid-template-columns: 90px repeat(7, 1fr);
+  gap:10px;
+  align-items:center;
+}
+.oe-cal__corner{ color: var(--muted); padding-top: 6px; }
+.oe-cal__day{ padding:10px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.08); opacity:.95; }
+
+.oe-cal__body{
+  display:grid;
+  grid-template-columns: 90px 1fr;
+  gap:10px;
+  height: 620px;              /* area scrollabile centrale */
+  overflow: hidden;
+}
+.oe-cal__timecol{
+  position: relative;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  overflow: hidden;
+}
+.oe-time{
+  position:absolute;
+  left: 10px;
+  transform: translateY(-8px);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.oe-cal__grid{
+  position: relative;
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+  overflow: auto;             /* scroll verticale calendario */
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+.oe-cal__col{
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.06);
+  background: rgba(0,0,0,.08);
+  overflow: hidden;
+}
+.oe-cal__lines{
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  pointer-events:none;
+}
+.oe-line{
+  position:absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255,255,255,.06);
+}
+
+.oe-event{
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.06);
+  padding: 10px;
+  cursor: pointer;
+  overflow:hidden;
+}
+.oe-event__title{
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.oe-event__meta{
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: .85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.oe-cal__hint{
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Collassa sidebar sinistra/destra: più spazio al centro */
+body.oe-hide-left .sidebar{ width: 0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; }
+body.oe-hide-left .sidebar *{ display:none !important; }
+
+body.oe-hide-right .rightbar{ width: 0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; }
+body.oe-hide-right .rightbar *{ display:none !important; }
 
