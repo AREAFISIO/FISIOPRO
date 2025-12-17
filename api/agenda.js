@@ -20,6 +20,20 @@ function isUnknownFieldError(msg) {
   return s.includes("unknown field name") || s.includes("unknown field names");
 }
 
+function scoreField(name, keywords) {
+  const n = String(name || "").toLowerCase();
+  let score = 0;
+  for (const k of keywords) {
+    const kk = String(k || "").toLowerCase();
+    if (!kk) continue;
+    if (n === kk) score += 100;
+    else if (n.includes(kk)) score += 10;
+  }
+  // prefer longer, more specific names when tied
+  score += Math.min(5, Math.floor(n.length / 10));
+  return score;
+}
+
 async function probeField(tableEnc, candidate) {
   const name = String(candidate || "").trim();
   if (!name) return false;
@@ -40,6 +54,41 @@ async function resolveFieldNameByProbe(tableEnc, candidates) {
     if (await probeField(tableEnc, c)) return String(c).trim();
   }
   return "";
+}
+
+async function discoverFieldNames(tableEnc) {
+  // Pull some records and union field keys (works without Meta API).
+  // Note: Airtable omits null/empty fields on each record, so we sample multiple records.
+  const found = new Set();
+  let offset = null;
+  let pages = 0;
+  while (pages < 3) { // up to ~300 records worst-case, but typically far less
+    pages += 1;
+    const qs = new URLSearchParams({ pageSize: "100" });
+    if (offset) qs.set("offset", offset);
+    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    for (const r of data.records || []) {
+      const f = r.fields || {};
+      for (const k of Object.keys(f)) found.add(k);
+    }
+    offset = data.offset || null;
+    if (!offset) break;
+  }
+  return Array.from(found);
+}
+
+function resolveFieldNameHeuristic(fieldNames, keywords) {
+  let best = "";
+  let bestScore = -1;
+  for (const name of fieldNames || []) {
+    const s = scoreField(name, keywords);
+    if (s > bestScore) {
+      bestScore = s;
+      best = name;
+    }
+  }
+  // require at least some match (avoid picking random field)
+  return bestScore >= 10 ? best : "";
 }
 
 export default async function handler(req, res) {
@@ -63,22 +112,46 @@ export default async function handler(req, res) {
 
     const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
 
-    // Resolve field names by probing fields[] (works even if table is empty or fields are null).
-    const FIELD_START = await resolveFieldNameByProbe(tableEnc, [
+    // Resolve field names:
+    // 1) probe explicit candidates (fast if you know exact names)
+    // 2) if still missing, discover field names by sampling records and use heuristics
+    const startCandidates = [
       process.env.AGENDA_START_FIELD,
       "Data e ora INIZIO",
       "Data e ora Inizio",
-      "Start",
+      "Data INIZIO",
       "Inizio",
-    ]);
+      "Start",
+      "Start at",
+    ].filter(Boolean);
 
-    const FIELD_OPERATOR = await resolveFieldNameByProbe(tableEnc, [
+    const operatorCandidates = [
       process.env.AGENDA_OPERATOR_FIELD,
       "Collaboratore",
+      "Collaboratori",
       "Collaborator",
       "Operatore",
       "Operator",
-    ]);
+      "Fisioterapista",
+    ].filter(Boolean);
+
+    let FIELD_START = await resolveFieldNameByProbe(tableEnc, startCandidates);
+    let FIELD_OPERATOR = await resolveFieldNameByProbe(tableEnc, operatorCandidates);
+
+    let discovered = [];
+    if (!FIELD_START || !FIELD_OPERATOR) {
+      discovered = await discoverFieldNames(tableEnc);
+      if (!FIELD_START) {
+        FIELD_START =
+          resolveFieldNameHeuristic(discovered, ["data e ora inizio", "inizio", "start", "inizio appuntamento"]) ||
+          "";
+      }
+      if (!FIELD_OPERATOR) {
+        FIELD_OPERATOR =
+          resolveFieldNameHeuristic(discovered, ["collaboratore", "collaboratori", "operatore", "operator", "fisioterapista"]) ||
+          "";
+      }
+    }
 
     if (!FIELD_START || !FIELD_OPERATOR) {
       return res.status(500).json({
@@ -88,9 +161,10 @@ export default async function handler(req, res) {
           table: APPTS_TABLE_NAME,
           resolved: { FIELD_START, FIELD_OPERATOR },
           tried: {
-            start: [process.env.AGENDA_START_FIELD, "Data e ora INIZIO", "Data e ora Inizio", "Start", "Inizio"].filter(Boolean),
-            operator: [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Collaborator", "Operatore", "Operator"].filter(Boolean),
+            start: startCandidates,
+            operator: operatorCandidates,
           },
+          discoveredFields: discovered,
         },
       });
     }
