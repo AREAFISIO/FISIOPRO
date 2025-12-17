@@ -18,6 +18,8 @@
   const opsBtnClose = document.querySelector("[data-ops-close]");
   const opsBtnApply = document.querySelector("[data-ops-apply]");
   const opsBtnAll = document.querySelector("[data-ops-all]");
+  const btnOpenPrefs = document.querySelector("[data-open-prefs]");
+  const btnOpenOps = document.querySelector("[data-open-ops]");
   const btnPrev = document.querySelector("[data-cal-prev]");
   const btnNext = document.querySelector("[data-cal-next]");
   const btnToday = document.querySelector("[data-cal-today]");
@@ -29,16 +31,40 @@
 
   const START_HOUR = 8;
   const END_HOUR = 20;
-  const SLOT_MIN = 15;
+  let SLOT_MIN = 30; // user preference
   const SLOT_PX = 18;
 
   let view = "week"; // week | workweek
   let anchorDate = new Date();
   let rawItems = [];
-  let multiUser = true;
+  let multiUser = false; // default: show only logged-in user
   let knownTherapists = [];
+  let knownByEmail = new Map(); // email -> name
   let selectedTherapists = new Set();
   let draftSelected = new Set();
+  let pickMode = "view"; // view | defaults
+
+  // Preferences
+  const prefsBack = document.querySelector("[data-prefs-back]");
+  const prefsClose = document.querySelector("[data-prefs-close]");
+  const prefsSave = document.querySelector("[data-prefs-save]");
+  const prefsReset = document.querySelector("[data-prefs-reset]");
+  const prefSlot = document.querySelector("[data-pref-slot]");
+  const prefColor = document.querySelector("[data-pref-color]");
+  const prefMulti = document.querySelector("[data-pref-multi]");
+  const prefDefaultDots = document.querySelector("[data-pref-default-dots]");
+  const prefPick = document.querySelector("[data-pref-pick]");
+  const prefShowService = document.querySelector("[data-pref-show-service]");
+  const prefDayNav = document.querySelector("[data-pref-day-nav]");
+
+  let prefs = {
+    slotMin: 30,
+    multiUser: false,
+    defaultOperators: [],
+    showService: true,
+    dayNav: false,
+    userColor: "",
+  };
 
   function pad2(n) { return String(n).padStart(2, "0"); }
   function toYmd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -142,7 +168,84 @@
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     const hue = h % 360;
+    // user override
+    const me = String(getUserName() || "");
+    if (prefs.userColor && me && name === me) return prefs.userColor;
     return `hsl(${hue} 85% 62% / 0.95)`;
+  }
+
+  function getUserEmail() {
+    const u = window.FP_USER || window.FP_SESSION || null;
+    return String(u?.email || "").trim().toLowerCase();
+  }
+  function getUserName() {
+    // Prefer mapping by email to COLLABORATORI name
+    const email = getUserEmail();
+    if (email && knownByEmail.has(email)) return knownByEmail.get(email);
+    // Fallback: auth payload has only "nome"
+    const u = window.FP_USER || window.FP_SESSION || null;
+    return String(u?.nome || "").trim();
+  }
+
+  function prefsKey() {
+    const email = getUserEmail() || "anon";
+    return `fp_agenda_prefs_${email}`;
+  }
+  function loadPrefs() {
+    try {
+      const raw = localStorage.getItem(prefsKey());
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
+    } catch {}
+    SLOT_MIN = Number(prefs.slotMin || 30);
+    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    multiUser = Boolean(prefs.multiUser);
+  }
+  function savePrefs() {
+    try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
+  }
+  function resetPrefs() {
+    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], showService: true, dayNav: false, userColor: "" };
+    SLOT_MIN = 30;
+    multiUser = false;
+    savePrefs();
+  }
+
+  function syncPrefsUI() {
+    if (prefSlot) prefSlot.value = String(prefs.slotMin || 30);
+    if (prefMulti) prefMulti.checked = Boolean(prefs.multiUser);
+    if (prefShowService) prefShowService.checked = Boolean(prefs.showService);
+    if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
+    if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
+    renderDefaultDots();
+  }
+  function openPrefs() {
+    if (!prefsBack) return;
+    syncPrefsUI();
+    prefsBack.style.display = "block";
+  }
+  function closePrefs() {
+    if (!prefsBack) return;
+    prefsBack.style.display = "none";
+  }
+  function renderDefaultDots() {
+    if (!prefDefaultDots) return;
+    prefDefaultDots.innerHTML = "";
+    const names = (prefs.defaultOperators || []).slice(0, 10);
+    names.forEach((n) => {
+      const dot = document.createElement("div");
+      dot.className = "opsDot";
+      dot.style.background = solidForTherapist(n);
+      dot.textContent = therapistKey(n);
+      prefDefaultDots.appendChild(dot);
+    });
+    if (!names.length) {
+      const t = document.createElement("div");
+      t.className = "opsMini";
+      t.textContent = "—";
+      prefDefaultDots.appendChild(t);
+    }
   }
 
   function getTherapists(items) {
@@ -175,7 +278,8 @@
 
   function openOpsMenu() {
     if (!opsBack) return;
-    draftSelected = new Set(selectedTherapists);
+    if (pickMode === "defaults") draftSelected = new Set(prefs.defaultOperators || []);
+    else draftSelected = new Set(selectedTherapists);
     if (opsMulti) opsMulti.checked = Boolean(multiUser);
     renderOpsList();
     opsBack.style.display = "block";
@@ -246,8 +350,10 @@
     // then load appointments for the selected week.
     try {
       const ops = await apiGet("/api/operators");
-      const names = (ops.items || []).map((x) => String(x.name || "").trim()).filter(Boolean);
+      const items = (ops.items || []);
+      const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
       if (names.length) knownTherapists = names;
+      knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
     } catch {
       // fallback to operators found in the week
     }
@@ -256,15 +362,24 @@
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
 
-    // init selection once (default: first 6 found, like screenshot)
+    // Default behavior:
+    // - show the logged-in user's agenda only
+    // - if multi-user is enabled (preference), use defaultOperators list
     if (selectedTherapists.size === 0 && knownTherapists.length) {
-      knownTherapists.slice(0, 6).forEach((n) => selectedTherapists.add(n));
+      const me = getUserName();
+      if (!multiUser && me) {
+        selectedTherapists = new Set([me]);
+      } else if (multiUser && (prefs.defaultOperators || []).length) {
+        selectedTherapists = new Set(prefs.defaultOperators);
+      } else if (me) {
+        selectedTherapists = new Set([me]);
+      } else {
+        selectedTherapists = new Set([knownTherapists[0]]);
+      }
     }
 
-    // if selection became empty, fallback to first operator to keep grid usable
-    if (selectedTherapists.size === 0 && knownTherapists.length) {
-      selectedTherapists.add(knownTherapists[0]);
-    }
+    // keep selection valid
+    if (selectedTherapists.size === 0 && knownTherapists.length) selectedTherapists.add(knownTherapists[0]);
 
     syncOpsBar();
     render();
@@ -467,9 +582,13 @@
       ev.style.background = colorForTherapist(it.therapist);
 
       const dot = `<span class="dot" style="background:${colorForTherapist(it.therapist).replace("/ 0.18", "/ 1")}"></span>`;
+      const line = prefs.showService
+        ? [it.service, it.status].filter(Boolean).join(" • ")
+        : [it.status].filter(Boolean).join(" • ");
+
       ev.innerHTML = `
         <div class="t">${it.patient || "Appuntamento"}</div>
-        <div class="m">${[it.service, it.status].filter(Boolean).join(" • ")}</div>
+        <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
       ev.onclick = () => openModal(it);
@@ -499,7 +618,7 @@
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
 
   // Operator selector
-  opsBar?.addEventListener("click", openOpsMenu);
+  opsBar?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
   opsBtnClose?.addEventListener("click", closeOpsMenu);
   opsBack?.addEventListener("click", (e) => { if (e.target === opsBack) closeOpsMenu(); });
   opsBtnAll?.addEventListener("click", () => {
@@ -507,7 +626,15 @@
     renderOpsList();
   });
   opsBtnApply?.addEventListener("click", () => {
-    selectedTherapists = new Set(draftSelected);
+    if (pickMode === "defaults") {
+      prefs.defaultOperators = Array.from(draftSelected);
+      savePrefs();
+      renderDefaultDots();
+      // apply immediately if multi-user is on
+      if (multiUser) selectedTherapists = new Set(prefs.defaultOperators);
+    } else {
+      selectedTherapists = new Set(draftSelected);
+    }
     multiUser = Boolean(opsMulti?.checked);
     syncOpsBar();
     closeOpsMenu();
@@ -517,6 +644,40 @@
     // keep UI responsive but don't rebuild grid until Apply
   });
 
+  // Right bar buttons
+  btnOpenPrefs?.addEventListener("click", openPrefs);
+  btnOpenOps?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
+
+  // Preferences modal events
+  prefsClose?.addEventListener("click", closePrefs);
+  prefsBack?.addEventListener("click", (e) => { if (e.target === prefsBack) closePrefs(); });
+  prefPick?.addEventListener("click", () => { pickMode = "defaults"; openOpsMenu(); });
+  prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
+  prefsSave?.addEventListener("click", () => {
+    prefs.slotMin = Number(prefSlot?.value || 30);
+    prefs.multiUser = Boolean(prefMulti?.checked);
+    prefs.showService = Boolean(prefShowService?.checked);
+    prefs.dayNav = Boolean(prefDayNav?.checked);
+    prefs.userColor = String(prefColor?.value || "").trim();
+    savePrefs();
+
+    SLOT_MIN = Number(prefs.slotMin || 30);
+    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    multiUser = Boolean(prefs.multiUser);
+
+    // enforce default selection logic
+    if (!multiUser) {
+      const me = getUserName();
+      if (me) selectedTherapists = new Set([me]);
+    } else if ((prefs.defaultOperators || []).length) {
+      selectedTherapists = new Set(prefs.defaultOperators);
+    }
+
+    syncOpsBar();
+    closePrefs();
+    render();
+  });
+
   // Init from URL (?date=YYYY-MM-DD)
   try {
     const u = new URL(location.href);
@@ -524,6 +685,7 @@
     if (d) anchorDate = d;
   } catch {}
 
+  loadPrefs();
   setView("week");
 })();
 
