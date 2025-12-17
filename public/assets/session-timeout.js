@@ -6,7 +6,7 @@
 
   async function doLogout() {
     try {
-      await fetch("/api/auth-logout", { method: "POST" });
+      await fetch("/api/auth-logout", { method: "POST", credentials: "include" });
     } catch (e) {}
     window.location.href = "/?timeout=1";
   }

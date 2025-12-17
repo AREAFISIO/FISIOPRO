@@ -1,6 +1,6 @@
 (async function () {
   try {
-    const r = await fetch("/api/auth-me");
+    const r = await fetch("/api/auth-me", { credentials: "include" });
     const data = await r.json();
 
     if (!data.ok) {
@@ -9,10 +9,12 @@
     }
 
     // sessione disponibile globalmente
-    window.FP_SESSION = data.session;
+    window.FP_SESSION = data.session || null;
+    window.FP_USER = data.user || null;
 
     // esempio: stampa
-    console.log("LOGGATO:", data.session.email, data.session.role);
+    const u = data.user || data.session || {};
+    console.log("LOGGATO:", u.email, u.role);
 
   } catch (e) {
     window.location.href = "/";

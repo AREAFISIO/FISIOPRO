@@ -1,4 +1,4 @@
-import { airtableFetch, normalizeRole, requireSession } from "./_auth.js";
+import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 
 function enc(x) {
   return encodeURIComponent(String(x));
@@ -19,6 +19,7 @@ async function physioCanAccessPatient({ patientId, email }) {
 }
 
 export default async function handler(req, res) {
+  ensureRes(res);
   try {
     const session = requireSession(req);
     if (!session) return res.status(401).json({ error: "Not authenticated" });

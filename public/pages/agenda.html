@@ -6,12 +6,232 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro • Agenda</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+  <style>
+    /* Agenda shell (keeps your management system look) */
+    body { overflow: hidden; }
+    .app { grid-template-columns: 260px 1fr 300px; }
+
+    .calWrap{
+      height: calc(100vh - 120px);
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255,255,255,.03);
+      overflow:hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .calTop{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    }
+    .calTop .left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .calTitle{ font-weight:900; letter-spacing:-.2px; }
+    .calSub{ color: var(--muted); font-size: 13px; }
+
+    .calChips{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .chip.btnlike{ cursor:pointer; user-select:none; }
+    .chip.btnlike.active{ background: rgba(34,230,195,.12); border-color: rgba(34,230,195,.25); color: var(--text); }
+
+    .calGridOuter{ height: 100%; overflow:auto; }
+
+    .calGrid{
+      position: relative;
+      display:grid;
+      grid-template-columns: 64px repeat(7, minmax(160px, 1fr));
+      min-width: 1100px;
+    }
+
+    .calHead{
+      position: sticky; top: 0;
+      z-index: 5;
+      display: contents;
+    }
+    .calHead .corner{
+      position: sticky; top:0; left:0;
+      z-index: 7;
+      background: rgba(15,26,44,.96);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      height: 58px;
+    }
+    .calHead .dayHead{
+      position: sticky; top:0;
+      z-index: 6;
+      height: 58px;
+      display:flex; flex-direction:column; justify-content:center;
+      gap:4px; padding: 8px 10px;
+      background: rgba(15,26,44,.96);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: rgba(255,255,255,.72); }
+    .dayHead .d2{ font-weight:900; font-size: 15px; }
+
+    .timeCol{
+      position: relative;
+      border-right: 1px solid var(--border);
+    }
+    .timeTick{
+      position:absolute; left:0; right:0;
+      transform: translateY(-7px);
+      color: rgba(255,255,255,.55);
+      font-size: 12px;
+      padding-left: 10px;
+      pointer-events:none;
+    }
+
+    .dayCol{
+      position: relative;
+      border-right: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+    .gridLine{
+      position:absolute; left:0; right:0;
+      border-top: 1px solid rgba(255,255,255,.06);
+      pointer-events:none;
+    }
+    .gridLine.hour{ border-top-color: rgba(255,255,255,.10); }
+
+    .event{
+      position:absolute;
+      left: 10px;
+      right: 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      padding: 8px 10px;
+      cursor:pointer;
+      overflow:hidden;
+    }
+    .event .t{ font-weight:900; font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .event .m{ margin-top:4px; font-size: 12px; color: rgba(255,255,255,.70); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .event .b{ margin-top:6px; display:flex; gap:8px; align-items:center; color: rgba(255,255,255,.70); font-size: 12px; }
+    .dot{ width:10px; height:10px; border-radius:999px; background: var(--accent); box-shadow: 0 10px 22px rgba(34,230,195,.16); }
+
+    /* Modal */
+    .fp-modalBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none; align-items:center; justify-content:center;
+      z-index: 50;
+      padding: 16px;
+    }
+    .fp-modal{
+      width: 720px; max-width: 96vw;
+      border-radius: 18px;
+      background: rgba(15,26,44,.98);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .fp-modalHead{ padding: 14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .fp-modalTitle{ font-weight:900; font-size: 16px; }
+    .fp-modalBody{ padding: 14px 16px; color: rgba(255,255,255,.80); font-size: 14px; line-height:1.5; }
+    .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed rgba(255,255,255,.10); }
+    .fp-kv:last-child{ border-bottom:none; }
+    .fp-kv .k{ color: rgba(255,255,255,.55); }
+  </style>
 </head>
 <body>
-  <script>
-    // Keep legacy links working: many pages link to /pages/agenda.html
-    location.replace("/agenda.html");
-  </script>
+<div class="app" data-diary>
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Agenda</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" class="active" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Agenda <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" data-cal-today>Oggi</button>
+          <button class="btn" data-cal-prev>Indietro</button>
+          <button class="btn" data-cal-next>Avanti</button>
+          <span class="chip" data-cal-range>—</span>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head">
+        <h2>Diario</h2>
+        <span class="chip">Settimanale</span>
+      </div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="search">Cerca <input data-cal-q placeholder="Paziente, prestazione, operatore..." /></div>
+          <div class="calChips" data-cal-therapists></div>
+        </div>
+
+        <div class="calWrap">
+          <div class="calTop">
+            <div class="left">
+              <div>
+                <div class="calTitle" data-cal-month>—</div>
+                <div class="calSub" data-cal-week>—</div>
+              </div>
+            </div>
+            <div class="calChips">
+              <span class="chip btnlike active" data-cal-view="week">Settimana</span>
+              <span class="chip btnlike" data-cal-view="workweek">6 giorni</span>
+            </div>
+          </div>
+
+          <div class="calGridOuter">
+            <div class="calGrid" data-cal-grid>
+              <!-- header + columns injected by diary.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Dettagli</div>
+    <div class="card" style="padding:14px;">
+      <div style="font-weight:900;">Suggerimento</div>
+      <div class="mini" style="margin-top:8px; color:var(--muted); line-height:1.5;">
+        Clicca un appuntamento per vedere i dettagli.
+        <br/>Usa la ricerca e i badge operatore per filtrare.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+
+<div class="fp-modalBack" data-cal-modal>
+  <div class="fp-modal">
+    <div class="fp-modalHead">
+      <div class="fp-modalTitle" data-cal-modal-title>Dettagli</div>
+      <button class="btn" data-cal-modal-close>Chiudi</button>
+    </div>
+    <div class="fp-modalBody" data-cal-modal-body></div>
+  </div>
+</div>
+
+<script src="../assets/app.js"></script>
+<script src="../assets/diary.js"></script>
 </body>
 </html>
 

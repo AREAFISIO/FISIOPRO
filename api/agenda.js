@@ -1,4 +1,4 @@
-import { airtableFetch, normalizeRole, requireSession } from "./_auth.js";
+import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -16,6 +16,7 @@ function addDaysUtcISO(iso, days) {
 }
 
 export default async function handler(req, res) {
+  ensureRes(res);
   try {
     const session = requireSession(req);
     if (!session) return res.status(401).json({ ok: false, error: "unauthorized" });

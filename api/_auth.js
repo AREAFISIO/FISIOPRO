@@ -11,6 +11,24 @@ function timingSafeEqual(a, b) {
   }
 }
 
+export function ensureRes(res) {
+  if (!res) return res;
+  if (typeof res.status !== "function") {
+    res.status = (code) => {
+      res.statusCode = code;
+      return res;
+    };
+  }
+  if (typeof res.json !== "function") {
+    res.json = (data) => {
+      if (!res.getHeader?.("Content-Type")) res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(data));
+      return res;
+    };
+  }
+  return res;
+}
+
 export function normalizeRole(roleRaw) {
   const r = String(roleRaw || "").trim().toLowerCase();
   if (r === "fisioterapista" || r === "physio") return "physio";
@@ -86,6 +104,7 @@ export function clearSessionCookie() {
 }
 
 export function requireRoles(req, res, allowedRoles) {
+  ensureRes(res);
   const session = requireSession(req);
   if (!session) {
     res.status(401).json({ ok: false, error: "unauthorized" });

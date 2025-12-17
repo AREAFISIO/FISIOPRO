@@ -1,4 +1,4 @@
-import { airtableFetch, requireRoles } from "./_auth.js";
+import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 
 function escAirtableString(s) {
   return String(s ?? "")
@@ -10,6 +10,7 @@ function escAirtableString(s) {
 }
 
 export default async function handler(req, res) {
+  ensureRes(res);
   const user = requireRoles(req, res, ["physio", "front", "manager"]);
   if (!user) return;
 

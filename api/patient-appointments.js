@@ -1,5 +1,5 @@
 // api/patient-appointments.js
-import { normalizeRole, requireSession } from "./_auth.js";
+import { ensureRes, normalizeRole, requireSession } from "./_auth.js";
 
 async function airtableListAppointments({ baseId, token, patientId, max = 200 }) {
   const tableName = "APPUNTAMENTI";
@@ -40,6 +40,7 @@ async function airtableListAppointments({ baseId, token, patientId, max = 200 })
 }
 
 export default async function handler(req, res) {
+  ensureRes(res);
   try {
     const session = requireSession(req);
     if (!session) return res.status(401).json({ error: "Not authenticated" });
