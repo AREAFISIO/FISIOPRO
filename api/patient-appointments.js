@@ -1,40 +1,5 @@
 // api/patient-appointments.js
-import crypto from "crypto";
-
-function getCookie(req, name) {
-  const raw = req.headers.cookie || "";
-  const parts = raw.split(";").map((p) => p.trim());
-  const found = parts.find((p) => p.startsWith(name + "="));
-  return found ? decodeURIComponent(found.split("=").slice(1).join("=")) : "";
-}
-
-function verifySession(req) {
-  const { SESSION_SECRET } = process.env;
-  if (!SESSION_SECRET) return null;
-
-  const token = getCookie(req, "fisio_session");
-  if (!token) return null;
-
-  const [b64, sig] = token.split(".");
-  if (!b64 || !sig) return null;
-
-  const expected = crypto
-    .createHmac("sha256", SESSION_SECRET)
-    .update(b64)
-    .digest("hex");
-
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
-
-  let payload;
-  try {
-    payload = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
-  } catch {
-    return null;
-  }
-
-  if (!payload.exp || Date.now() > payload.exp) return null;
-  return payload;
-}
+import { normalizeRole, requireSession } from "./_auth.js";
 
 async function airtableListAppointments({ baseId, token, patientId, max = 200 }) {
   const tableName = "APPUNTAMENTI";
@@ -76,7 +41,7 @@ async function airtableListAppointments({ baseId, token, patientId, max = 200 })
 
 export default async function handler(req, res) {
   try {
-    const session = verifySession(req);
+    const session = requireSession(req);
     if (!session) return res.status(401).json({ error: "Not authenticated" });
 
     const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
@@ -94,13 +59,14 @@ export default async function handler(req, res) {
       max: 500,
     });
 
-    // RBAC: se fisio, filtro SOLO i suoi appuntamenti
+    // RBAC: se physio, filtro SOLO i suoi appuntamenti
+    const role = normalizeRole(session.role);
     const filtered =
-      session.role === "Fisioterapista"
+      role === "physio"
         ? records.filter(
             (r) =>
               (r.fields?.Email || "").toLowerCase() ===
-              (session.email || "").toLowerCase()
+              String(session.email || "").toLowerCase()
           )
         : records;
 

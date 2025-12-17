@@ -1,4 +1,4 @@
-import { signSession, setJson, makeSessionCookie } from "./_auth.js";
+import { normalizeRole, signSession, setJson, makeSessionCookie } from "./_auth.js";
 
 const {
   AIRTABLE_TOKEN,
@@ -44,12 +44,22 @@ export default async function handler(req, res) {
       return setJson(res, 401, { ok: false, error: "invalid" });
     }
 
-    const token = signSession({ email, role: ruolo, nome });
+    const role = normalizeRole(ruolo);
+    const maxAgeSeconds = 60 * 60 * 1; // 1 ora (GDPR-friendly)
+    const exp = Date.now() + maxAgeSeconds * 1000;
 
-    // 1 ORA durata massima cookie (GDPR-friendly)
-    const cookie = makeSessionCookie(token, 60 * 60 * 1);
+    const token = signSession({
+      email: email.toLowerCase(),
+      role,
+      roleLabel: ruolo,
+      nome,
+      exp,
+    });
 
-    return setJson(res, 200, { ok: true, email, role: ruolo, nome }, cookie);
+    const cookie = makeSessionCookie(token, maxAgeSeconds);
+
+    const user = { email: email.toLowerCase(), role, roleLabel: ruolo, nome };
+    return setJson(res, 200, { ok: true, user }, cookie);
   } catch (e) {
     return setJson(res, 500, { ok: false, error: "server_error" });
   }

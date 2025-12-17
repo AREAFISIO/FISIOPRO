@@ -1,6 +1,23 @@
 import crypto from "crypto";
 
 const { SESSION_SECRET } = process.env;
+const SESSION_COOKIE = "fp_session";
+
+function timingSafeEqual(a, b) {
+  try {
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeRole(roleRaw) {
+  const r = String(roleRaw || "").trim().toLowerCase();
+  if (r === "fisioterapista" || r === "physio") return "physio";
+  if (r === "front office" || r === "front-office" || r === "front") return "front";
+  if (r === "manager" || r === "admin" || r === "amministratore") return "manager";
+  return "";
+}
 
 export function getCookie(req, name) {
   const raw = req.headers.cookie || "";
@@ -23,7 +40,7 @@ export function verifySession(token) {
   if (!b64 || !sig) return null;
 
   const expected = crypto.createHmac("sha256", SESSION_SECRET).update(b64).digest("base64url");
-  if (sig !== expected) return null;
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
 
   try {
     const json = Buffer.from(b64, "base64url").toString("utf8");
@@ -34,7 +51,7 @@ export function verifySession(token) {
 }
 
 export function requireSession(req) {
-  const token = getCookie(req, "fp_session");
+  const token = getCookie(req, SESSION_COOKIE);
   return token ? verifySession(token) : null;
 }
 
@@ -48,7 +65,7 @@ export function setJson(res, status, data, cookie) {
 export function makeSessionCookie(token, maxAgeSeconds = 60 * 60 * 8) {
   // 8 ore (meglio per sanità)
   return [
-    `fp_session=${token}`,
+    `${SESSION_COOKIE}=${token}`,
     "Path=/",
     "HttpOnly",
     "Secure",
@@ -59,11 +76,62 @@ export function makeSessionCookie(token, maxAgeSeconds = 60 * 60 * 8) {
 
 export function clearSessionCookie() {
   return [
-    "fp_session=",
+    `${SESSION_COOKIE}=`,
     "Path=/",
     "HttpOnly",
     "Secure",
     "SameSite=Lax",
     "Max-Age=0",
   ].join("; ");
+}
+
+export function requireRoles(req, res, allowedRoles) {
+  const session = requireSession(req);
+  if (!session) {
+    res.status(401).json({ ok: false, error: "unauthorized" });
+    return null;
+  }
+
+  const role = normalizeRole(session.role);
+  const allowed = (allowedRoles || []).map(normalizeRole).filter(Boolean);
+  if (allowed.length && !allowed.includes(role)) {
+    res.status(403).json({ ok: false, error: "forbidden" });
+    return null;
+  }
+
+  return { ...session, role };
+}
+
+export async function airtableFetch(path, init = {}) {
+  const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
+    const err = new Error("Missing AIRTABLE_TOKEN or AIRTABLE_BASE_ID");
+    err.status = 500;
+    throw err;
+  }
+
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${path}`;
+  const headers = {
+    Authorization: `Bearer ${AIRTABLE_TOKEN}`,
+    ...(init.headers || {}),
+  };
+
+  const res = await fetch(url, { ...init, headers });
+  const text = await res.text();
+  let json = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = { raw: text };
+  }
+
+  if (!res.ok) {
+    const msg = json?.error?.message || json?.error || text || `Airtable error ${res.status}`;
+    const err = new Error(msg);
+    err.status = 502;
+    err.airtable = json;
+    throw err;
+  }
+
+  return json;
 }
