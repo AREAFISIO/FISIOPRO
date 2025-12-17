@@ -86,7 +86,9 @@
     const f = x.fields || {};
     const start = pickField(f, ["Data e ora INIZIO", "Start", "Inizio", "start_at", "StartAt"]);
     const end = pickField(f, ["Data e ora FINE", "End", "Fine", "end_at", "EndAt"]);
-    const therapist = pickField(f, ["Operatore", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
+    let therapist = pickField(f, ["Operatore", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
+    // In case Operatore is still an array, normalize to a readable string.
+    if (Array.isArray(therapist)) therapist = therapist.filter(Boolean).join(", ");
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
     const status = pickField(f, ["Stato", "status"]) || "";
 
@@ -235,9 +237,19 @@
     if (monthEl) monthEl.textContent = fmtMonth(start);
     if (weekEl) weekEl.textContent = fmtWeekRange(start, days);
 
+    // Load known operators from COLLABORATORI (preferred),
+    // then load appointments for the selected week.
+    try {
+      const ops = await apiGet("/api/operators");
+      const names = (ops.items || []).map((x) => String(x.name || "").trim()).filter(Boolean);
+      if (names.length) knownTherapists = names;
+    } catch {
+      // fallback to operators found in the week
+    }
+
     const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
-    knownTherapists = getTherapists(rawItems);
+    if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
 
     // init selection once (default: first 6 found, like screenshot)
     if (selectedTherapists.size === 0 && knownTherapists.length) {

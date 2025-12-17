@@ -35,6 +35,7 @@ export default async function handler(req, res) {
     // Airtable datetime range filter (inclusive start, exclusive end)
     const FIELD_START = process.env.AGENDA_START_FIELD || "Data e ora INIZIO";
     const FIELD_EMAIL = process.env.AGENDA_EMAIL_FIELD || "Email";
+    const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Operatore";
 
     const rangeFilter = `AND(
       OR(IS_AFTER({${FIELD_START}}, "${startISO}"), IS_SAME({${FIELD_START}}, "${startISO}")),
@@ -55,8 +56,58 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(process.env.AGENDA_TABLE || "APPUNTAMENTI");
     const data = await airtableFetch(`${table}?${qs.toString()}`);
 
+    // If Operatore is a linked-record field, Airtable returns record IDs.
+    // Resolve to names via COLLABORATORI table so the UI can show proper operator names.
+    const operatorIds = new Set();
+    for (const r of data.records || []) {
+      const v = r.fields?.[FIELD_OPERATOR];
+      if (Array.isArray(v)) {
+        for (const x of v) {
+          if (typeof x === "string" && x.startsWith("rec")) operatorIds.add(x);
+        }
+      }
+    }
+
+    let operatorIdToName = {};
+    if (operatorIds.size) {
+      const tableOps = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+      const ids = Array.from(operatorIds);
+
+      const pickName = (fields) => {
+        const f = fields || {};
+        return (
+          f.Nome ||
+          f["Cognome e Nome"] ||
+          f["Nome completo"] ||
+          f.Name ||
+          f["Full Name"] ||
+          ""
+        );
+      };
+
+      // Chunk OR() to stay under formula limits
+      for (let i = 0; i < ids.length; i += 30) {
+        const chunk = ids.slice(i, i + 30);
+        const orParts = chunk.map((id) => `RECORD_ID()="${String(id).replace(/"/g, '\\"')}"`);
+        const formula = `OR(${orParts.join(",")})`;
+        const qsOps = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
+        const opsData = await airtableFetch(`${tableOps}?${qsOps.toString()}`);
+        for (const rec of opsData.records || []) {
+          const name = String(pickName(rec.fields) || "").trim();
+          if (name) operatorIdToName[rec.id] = name;
+        }
+      }
+    }
+
     const items = (data.records || []).map((r) => {
       const f = r.fields || {};
+      const opVal = f[FIELD_OPERATOR];
+      if (Array.isArray(opVal) && opVal.some((x) => typeof x === "string" && x.startsWith("rec"))) {
+        f[FIELD_OPERATOR] = opVal.map((id) => operatorIdToName[id] || id).filter(Boolean).join(", ");
+      } else if (Array.isArray(opVal)) {
+        f[FIELD_OPERATOR] = opVal.filter(Boolean).join(", ");
+      }
+
       const dt = String(f[FIELD_START] || "");
       return {
         id: r.id,
