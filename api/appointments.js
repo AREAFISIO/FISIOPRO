@@ -1,44 +1,5 @@
 // api/appointments.js
-import crypto from "crypto";
-
-function getCookie(req, name) {
-  const raw = req.headers.cookie || "";
-  const parts = raw.split(";").map((p) => p.trim());
-  const found = parts.find((p) => p.startsWith(name + "="));
-  return found ? decodeURIComponent(found.split("=").slice(1).join("=")) : "";
-}
-
-function verifySession(req) {
-  const { SESSION_SECRET } = process.env;
-  if (!SESSION_SECRET) return null;
-
-  const token = getCookie(req, "fisio_session");
-  if (!token) return null;
-
-  const [b64, sig] = token.split(".");
-  if (!b64 || !sig) return null;
-
-  const expected = crypto
-    .createHmac("sha256", SESSION_SECRET)
-    .update(b64)
-    .digest("hex");
-
-  try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
-  } catch {
-    return null;
-  }
-
-  let payload;
-  try {
-    payload = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
-  } catch {
-    return null;
-  }
-
-  if (!payload.exp || Date.now() > payload.exp) return null;
-  return payload; // {email, role, exp, ...}
-}
+import { normalizeRole, requireSession } from "./_auth.js";
 
 function requireEnv(...names) {
   const missing = names.filter((n) => !process.env[n]);
@@ -104,7 +65,7 @@ async function airtableList({ baseId, token, table, filterByFormula, fields = []
 
 export default async function handler(req, res) {
   try {
-    const session = verifySession(req);
+    const session = requireSession(req);
     if (!session) return res.status(401).json({ error: "Not authenticated" });
 
     requireEnv("AIRTABLE_TOKEN", "AIRTABLE_BASE_ID");
@@ -138,12 +99,12 @@ export default async function handler(req, res) {
       IS_BEFORE({${FIELD_START}}, "${endISO}")
     )`;
 
-    // RBAC: se fisio -> aggiungo filtro Email = session.email
-    const role = session.role || "";
-    const email = (session.email || "").toLowerCase();
+    // RBAC: se physio -> aggiungo filtro Email = session.email
+    const role = normalizeRole(session.role || "");
+    const email = String(session.email || "").toLowerCase();
 
     const roleFilter =
-      role === "Fisioterapista"
+      role === "physio"
         ? `{${FIELD_EMAIL}} = "${email}"`
         : "TRUE()";
 

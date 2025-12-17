@@ -1,0 +1,11 @@
+{
+  "name": "fisiopro",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "check:api": "node --check api/_auth.js api/auth-login.js api/auth-me.js api/auth-logout.js api/auth-forgot.js api/ping.js api/patient.js api/patients.js api/patient-appointments.js api/appointments.js api/patients-batch.js api/cases.js api/sales.js api/treatments.js api/insurance.js api/evaluations.js api/agenda.js api/airtable.js"
+  }
+}

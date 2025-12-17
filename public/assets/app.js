@@ -1,15 +1,11 @@
 // =====================
 // AUTH + ROLE GUARDS
 // =====================
-function getToken() { return localStorage.getItem("token") || ""; }
-
 async function api(path, opts = {}) {
-  const token = getToken();
   const headers = { ...(opts.headers || {}) };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(path, { ...opts, headers });
+  const res = await fetch(path, { ...opts, headers, credentials: "include" });
   const text = await res.text();
   let data = {};
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -18,18 +14,20 @@ async function api(path, opts = {}) {
 }
 
 async function ensureAuth() {
-  const isLoginPage = location.pathname.endsWith("/pages/login.html");
-  const token = getToken();
-  if (!token) { if (!isLoginPage) location.href = "/pages/login.html"; return null; }
-
   try {
-    const { user } = await api("/api/auth-me");
-    localStorage.setItem("user", JSON.stringify(user));
-    return user;
+    const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
+    const data = await api("/api/auth-me");
+    if (!data?.ok) {
+      if (!isLoginPage) location.href = "/";
+      return null;
+    }
+
+    // already logged in and on login page -> go to agenda
+    if (isLoginPage) location.href = "/pages/agenda.html";
+    return data.user || data.session || null;
   } catch {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    if (!isLoginPage) location.href = "/pages/login.html";
+    const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
+    if (!isLoginPage) location.href = "/";
     return null;
   }
 }
@@ -56,6 +54,25 @@ function toast(msg){
   t.style.display = "block";
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(()=> t.style.display="none", 1600);
+}
+
+function initLogoutLinks() {
+  document.querySelectorAll('a[href$="login.html"], a[href$="/login.html"]').forEach((a) => {
+    a.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await fetch("/api/auth-logout", { method: "POST", credentials: "include" });
+      } catch {}
+      location.href = "/";
+    });
+  });
+}
+
+function setUserBadges(user) {
+  const label = user
+    ? [user.nome || "", user.roleLabel || user.role || ""].filter(Boolean).join(" • ")
+    : "—";
+  document.querySelectorAll("[data-user-badge]").forEach((el) => (el.textContent = label));
 }
 
 // =====================
@@ -435,6 +452,8 @@ async function initAgenda() {
   const user = await ensureAuth();
   if (!user) return;
 
+  initLogoutLinks();
+  setUserBadges(user);
   roleGuard(user.role);
   activeNav();
   await initAgenda();
