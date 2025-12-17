@@ -1,8 +1,5 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 
-let _schemaCache = { at: 0, tables: null };
-const SCHEMA_TTL_MS = 10 * 60 * 1000;
-
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 }
@@ -18,27 +15,8 @@ function addDaysUtcISO(iso, days) {
   return dt.toISOString();
 }
 
-async function airtableMetaTables() {
-  const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
-  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) throw new Error("Missing Airtable env vars");
-
-  if (_schemaCache.tables && Date.now() - _schemaCache.at < SCHEMA_TTL_MS) return _schemaCache.tables;
-
-  const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
-  const text = await res.text();
-  let json = {};
-  try { json = text ? JSON.parse(text) : {}; } catch {}
-  if (!res.ok) {
-    const msg = json?.error?.message || json?.error || text || `Airtable meta error ${res.status}`;
-    throw new Error(msg);
-  }
-  _schemaCache = { at: Date.now(), tables: json.tables || [] };
-  return _schemaCache.tables;
-}
-
-function resolveFieldName(fields, candidates) {
-  const list = (fields || []).map((f) => f?.name).filter(Boolean);
+function resolveFieldName(fieldNames, candidates) {
+  const list = (fieldNames || []).map((x) => String(x)).filter(Boolean);
   const set = new Set(list);
 
   for (const c of candidates) {
@@ -72,12 +50,19 @@ export default async function handler(req, res) {
 
     const APPTS_TABLE_NAME = process.env.AGENDA_TABLE || "APPUNTAMENTI";
 
-    // Resolve field names from Airtable schema (avoids "unknown field" errors)
-    const tables = await airtableMetaTables();
-    const table = tables.find((t) => t?.name === APPTS_TABLE_NAME) || tables.find((t) => String(t?.name || "").toLowerCase() === String(APPTS_TABLE_NAME).toLowerCase());
-    const fields = table?.fields || [];
+    // Resolve field names by sampling one record (no Meta API permissions required).
+    // If the table is empty, we fall back to defaults.
+    const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
+    let sampledFieldNames = [];
+    try {
+      const sample = await airtableFetch(`${tableEnc}?pageSize=1`);
+      const first = sample.records?.[0];
+      sampledFieldNames = first?.fields ? Object.keys(first.fields) : [];
+    } catch {
+      sampledFieldNames = [];
+    }
 
-    const FIELD_START = resolveFieldName(fields, [
+    const FIELD_START = resolveFieldName(sampledFieldNames, [
       process.env.AGENDA_START_FIELD,
       "Data e ora INIZIO",
       "Data e ora Inizio",
@@ -85,7 +70,7 @@ export default async function handler(req, res) {
       "Inizio",
     ]);
 
-    const FIELD_OPERATOR = resolveFieldName(fields, [
+    const FIELD_OPERATOR = resolveFieldName(sampledFieldNames, [
       process.env.AGENDA_OPERATOR_FIELD,
       "Collaboratore",
       "Collaborator",
@@ -100,7 +85,7 @@ export default async function handler(req, res) {
         details: {
           table: APPTS_TABLE_NAME,
           resolved: { FIELD_START, FIELD_OPERATOR },
-          availableFields: fields.map((f) => f.name),
+          availableFields: sampledFieldNames,
         },
       });
     }
@@ -111,7 +96,7 @@ export default async function handler(req, res) {
         ok: true,
         table: APPTS_TABLE_NAME,
         resolved: { FIELD_START, FIELD_OPERATOR },
-        availableFields: fields.map((f) => f.name),
+        availableFields: sampledFieldNames,
       });
     }
 
@@ -152,7 +137,6 @@ export default async function handler(req, res) {
       "sort[0][direction]": "asc",
     });
 
-    const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
     const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
 
     // If Collaboratore/Operatore is a linked-record field, Airtable returns record IDs.
