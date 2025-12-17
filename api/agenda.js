@@ -1,5 +1,8 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 
+let _schemaCache = { at: 0, tables: null };
+const SCHEMA_TTL_MS = 10 * 60 * 1000;
+
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 }
@@ -13,6 +16,41 @@ function addDaysUtcISO(iso, days) {
   const dt = new Date(iso);
   dt.setUTCDate(dt.getUTCDate() + days);
   return dt.toISOString();
+}
+
+async function airtableMetaTables() {
+  const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) throw new Error("Missing Airtable env vars");
+
+  if (_schemaCache.tables && Date.now() - _schemaCache.at < SCHEMA_TTL_MS) return _schemaCache.tables;
+
+  const url = `https://api.airtable.com/v0/meta/bases/${AIRTABLE_BASE_ID}/tables`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+  const text = await res.text();
+  let json = {};
+  try { json = text ? JSON.parse(text) : {}; } catch {}
+  if (!res.ok) {
+    const msg = json?.error?.message || json?.error || text || `Airtable meta error ${res.status}`;
+    throw new Error(msg);
+  }
+  _schemaCache = { at: Date.now(), tables: json.tables || [] };
+  return _schemaCache.tables;
+}
+
+function resolveFieldName(fields, candidates) {
+  const list = (fields || []).map((f) => f?.name).filter(Boolean);
+  const set = new Set(list);
+
+  for (const c of candidates) {
+    if (c && set.has(c)) return c;
+  }
+
+  const lowerMap = new Map(list.map((n) => [n.toLowerCase(), n]));
+  for (const c of candidates) {
+    const key = String(c || "").toLowerCase();
+    if (key && lowerMap.has(key)) return lowerMap.get(key);
+  }
+  return "";
 }
 
 export default async function handler(req, res) {
@@ -32,11 +70,50 @@ export default async function handler(req, res) {
     const startISO = ymdToUtcStartISO(from);
     const endExclusiveISO = addDaysUtcISO(ymdToUtcStartISO(to), 1);
 
-    // Airtable datetime range filter (inclusive start, exclusive end)
-    const FIELD_START = process.env.AGENDA_START_FIELD || "Data e ora INIZIO";
-    // Airtable field names are case-sensitive. Your field is exactly "Collaboratore".
-    // Do not allow env overrides here (misconfigured values like "collaborator" will break formulas).
-    const FIELD_OPERATOR = "Collaboratore";
+    const APPTS_TABLE_NAME = process.env.AGENDA_TABLE || "APPUNTAMENTI";
+
+    // Resolve field names from Airtable schema (avoids "unknown field" errors)
+    const tables = await airtableMetaTables();
+    const table = tables.find((t) => t?.name === APPTS_TABLE_NAME) || tables.find((t) => String(t?.name || "").toLowerCase() === String(APPTS_TABLE_NAME).toLowerCase());
+    const fields = table?.fields || [];
+
+    const FIELD_START = resolveFieldName(fields, [
+      process.env.AGENDA_START_FIELD,
+      "Data e ora INIZIO",
+      "Data e ora Inizio",
+      "Start",
+      "Inizio",
+    ]);
+
+    const FIELD_OPERATOR = resolveFieldName(fields, [
+      process.env.AGENDA_OPERATOR_FIELD,
+      "Collaboratore",
+      "Collaborator",
+      "Operatore",
+      "Operator",
+    ]);
+
+    if (!FIELD_START || !FIELD_OPERATOR) {
+      return res.status(500).json({
+        ok: false,
+        error: "agenda_schema_mismatch",
+        details: {
+          table: APPTS_TABLE_NAME,
+          resolved: { FIELD_START, FIELD_OPERATOR },
+          availableFields: fields.map((f) => f.name),
+        },
+      });
+    }
+
+    // Debug mode: /api/agenda?op=schema&from=...&to=...
+    if (String(req.query?.op || "") === "schema") {
+      return res.status(200).json({
+        ok: true,
+        table: APPTS_TABLE_NAME,
+        resolved: { FIELD_START, FIELD_OPERATOR },
+        availableFields: fields.map((f) => f.name),
+      });
+    }
 
     const rangeFilter = `AND(
       OR(IS_AFTER({${FIELD_START}}, "${startISO}"), IS_SAME({${FIELD_START}}, "${startISO}")),
@@ -75,8 +152,8 @@ export default async function handler(req, res) {
       "sort[0][direction]": "asc",
     });
 
-    const table = encodeURIComponent(process.env.AGENDA_TABLE || "APPUNTAMENTI");
-    const data = await airtableFetch(`${table}?${qs.toString()}`);
+    const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
+    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
 
     // If Collaboratore/Operatore is a linked-record field, Airtable returns record IDs.
     // Resolve to names via COLLABORATORI table so the UI can show proper operator names.
@@ -127,10 +204,15 @@ export default async function handler(req, res) {
     const items = (data.records || []).map((r) => {
       const f = r.fields || {};
       const opVal = f[FIELD_OPERATOR];
+      let operatorName = "";
       if (Array.isArray(opVal) && opVal.some((x) => typeof x === "string" && x.startsWith("rec"))) {
-        f[FIELD_OPERATOR] = opVal.map((id) => operatorIdToName[id] || id).filter(Boolean).join(", ");
+        operatorName = String(operatorIdToName[opVal[0]] || opVal[0] || "");
+        f[FIELD_OPERATOR] = operatorName;
       } else if (Array.isArray(opVal)) {
-        f[FIELD_OPERATOR] = opVal.filter(Boolean).join(", ");
+        operatorName = String(opVal[0] || "");
+        f[FIELD_OPERATOR] = operatorName;
+      } else if (opVal) {
+        operatorName = String(opVal);
       }
 
       const dt = String(f[FIELD_START] || "");
@@ -139,6 +221,7 @@ export default async function handler(req, res) {
         datetime: dt,
         date: dt ? dt.slice(0, 10) : "",
         time: dt ? dt.slice(11, 16) : "",
+        operator: operatorName,
         fields: f,
       };
     });
