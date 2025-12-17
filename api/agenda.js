@@ -34,7 +34,9 @@ export default async function handler(req, res) {
 
     // Airtable datetime range filter (inclusive start, exclusive end)
     const FIELD_START = process.env.AGENDA_START_FIELD || "Data e ora INIZIO";
-    const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Collaboratore";
+    // Airtable field names are case-sensitive. Your field is exactly "Collaboratore".
+    // Do not allow env overrides here (misconfigured values like "collaborator" will break formulas).
+    const FIELD_OPERATOR = "Collaboratore";
 
     const rangeFilter = `AND(
       OR(IS_AFTER({${FIELD_START}}, "${startISO}"), IS_SAME({${FIELD_START}}, "${startISO}")),
