@@ -2,13 +2,15 @@ import { airtableFetch, ensureRes, requireSession } from "./_auth.js";
 
 function pickName(fields) {
   const f = fields || {};
+  const nome = String(f.Nome || "").trim();
+  const cognome = String(f.Cognome || "").trim();
+  const full = [nome, cognome].filter(Boolean).join(" ").trim();
   return (
-    f.Collaboratore ||
-    f.Nome ||
-    f["Cognome e Nome"] ||
-    f["Nome completo"] ||
-    f.Name ||
-    f["Full Name"] ||
+    full ||
+    String(f["Cognome e Nome"] || "").trim() ||
+    String(f["Nome completo"] || "").trim() ||
+    String(f.Name || "").trim() ||
+    String(f["Full Name"] || "").trim() ||
     ""
   );
 }
@@ -27,12 +29,8 @@ export default async function handler(req, res) {
     // Fields are aligned with auth-login.js: Attivo, Ruolo, Nome, Email
     const formula = `AND({Attivo}=1, OR({Ruolo}="Fisioterapista", {Ruolo}="Fisioterapista "))`;
 
-    const qs = new URLSearchParams({
-      filterByFormula: formula,
-      pageSize: "100",
-      "sort[0][field]": "Collaboratore",
-      "sort[0][direction]": "asc",
-    });
+    // Avoid sort-by-field errors if base differs; we sort in JS.
+    const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
 
     const data = await airtableFetch(`${table}?${qs.toString()}`);
     const items = (data.records || [])
@@ -48,7 +46,8 @@ export default async function handler(req, res) {
           active: Boolean(f.Attivo),
         };
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
 
     return res.status(200).json({ ok: true, items });
   } catch (e) {

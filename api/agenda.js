@@ -97,13 +97,15 @@ export default async function handler(req, res) {
 
       const pickName = (fields) => {
         const f = fields || {};
+        const nome = String(f.Nome || "").trim();
+        const cognome = String(f.Cognome || "").trim();
+        const full = [nome, cognome].filter(Boolean).join(" ").trim();
         return (
-          f.Collaboratore ||
-          f.Nome ||
-          f["Cognome e Nome"] ||
-          f["Nome completo"] ||
-          f.Name ||
-          f["Full Name"] ||
+          full ||
+          String(f["Cognome e Nome"] || "").trim() ||
+          String(f["Nome completo"] || "").trim() ||
+          String(f.Name || "").trim() ||
+          String(f["Full Name"] || "").trim() ||
           ""
         );
       };
