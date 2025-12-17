@@ -4,28 +4,30 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro — Agenda</title>
+
+  <!-- CSS GLOBALE DEL GESTIONALE (metti qui il tuo vero file) -->
+  <link rel="stylesheet" href="/assets/style.css" />
+
+  <!-- CSS SOLO AGENDA (NON cambia tema) -->
   <link rel="stylesheet" href="/assets/agenda.css" />
 </head>
 
 <body>
-  <div class="app">
-    <!-- TOP BAR -->
-    <header class="topbar">
-      <div class="brand">
-        <div class="logo">FP</div>
-        <div class="titles">
-          <div class="h1">Agenda</div>
-          <div class="h2">07:00 → 21:00 • slot 30 min</div>
-        </div>
+  <div class="agendaPage">
+    <header class="agendaTop">
+      <div class="agendaTopLeft">
+        <div class="agendaTitle">Agenda</div>
+        <div class="agendaSub">07:00 → 21:00 • slot 30 min</div>
       </div>
 
-      <div class="controls">
-        <button id="btnToggleLeft" class="btn btnGhost" type="button">Colonna sinistra</button>
-        <button id="btnToggleRight" class="btn btnGhost" type="button">Colonna destra</button>
-        <div class="divider"></div>
+      <div class="agendaTopRight">
+        <button id="btnToggleLeft" class="btn" type="button">Colonna sinistra</button>
+        <button id="btnToggleRight" class="btn" type="button">Colonna destra</button>
+
+        <div class="sep"></div>
 
         <button id="btnPrev" class="btn" type="button">←</button>
-        <button id="btnToday" class="btn btnGhost" type="button">Oggi</button>
+        <button id="btnToday" class="btn" type="button">Oggi</button>
         <button id="btnNext" class="btn" type="button">→</button>
 
         <label class="datePick">
@@ -37,12 +39,10 @@
       </div>
     </header>
 
-    <!-- LAYOUT -->
-    <main class="layout">
-      <!-- LEFT PANEL -->
-      <aside id="leftPanel" class="panel left">
-        <div class="panelHeader">Filtri rapidi</div>
-        <div class="panelBody">
+    <main class="agendaLayout">
+      <aside id="leftPanel" class="agendaPanel">
+        <div class="agendaPanelHead">Filtri</div>
+        <div class="agendaPanelBody">
           <label class="field">
             <span>Ricerca</span>
             <input id="searchInput" type="text" placeholder="Paziente / email / nota..." />
@@ -57,110 +57,102 @@
               <option value="Fisio 3">Fisio 3</option>
             </select>
           </label>
-
-          <div class="hint">
-            Nota: backend lo colleghiamo dopo. Intanto puoi creare/modificare e salva in locale.
-          </div>
         </div>
       </aside>
 
-      <!-- CENTER -->
-      <section class="center">
-        <div class="dayTitle">
-          <div id="dayLabel" class="dayLabel">—</div>
-          <div class="mini">Clicca uno slot per dettagli • trascina scroll per scendere</div>
+      <section class="agendaCenter">
+        <div class="agendaDayBar">
+          <div id="dayLabel" class="agendaDayLabel">—</div>
+          <div class="agendaMini">Clicca uno slot per aprire i dettagli</div>
         </div>
 
-        <div class="gridWrap" id="gridWrap">
-          <div class="gridHeader">
+        <div class="agendaGrid">
+          <div class="agendaGridHead">
             <div class="corner"></div>
             <div class="colHead">Fisio 1</div>
             <div class="colHead">Fisio 2</div>
             <div class="colHead">Fisio 3</div>
           </div>
 
-          <div class="gridBody" id="gridBody">
-            <!-- righe generate via JS -->
-          </div>
+          <div class="agendaGridBody" id="gridBody"></div>
         </div>
       </section>
 
-      <!-- RIGHT PANEL -->
-      <aside id="rightPanel" class="panel right">
-        <div class="panelHeader">Lista del giorno</div>
-        <div class="panelBody">
+      <aside id="rightPanel" class="agendaPanel">
+        <div class="agendaPanelHead">Lista del giorno</div>
+        <div class="agendaPanelBody">
           <div id="listDay" class="listDay"></div>
         </div>
       </aside>
     </main>
-  </div>
 
-  <!-- MODAL -->
-  <div id="modalBack" class="modalBack hidden" aria-hidden="true">
-    <div class="modal">
-      <div class="modalTop">
-        <div class="modalTitle" id="modalTitle">Dettagli appuntamento</div>
-        <button id="btnCloseModal" class="iconBtn" type="button" aria-label="Chiudi">✕</button>
-      </div>
-
-      <div class="modalBody">
-        <div class="row2">
-          <label class="field">
-            <span>Paziente (testo)</span>
-            <input id="mPaziente" type="text" placeholder="Es. Rossi Mario" />
-          </label>
-
-          <label class="field">
-            <span>Email (opzionale)</span>
-            <input id="mEmail" type="email" placeholder="nome@email.it" />
-          </label>
+    <!-- MODAL -->
+    <div id="modalBack" class="modalBack hidden" aria-hidden="true">
+      <div class="modal">
+        <div class="modalTop">
+          <div class="modalTitle" id="modalTitle">Dettagli appuntamento</div>
+          <button id="btnCloseModal" class="btn" type="button">Chiudi</button>
         </div>
 
-        <div class="row2">
-          <label class="field">
-            <span>Risorsa</span>
-            <select id="mRisorsa">
-              <option value="Fisio 1">Fisio 1</option>
-              <option value="Fisio 2">Fisio 2</option>
-              <option value="Fisio 3">Fisio 3</option>
-            </select>
-          </label>
+        <div class="modalBody">
+          <div class="row2">
+            <label class="field">
+              <span>Paziente (testo)</span>
+              <input id="mPaziente" type="text" placeholder="Es. Rossi Mario" />
+            </label>
+
+            <label class="field">
+              <span>Email (opzionale)</span>
+              <input id="mEmail" type="email" placeholder="nome@email.it" />
+            </label>
+          </div>
+
+          <div class="row2">
+            <label class="field">
+              <span>Risorsa</span>
+              <select id="mRisorsa">
+                <option value="Fisio 1">Fisio 1</option>
+                <option value="Fisio 2">Fisio 2</option>
+                <option value="Fisio 3">Fisio 3</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Durata</span>
+              <select id="mDurata">
+                <option value="30">30 min</option>
+                <option value="60">60 min</option>
+                <option value="90">90 min</option>
+                <option value="120">120 min</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row2">
+            <label class="field">
+              <span>Data e ora INIZIO</span>
+              <input id="mStart" type="datetime-local" />
+            </label>
+
+            <label class="field">
+              <span>Data e ora FINE</span>
+              <input id="mEnd" type="datetime-local" />
+            </label>
+          </div>
 
           <label class="field">
-            <span>Durata</span>
-            <select id="mDurata">
-              <option value="30">30 min</option>
-              <option value="60">60 min</option>
-              <option value="90">90 min</option>
-              <option value="120">120 min</option>
-            </select>
+            <span>Note</span>
+            <textarea id="mNote" rows="3" placeholder="Dettagli, promemoria, ecc."></textarea>
           </label>
+
+          <div class="modalActions">
+            <button id="btnDelete" class="btn btnDanger" type="button">Elimina</button>
+            <div class="spacer"></div>
+            <button id="btnSave" class="btn btnPrimary" type="button">Salva</button>
+          </div>
+
+          <div class="smallHint" id="saveHint">—</div>
         </div>
-
-        <div class="row2">
-          <label class="field">
-            <span>Data e ora INIZIO</span>
-            <input id="mStart" type="datetime-local" />
-          </label>
-
-          <label class="field">
-            <span>Data e ora FINE</span>
-            <input id="mEnd" type="datetime-local" />
-          </label>
-        </div>
-
-        <label class="field">
-          <span>Note</span>
-          <textarea id="mNote" rows="3" placeholder="Dettagli, promemoria, ecc."></textarea>
-        </label>
-
-        <div class="dangerZone">
-          <button id="btnDelete" class="btn btnDanger" type="button">Elimina</button>
-          <div class="spacer"></div>
-          <button id="btnSave" class="btn btnPrimary" type="button">Salva</button>
-        </div>
-
-        <div class="smallHint" id="saveHint">—</div>
       </div>
     </div>
   </div>
