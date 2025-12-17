@@ -3,6 +3,7 @@ import { airtableFetch, ensureRes, requireSession } from "./_auth.js";
 function pickName(fields) {
   const f = fields || {};
   return (
+    f.Collaboratore ||
     f.Nome ||
     f["Cognome e Nome"] ||
     f["Nome completo"] ||
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
     const qs = new URLSearchParams({
       filterByFormula: formula,
       pageSize: "100",
-      "sort[0][field]": "Nome",
+      "sort[0][field]": "Collaboratore",
       "sort[0][direction]": "asc",
     });
 

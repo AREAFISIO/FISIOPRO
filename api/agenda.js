@@ -34,8 +34,8 @@ export default async function handler(req, res) {
 
     // Airtable datetime range filter (inclusive start, exclusive end)
     const FIELD_START = process.env.AGENDA_START_FIELD || "Data e ora INIZIO";
-    const FIELD_EMAIL = process.env.AGENDA_EMAIL_FIELD || "Email";
-    const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Operatore";
+    const FIELD_EMAIL = process.env.AGENDA_EMAIL_FIELD || ""; // optional legacy
+    const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Collaboratore";
 
     const rangeFilter = `AND(
       OR(IS_AFTER({${FIELD_START}}, "${startISO}"), IS_SAME({${FIELD_START}}, "${startISO}")),
@@ -44,7 +44,29 @@ export default async function handler(req, res) {
 
     const role = normalizeRole(session.role);
     const email = String(session.email || "").toLowerCase();
-    const roleFilter = role === "physio" ? `{${FIELD_EMAIL}} = "${email}"` : "TRUE()";
+
+    // RBAC filter for physio:
+    // Prefer linking via {Collaboratore} (linked to COLLABORATORI) using the current user's Email.
+    let roleFilter = "TRUE()";
+    if (role === "physio") {
+      const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+      const fEmail = `LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}")`;
+      const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+      const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
+      const rec = userData.records?.[0] || null;
+      const userRecId = rec?.id || "";
+
+      if (userRecId) {
+        // linked-record field match
+        roleFilter = `FIND("${userRecId}", ARRAYJOIN({${FIELD_OPERATOR}}))`;
+      } else if (FIELD_EMAIL) {
+        // fallback to explicit email field on appointments table (if you really have one)
+        roleFilter = `{${FIELD_EMAIL}} = "${email}"`;
+      } else {
+        // safest fallback: no access if mapping can't be resolved
+        roleFilter = "FALSE()";
+      }
+    }
 
     const qs = new URLSearchParams({
       filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
@@ -56,7 +78,7 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(process.env.AGENDA_TABLE || "APPUNTAMENTI");
     const data = await airtableFetch(`${table}?${qs.toString()}`);
 
-    // If Operatore is a linked-record field, Airtable returns record IDs.
+    // If Collaboratore/Operatore is a linked-record field, Airtable returns record IDs.
     // Resolve to names via COLLABORATORI table so the UI can show proper operator names.
     const operatorIds = new Set();
     for (const r of data.records || []) {
@@ -76,6 +98,7 @@ export default async function handler(req, res) {
       const pickName = (fields) => {
         const f = fields || {};
         return (
+          f.Collaboratore ||
           f.Nome ||
           f["Cognome e Nome"] ||
           f["Nome completo"] ||

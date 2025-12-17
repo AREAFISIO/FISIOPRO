@@ -86,9 +86,11 @@
     const f = x.fields || {};
     const start = pickField(f, ["Data e ora INIZIO", "Start", "Inizio", "start_at", "StartAt"]);
     const end = pickField(f, ["Data e ora FINE", "End", "Fine", "end_at", "EndAt"]);
-    let therapist = pickField(f, ["Operatore", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
+    let therapist = pickField(f, ["Collaboratore", "Operatore", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
     // In case Operatore is still an array, normalize to a readable string.
     if (Array.isArray(therapist)) therapist = therapist.filter(Boolean).join(", ");
+    // If it contains multiple names, pick the first for column placement
+    if (typeof therapist === "string" && therapist.includes(",")) therapist = therapist.split(",")[0].trim();
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
     const status = pickField(f, ["Stato", "status"]) || "";
 
