@@ -35,6 +35,106 @@
     .chip.btnlike{ cursor:pointer; user-select:none; }
     .chip.btnlike.active{ background: rgba(34,230,195,.12); border-color: rgba(34,230,195,.25); color: var(--text); }
 
+    /* Operator selector bar (like screenshot) */
+    .opsBar{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      padding: 10px 12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      cursor:pointer;
+      user-select:none;
+      min-height: 44px;
+    }
+    .opsLeft{ display:flex; align-items:center; gap:10px; min-width: 0; }
+    .opsDots{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .opsDot{
+      width: 26px; height: 26px; border-radius: 999px;
+      display:grid; place-items:center;
+      font-weight: 900; font-size: 12px;
+      color: rgba(10,18,32,.90);
+      border: 1px solid rgba(255,255,255,.25);
+    }
+    .opsText{ color: rgba(255,255,255,.75); font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .opsCaret{ opacity: .8; }
+
+    /* Operator dropdown */
+    .opsBack{
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      display:none;
+      z-index: 60;
+      padding: 18px;
+    }
+    .opsMenu{
+      width: 620px; max-width: 96vw;
+      margin: 10vh auto 0;
+      border-radius: 16px;
+      background: rgba(15,26,44,.98);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .opsMenuTop{
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    }
+    .opsToggle{ display:flex; align-items:center; gap:10px; }
+    .opsToggleLabel{ font-weight: 800; }
+    .opsMenuBody{ max-height: 52vh; overflow:auto; }
+    .opsRow{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.02);
+    }
+    .opsRow:last-child{ border-bottom:none; }
+    .opsRowLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .opsCheck{
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.15);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+    }
+    .opsCheck.on{ background: rgba(34,230,195,.20); border-color: rgba(34,230,195,.35); }
+    .opsName{ font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .opsMini{ color: var(--muted); font-size: 13px; }
+    .opsMenuFoot{ padding: 12px 14px; display:flex; justify-content:flex-end; gap:10px; border-top: 1px solid var(--border); }
+
+    /* Minimal switch */
+    .switch{ position: relative; display:inline-block; width: 46px; height: 26px; }
+    .switch input{ opacity:0; width:0; height:0; }
+    .slider{
+      position:absolute; inset:0;
+      cursor:pointer;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.18);
+      transition: .2s;
+      border-radius: 999px;
+    }
+    .slider:before{
+      content:"";
+      position:absolute;
+      height: 20px; width: 20px;
+      left: 3px; top: 2px;
+      background: rgba(255,255,255,.92);
+      transition: .2s;
+      border-radius: 999px;
+    }
+    .switch input:checked + .slider{
+      background: rgba(34,230,195,.25);
+      border-color: rgba(34,230,195,.35);
+    }
+    .switch input:checked + .slider:before{
+      transform: translateX(20px);
+      background: rgba(34,230,195,.95);
+    }
+
     .calGridOuter{ height: 100%; overflow:auto; }
 
     .calGrid{
@@ -179,7 +279,13 @@
       <div class="body">
         <div class="toolbar">
           <div class="search">Cerca <input data-cal-q placeholder="Paziente, prestazione, operatore..." /></div>
-          <div class="calChips" data-cal-therapists></div>
+          <div class="opsBar" data-ops-bar title="Seleziona operatori">
+            <div class="opsLeft">
+              <div class="opsDots" data-ops-dots></div>
+              <div class="opsText" data-ops-text>Operatori</div>
+            </div>
+            <div class="opsCaret">▾</div>
+          </div>
         </div>
 
         <div class="calWrap">
@@ -227,6 +333,26 @@
       <button class="btn" data-cal-modal-close>Chiudi</button>
     </div>
     <div class="fp-modalBody" data-cal-modal-body></div>
+  </div>
+</div>
+
+<div class="opsBack" data-ops-back>
+  <div class="opsMenu" role="dialog" aria-modal="true">
+    <div class="opsMenuTop">
+      <div class="opsToggle">
+        <span class="opsToggleLabel">Vista multi utente</span>
+        <label class="switch">
+          <input type="checkbox" data-ops-multi />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="btn" data-ops-close>Chiudi</button>
+    </div>
+    <div class="opsMenuBody" data-ops-list></div>
+    <div class="opsMenuFoot">
+      <button class="btn" data-ops-all>Seleziona tutti</button>
+      <button class="btn primary" data-ops-apply>Applica</button>
+    </div>
   </div>
 </div>
 

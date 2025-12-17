@@ -9,7 +9,15 @@
   const rangeEl = document.querySelector("[data-cal-range]");
   const monthEl = document.querySelector("[data-cal-month]");
   const weekEl = document.querySelector("[data-cal-week]");
-  const therapistsEl = document.querySelector("[data-cal-therapists]");
+  const opsBar = document.querySelector("[data-ops-bar]");
+  const opsDots = document.querySelector("[data-ops-dots]");
+  const opsText = document.querySelector("[data-ops-text]");
+  const opsBack = document.querySelector("[data-ops-back]");
+  const opsList = document.querySelector("[data-ops-list]");
+  const opsMulti = document.querySelector("[data-ops-multi]");
+  const opsBtnClose = document.querySelector("[data-ops-close]");
+  const opsBtnApply = document.querySelector("[data-ops-apply]");
+  const opsBtnAll = document.querySelector("[data-ops-all]");
   const btnPrev = document.querySelector("[data-cal-prev]");
   const btnNext = document.querySelector("[data-cal-next]");
   const btnToday = document.querySelector("[data-cal-today]");
@@ -27,7 +35,10 @@
   let view = "week"; // week | workweek
   let anchorDate = new Date();
   let rawItems = [];
-  let activeTherapist = "ALL";
+  let multiUser = true;
+  let knownTherapists = [];
+  let selectedTherapists = new Set();
+  let draftSelected = new Set();
 
   function pad2(n) { return String(n).padStart(2, "0"); }
   function toYmd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -122,6 +133,91 @@
     return `hsl(${hue} 80% 60% / 0.18)`;
   }
 
+  function solidForTherapist(name) {
+    const s = String(name || "");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    return `hsl(${hue} 85% 62% / 0.95)`;
+  }
+
+  function getTherapists(items) {
+    return Array.from(new Set(items.map((x) => x.therapist).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  function syncOpsBar() {
+    if (!opsDots || !opsText) return;
+    opsDots.innerHTML = "";
+    const names = Array.from(selectedTherapists);
+    const shown = names.slice(0, 10);
+    shown.forEach((n) => {
+      const dot = document.createElement("div");
+      dot.className = "opsDot";
+      dot.style.background = solidForTherapist(n);
+      dot.textContent = therapistKey(n) || n.slice(0, 2).toUpperCase();
+      opsDots.appendChild(dot);
+    });
+    if (names.length > shown.length) {
+      const more = document.createElement("div");
+      more.className = "opsDot";
+      more.style.background = "rgba(255,255,255,.14)";
+      more.style.color = "rgba(255,255,255,.85)";
+      more.textContent = "+" + String(names.length - shown.length);
+      opsDots.appendChild(more);
+    }
+    opsText.textContent = names.length ? `${names.length} operatori selezionati` : "Seleziona operatori";
+  }
+
+  function openOpsMenu() {
+    if (!opsBack) return;
+    draftSelected = new Set(selectedTherapists);
+    if (opsMulti) opsMulti.checked = Boolean(multiUser);
+    renderOpsList();
+    opsBack.style.display = "block";
+  }
+
+  function closeOpsMenu() {
+    if (!opsBack) return;
+    opsBack.style.display = "none";
+  }
+
+  function renderOpsList() {
+    if (!opsList) return;
+    opsList.innerHTML = "";
+
+    if (!knownTherapists.length) {
+      const empty = document.createElement("div");
+      empty.className = "opsRow";
+      empty.innerHTML = `<div class="opsRowLeft"><div class="opsMini">Nessun operatore trovato nei dati.</div></div>`;
+      opsList.appendChild(empty);
+      return;
+    }
+
+    knownTherapists.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "opsRow";
+      const on = draftSelected.has(name);
+      const check = `<div class="opsCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      row.innerHTML = `
+        <div class="opsRowLeft">
+          ${check}
+          <div style="min-width:0;">
+            <div class="opsName">${name}</div>
+            <div class="opsMini">${therapistKey(name) || ""}</div>
+          </div>
+        </div>
+        <div class="opsDot" style="background:${solidForTherapist(name)}">${therapistKey(name) || ""}</div>
+      `;
+      row.addEventListener("click", () => {
+        if (draftSelected.has(name)) draftSelected.delete(name);
+        else draftSelected.add(name);
+        renderOpsList();
+      });
+      opsList.appendChild(row);
+    });
+  }
+
   async function apiGet(url) {
     const r = await fetch(url, { credentials: "include" });
     const data = await r.json().catch(() => ({}));
@@ -141,60 +237,89 @@
 
     const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
+    knownTherapists = getTherapists(rawItems);
+
+    // init selection once (default: first 6 found, like screenshot)
+    if (selectedTherapists.size === 0 && knownTherapists.length) {
+      knownTherapists.slice(0, 6).forEach((n) => selectedTherapists.add(n));
+    }
+
+    // if selection became empty, fallback to first operator to keep grid usable
+    if (selectedTherapists.size === 0 && knownTherapists.length) {
+      selectedTherapists.add(knownTherapists[0]);
+    }
+
+    syncOpsBar();
     render();
   }
 
-  function renderTherapists(items) {
-    const names = Array.from(new Set(items.map((x) => x.therapist).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-    therapistsEl.innerHTML = "";
-
-    const makeChip = (label, value, active) => {
-      const el = document.createElement("span");
-      el.className = "chip btnlike" + (active ? " active" : "");
-      el.textContent = label;
-      el.onclick = () => { activeTherapist = value; render(); };
-      return el;
-    };
-
-    therapistsEl.appendChild(makeChip("Tutti", "ALL", activeTherapist === "ALL"));
-    names.slice(0, 12).forEach((n) => {
-      const key = therapistKey(n) || n.slice(0, 2).toUpperCase();
-      therapistsEl.appendChild(makeChip(key, n, activeTherapist === n));
-    });
-  }
-
-  function buildGridSkeleton(start, days) {
+  function buildGridSkeleton(start, days, ops) {
     gridEl.innerHTML = "";
-
-    // Header row
-    const head = document.createElement("div");
-    head.className = "calHead";
-
-    const corner = document.createElement("div");
-    corner.className = "corner";
-    head.appendChild(corner);
-
-    for (let i = 0; i < days; i++) {
-      const d = addDays(start, i);
-      const dh = document.createElement("div");
-      dh.className = "dayHead";
-      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
-      head.appendChild(dh);
-    }
-
-    gridEl.appendChild(head);
 
     // Body columns
     const totalMin = (END_HOUR - START_HOUR) * 60;
     const totalSlots = Math.ceil(totalMin / SLOT_MIN);
     const heightPx = totalSlots * SLOT_PX;
 
+    const colsPerDay = multiUser ? Math.max(1, ops.length) : 1;
+    const totalDayCols = days * colsPerDay;
+
+    gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(160px, 1fr))`;
+    if (multiUser) gridEl.style.gridTemplateRows = `58px 34px ${heightPx}px`;
+    else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
+
+    // Corner (day header)
+    const corner = document.createElement("div");
+    corner.className = "corner";
+    corner.style.gridColumn = "1";
+    corner.style.gridRow = "1";
+    gridEl.appendChild(corner);
+
+    // Day headers (span operator subcolumns)
+    for (let dIdx = 0; dIdx < days; dIdx++) {
+      const d = addDays(start, dIdx);
+      const dh = document.createElement("div");
+      dh.className = "dayHead";
+      const startCol = 2 + dIdx * colsPerDay;
+      dh.style.gridColumn = `${startCol} / span ${colsPerDay}`;
+      dh.style.gridRow = "1";
+      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
+      gridEl.appendChild(dh);
+    }
+
+    // Operator headers (only in multi-user)
+    if (multiUser) {
+      const blank = document.createElement("div");
+      blank.className = "corner";
+      blank.style.height = "34px";
+      blank.style.gridColumn = "1";
+      blank.style.gridRow = "2";
+      gridEl.appendChild(blank);
+
+      for (let dIdx = 0; dIdx < days; dIdx++) {
+        for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
+          const name = ops[oIdx] || "";
+          const cell = document.createElement("div");
+          cell.className = "dayHead";
+          cell.style.height = "34px";
+          cell.style.padding = "6px 10px";
+          cell.style.gridRow = "2";
+          cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
+          cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
+            <span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9;">${name}</span>
+          </div>`;
+          gridEl.appendChild(cell);
+        }
+      }
+    }
+
     // time column
     const timeCol = document.createElement("div");
     timeCol.className = "timeCol";
     timeCol.style.height = heightPx + "px";
     timeCol.style.gridColumn = "1";
-    timeCol.style.gridRow = "2";
+    timeCol.style.gridRow = multiUser ? "3" : "2";
     timeCol.style.position = "sticky";
     timeCol.style.left = "0";
     timeCol.style.zIndex = "4";
@@ -211,26 +336,29 @@
 
     gridEl.appendChild(timeCol);
 
-    // day columns
-    for (let i = 0; i < days; i++) {
-      const col = document.createElement("div");
-      col.className = "dayCol";
-      col.dataset.dayIndex = String(i);
-      col.style.height = heightPx + "px";
-      col.style.gridColumn = String(2 + i);
-      col.style.gridRow = "2";
+    // day/operator columns
+    for (let dIdx = 0; dIdx < days; dIdx++) {
+      for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
+        const col = document.createElement("div");
+        col.className = "dayCol";
+        col.dataset.dayIndex = String(dIdx);
+        col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
+        col.style.height = heightPx + "px";
+        col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
+        col.style.gridRow = multiUser ? "3" : "2";
 
-      // grid lines
-      for (let s = 0; s <= totalSlots; s++) {
-        const m = s * SLOT_MIN;
-        const y = s * SLOT_PX;
-        const line = document.createElement("div");
-        line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
-        line.style.top = y + "px";
-        col.appendChild(line);
+        // grid lines
+        for (let s = 0; s <= totalSlots; s++) {
+          const m = s * SLOT_MIN;
+          const y = s * SLOT_PX;
+          const line = document.createElement("div");
+          line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
+          line.style.top = y + "px";
+          col.appendChild(line);
+        }
+
+        gridEl.appendChild(col);
       }
-
-      gridEl.appendChild(col);
     }
   }
 
@@ -267,6 +395,7 @@
   function render() {
     const start = startOfWeekMonday(anchorDate);
     const days = view === "workweek" ? 6 : 7;
+    const ops = Array.from(selectedTherapists);
 
     const q = String(qEl?.value || "").trim().toLowerCase();
     const items = rawItems
@@ -276,7 +405,7 @@
         const dt0 = new Date(x.startAt.getFullYear(), x.startAt.getMonth(), x.startAt.getDate()).getTime();
         const idx = Math.round((dt0 - day0) / 86400000);
         if (idx < 0 || idx >= days) return false;
-        if (activeTherapist !== "ALL" && x.therapist !== activeTherapist) return false;
+        if (selectedTherapists.size && !selectedTherapists.has(x.therapist)) return false;
         if (!q) return true;
         const hay = [x.patient, x.service, x.therapist, x.status].filter(Boolean).join(" ").toLowerCase();
         return hay.includes(q);
@@ -288,15 +417,20 @@
         return { ...x, _dayIndex: idx };
       });
 
-    renderTherapists(rawItems);
-    buildGridSkeleton(start, days);
+    buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1));
 
     const cols = Array.from(document.querySelectorAll(".dayCol"));
     const startMin = START_HOUR * 60;
     const endMin = END_HOUR * 60;
 
     items.forEach((it) => {
-      const col = cols[it._dayIndex];
+      let col = null;
+      if (multiUser) {
+        col = cols.find((c) => c.dataset.dayIndex === String(it._dayIndex) && c.dataset.therapist === String(it.therapist || ""));
+      } else {
+        // first column for that day
+        col = cols.find((c) => c.dataset.dayIndex === String(it._dayIndex));
+      }
       if (!col) return;
 
       const stMin = minutesOfDay(it.startAt);
@@ -346,6 +480,25 @@
 
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
+
+  // Operator selector
+  opsBar?.addEventListener("click", openOpsMenu);
+  opsBtnClose?.addEventListener("click", closeOpsMenu);
+  opsBack?.addEventListener("click", (e) => { if (e.target === opsBack) closeOpsMenu(); });
+  opsBtnAll?.addEventListener("click", () => {
+    draftSelected = new Set(knownTherapists);
+    renderOpsList();
+  });
+  opsBtnApply?.addEventListener("click", () => {
+    selectedTherapists = new Set(draftSelected);
+    multiUser = Boolean(opsMulti?.checked);
+    syncOpsBar();
+    closeOpsMenu();
+    render();
+  });
+  opsMulti?.addEventListener("change", () => {
+    // keep UI responsive but don't rebuild grid until Apply
+  });
 
   // Init from URL (?date=YYYY-MM-DD)
   try {
