@@ -34,7 +34,6 @@ export default async function handler(req, res) {
 
     // Airtable datetime range filter (inclusive start, exclusive end)
     const FIELD_START = process.env.AGENDA_START_FIELD || "Data e ora INIZIO";
-    const FIELD_EMAIL = process.env.AGENDA_EMAIL_FIELD || ""; // optional legacy
     const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Collaboratore";
 
     const rangeFilter = `AND(
@@ -46,7 +45,9 @@ export default async function handler(req, res) {
     const email = String(session.email || "").toLowerCase();
 
     // RBAC filter for physio:
-    // Prefer linking via {Collaboratore} (linked to COLLABORATORI) using the current user's Email.
+    // Link via {Collaboratore} (linked to COLLABORATORI) using the current user's Email.
+    // IMPORTANT: Do not fallback to an "Email" field on APPUNTAMENTI, since many bases don't have it
+    // (and misconfigured env vars like AGENDA_EMAIL_FIELD=email can break Airtable formulas).
     let roleFilter = "TRUE()";
     if (role === "physio") {
       const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
@@ -59,9 +60,6 @@ export default async function handler(req, res) {
       if (userRecId) {
         // linked-record field match
         roleFilter = `FIND("${userRecId}", ARRAYJOIN({${FIELD_OPERATOR}}))`;
-      } else if (FIELD_EMAIL) {
-        // fallback to explicit email field on appointments table (if you really have one)
-        roleFilter = `{${FIELD_EMAIL}} = "${email}"`;
       } else {
         // safest fallback: no access if mapping can't be resolved
         roleFilter = "FALSE()";
