@@ -15,18 +15,29 @@ function addDaysUtcISO(iso, days) {
   return dt.toISOString();
 }
 
-function resolveFieldName(fieldNames, candidates) {
-  const list = (fieldNames || []).map((x) => String(x)).filter(Boolean);
-  const set = new Set(list);
+function isUnknownFieldError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return s.includes("unknown field name") || s.includes("unknown field names");
+}
 
-  for (const c of candidates) {
-    if (c && set.has(c)) return c;
+async function probeField(tableEnc, candidate) {
+  const name = String(candidate || "").trim();
+  if (!name) return false;
+  const qs = new URLSearchParams({ pageSize: "1" });
+  qs.append("fields[]", name);
+  try {
+    await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    return true;
+  } catch (e) {
+    if (isUnknownFieldError(e?.message)) return false;
+    // Any other error should bubble up (token/base id, perms, etc.)
+    throw e;
   }
+}
 
-  const lowerMap = new Map(list.map((n) => [n.toLowerCase(), n]));
+async function resolveFieldNameByProbe(tableEnc, candidates) {
   for (const c of candidates) {
-    const key = String(c || "").toLowerCase();
-    if (key && lowerMap.has(key)) return lowerMap.get(key);
+    if (await probeField(tableEnc, c)) return String(c).trim();
   }
   return "";
 }
@@ -50,19 +61,10 @@ export default async function handler(req, res) {
 
     const APPTS_TABLE_NAME = process.env.AGENDA_TABLE || "APPUNTAMENTI";
 
-    // Resolve field names by sampling one record (no Meta API permissions required).
-    // If the table is empty, we fall back to defaults.
     const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
-    let sampledFieldNames = [];
-    try {
-      const sample = await airtableFetch(`${tableEnc}?pageSize=1`);
-      const first = sample.records?.[0];
-      sampledFieldNames = first?.fields ? Object.keys(first.fields) : [];
-    } catch {
-      sampledFieldNames = [];
-    }
 
-    const FIELD_START = resolveFieldName(sampledFieldNames, [
+    // Resolve field names by probing fields[] (works even if table is empty or fields are null).
+    const FIELD_START = await resolveFieldNameByProbe(tableEnc, [
       process.env.AGENDA_START_FIELD,
       "Data e ora INIZIO",
       "Data e ora Inizio",
@@ -70,7 +72,7 @@ export default async function handler(req, res) {
       "Inizio",
     ]);
 
-    const FIELD_OPERATOR = resolveFieldName(sampledFieldNames, [
+    const FIELD_OPERATOR = await resolveFieldNameByProbe(tableEnc, [
       process.env.AGENDA_OPERATOR_FIELD,
       "Collaboratore",
       "Collaborator",
@@ -85,7 +87,10 @@ export default async function handler(req, res) {
         details: {
           table: APPTS_TABLE_NAME,
           resolved: { FIELD_START, FIELD_OPERATOR },
-          availableFields: sampledFieldNames,
+          tried: {
+            start: [process.env.AGENDA_START_FIELD, "Data e ora INIZIO", "Data e ora Inizio", "Start", "Inizio"].filter(Boolean),
+            operator: [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Collaborator", "Operatore", "Operator"].filter(Boolean),
+          },
         },
       });
     }
@@ -96,7 +101,7 @@ export default async function handler(req, res) {
         ok: true,
         table: APPTS_TABLE_NAME,
         resolved: { FIELD_START, FIELD_OPERATOR },
-        availableFields: sampledFieldNames,
+        note: "Field names were resolved by probing fields[] (no Airtable Meta API required).",
       });
     }
 

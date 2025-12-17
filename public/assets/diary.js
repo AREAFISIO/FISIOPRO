@@ -225,7 +225,10 @@
   async function apiGet(url) {
     const r = await fetch(url, { credentials: "include" });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+    if (!r.ok) {
+      const extra = data.details ? `\n\nDettagli: ${JSON.stringify(data.details)}` : "";
+      throw new Error((data.error || ("HTTP " + r.status)) + extra);
+    }
     return data;
   }
 
