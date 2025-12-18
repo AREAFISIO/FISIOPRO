@@ -32,8 +32,8 @@
   const modalBody = document.querySelector("[data-cal-modal-body]");
   const modalClose = document.querySelector("[data-cal-modal-close]");
 
-  const START_HOUR = 8;
-  const END_HOUR = 20;
+  const START_HOUR = 7;
+  const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
   const SLOT_PX = 18;
 
@@ -324,6 +324,10 @@
   let avSelected = new Set(); // keys "dayIndex|HH:MM" (touched in this session)
   let avPending = new Map();  // key -> { work:boolean, location:string } (preview + will be saved on OK)
   let avIsSelecting = false;
+  let avLastKey = "";
+  let avTimesCache = [];
+  let avTimeIndex = new Map(); // "HH:MM" -> idx
+  let avCellEls = new Map();   // "dayIndex|HH:MM" -> HTMLElement
 
   function cloneAvailability(src) {
     try {
@@ -420,15 +424,51 @@
     avSelected.add(key);
   }
 
+  function paintAvailabilityCell(key) {
+    const el = avCellEls.get(key);
+    if (!el) return;
+    const [dayIndexRaw, time] = String(key).split("|");
+    const dayIndex = Number(dayIndexRaw);
+    const st = avStyleForCell(dayIndex, time);
+    el.style.background = st.bg;
+    el.style.outline = st.outline;
+    el.style.outlineOffset = "-1px";
+    const v = avGetEffective(dayIndex, time);
+    el.title = v?.location ? v.location : "";
+  }
+
+  function applyPendingKey(key) {
+    const [dayIndexRaw, time] = String(key).split("|");
+    const dayIndex = Number(dayIndexRaw);
+    if (!Number.isFinite(dayIndex) || !time) return;
+    applyPendingToCell(dayIndex, time);
+    paintAvailabilityCell(key);
+  }
+
+  function keyFromPointerEvent(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const cell = el?.closest?.('[data-day-index][data-time]');
+    if (!cell) return "";
+    const dayIndex = Number(cell.dataset.dayIndex);
+    const time = String(cell.dataset.time || "");
+    if (!Number.isFinite(dayIndex) || !time) return "";
+    if (!AV_DAY_INDEXES.includes(dayIndex)) return "";
+    return avCellKey(dayIndex, time);
+  }
+
   function renderAvailabilityGrid() {
     if (!avGrid) return;
     const times = timeSlots();
+    avTimesCache = times;
+    avTimeIndex = new Map(times.map((t, idx) => [t, idx]));
+    avCellEls = new Map();
 
     // grid structure
     const wrap = document.createElement("div");
     wrap.style.display = "grid";
     wrap.style.gridTemplateColumns = `76px repeat(${AV_DAY_INDEXES.length}, minmax(140px, 1fr))`;
     wrap.style.borderTop = "1px solid rgba(255,255,255,.10)";
+    wrap.style.touchAction = "none"; // prevent scroll during drag on touchpads/touch
 
     // header row
     const corner = document.createElement("div");
@@ -482,25 +522,53 @@
         const v = avGetEffective(dayIndex, t);
         if (v?.location) cell.title = v.location;
 
-        cell.addEventListener("mousedown", (e) => {
-          e.preventDefault();
-          avIsSelecting = true;
-          applyPendingToCell(dayIndex, t);
-          updateAvCount();
-          renderAvailabilityGrid();
-        });
-        cell.addEventListener("mouseenter", (e) => {
-          if (!avIsSelecting) return;
-          e.preventDefault();
-          applyPendingToCell(dayIndex, t);
-          updateAvCount();
-          // lightweight re-render: update cell styles only would be nicer, but keep it simple
-          renderAvailabilityGrid();
-        });
+        avCellEls.set(avCellKey(dayIndex, t), cell);
 
         wrap.appendChild(cell);
       });
     });
+
+    // Pointer-based selection to avoid "skipping" cells on fast drags
+    wrap.onpointerdown = (e) => {
+      const key = keyFromPointerEvent(e);
+      if (!key) return;
+      e.preventDefault();
+      avIsSelecting = true;
+      avLastKey = "";
+      try { wrap.setPointerCapture(e.pointerId); } catch {}
+      applyPendingKey(key);
+      avLastKey = key;
+      updateAvCount();
+    };
+    wrap.onpointermove = (e) => {
+      if (!avIsSelecting) return;
+      const key = keyFromPointerEvent(e);
+      if (!key || key === avLastKey) return;
+
+      // Fill intermediate slots if we jumped over some (same day)
+      const [d0, t0] = String(avLastKey || "").split("|");
+      const [d1, t1] = String(key).split("|");
+      const day0 = Number(d0);
+      const day1 = Number(d1);
+      const i0 = avTimeIndex.get(t0);
+      const i1 = avTimeIndex.get(t1);
+      if (Number.isFinite(day0) && Number.isFinite(day1) && day0 === day1 && i0 != null && i1 != null) {
+        const lo = Math.min(i0, i1);
+        const hi = Math.max(i0, i1);
+        for (let i = lo; i <= hi; i++) {
+          const tt = avTimesCache[i];
+          if (!tt) continue;
+          applyPendingKey(avCellKey(day1, tt));
+        }
+      } else {
+        applyPendingKey(key);
+      }
+
+      avLastKey = key;
+      updateAvCount();
+    };
+    wrap.onpointerup = () => { avIsSelecting = false; avLastKey = ""; };
+    wrap.onlostpointercapture = () => { avIsSelecting = false; avLastKey = ""; };
 
     avGrid.innerHTML = "";
     avGrid.appendChild(wrap);
