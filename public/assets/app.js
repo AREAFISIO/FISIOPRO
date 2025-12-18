@@ -15,7 +15,10 @@ async function api(path, opts = {}) {
 
 async function ensureAuth() {
   try {
-    const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
+    // Treat ONLY the real login entrypoints as "login page".
+    // NOTE: /pages/index.html is the Pazienti page, so it must NOT redirect to agenda.
+    const p = location.pathname || "";
+    const isLoginPage = p === "/" || p === "/index.html" || p.endsWith("/pages/login.html");
     const data = await api("/api/auth-me");
     if (!data?.ok) {
       if (!isLoginPage) location.href = "/";
@@ -26,7 +29,8 @@ async function ensureAuth() {
     if (isLoginPage) location.href = "/pages/agenda.html";
     return data.user || data.session || null;
   } catch {
-    const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
+    const p = location.pathname || "";
+    const isLoginPage = p === "/" || p === "/index.html" || p.endsWith("/pages/login.html");
     if (!isLoginPage) location.href = "/";
     return null;
   }
