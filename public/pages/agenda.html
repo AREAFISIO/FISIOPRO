@@ -414,6 +414,9 @@
     <button class="rbBtn" data-open-prefs title="Impostazioni utente">
       <span class="rbIcon">⚙️</span>
     </button>
+    <button class="rbBtn" data-open-availability title="Configura disponibilità">
+      <span class="rbIcon">🕒</span>
+    </button>
     <button class="rbBtn" data-open-ops title="Seleziona operatori">
       <span class="rbIcon">👥</span>
     </button>
@@ -545,9 +548,75 @@
   </div>
 </div>
 
+<!-- Availability modal (OsteoEasy-like) -->
+<div class="prefsBack" data-av-back>
+  <div class="prefsPanel" role="dialog" aria-modal="true" style="width: 1100px;">
+    <div class="prefsHead">
+      <div class="prefsTitle"><span style="font-size:18px;">⏱️</span> Configura la disponibilità</div>
+      <button class="btn" data-av-close>Chiudi</button>
+    </div>
+    <div class="prefsBody">
+      <div class="prefsSub" style="margin-top:0; margin-bottom:12px;">
+        Puoi selezionare più slot cliccando e trascinando la selezione
+      </div>
+
+      <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="flex: 1 1 640px; min-width: 520px;">
+          <div class="prefsCard" style="padding:0; overflow:hidden;">
+            <div style="max-height: 58vh; overflow:auto; border-radius: 16px;" data-av-gridwrap>
+              <div data-av-grid></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex: 0 0 360px; width: 360px; max-width: 96vw;">
+          <div class="prefsCard">
+            <div class="prefsRow">
+              <div>
+                <div class="prefsLabel" data-av-count>0 slot selezionati</div>
+              </div>
+            </div>
+
+            <div class="prefsRow" style="align-items:flex-start;">
+              <div style="min-width:0;">
+                <div class="prefsLabel">Tipologia</div>
+                <div class="prefsSub">Gli slot non lavorativi vengono mostrati in grigio.</div>
+              </div>
+              <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:10px;">
+                <label style="display:flex; gap:8px; align-items:center;">
+                  <input type="radio" name="avType" value="non" data-av-type-non />
+                  <span>Non lavorativo</span>
+                </label>
+                <label style="display:flex; gap:8px; align-items:center;">
+                  <input type="radio" name="avType" value="work" data-av-type-work checked />
+                  <span>Lavorativo</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="prefsRow" style="align-items:flex-start;">
+              <div style="min-width:0;">
+                <div class="prefsLabel">Luogo di lavoro</div>
+                <div class="prefsSub">Opzionale (es. Sede di Bologna).</div>
+              </div>
+              <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:10px;">
+                <input class="selectSmall" style="width: 220px;" data-av-location placeholder="Es. SEDE DI BOLOGNA" />
+              </div>
+            </div>
+
+            <div class="prefsRow" style="justify-content:flex-end;">
+              <button class="btn primary" data-av-apply>OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- cache-bust -->
 <script src="../assets/app.js?v=7e72bca"></script>
-<script src="../assets/diary.js?v=7e72bca"></script>
+<script src="../assets/diary.js?v=av1"></script>
 </body>
 </html>
 

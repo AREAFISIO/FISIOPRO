@@ -22,6 +22,7 @@
   const opsBtnAll = document.querySelector("[data-ops-all]");
   const btnOpenPrefs = document.querySelector("[data-open-prefs]");
   const btnOpenOps = document.querySelector("[data-open-ops]");
+  const btnOpenAvailability = document.querySelector("[data-open-availability]");
   const btnPrev = document.querySelector("[data-cal-prev]");
   const btnNext = document.querySelector("[data-cal-next]");
   const btnToday = document.querySelector("[data-cal-today]");
@@ -63,6 +64,7 @@
     slotMin: 30,
     multiUser: false,
     defaultOperators: [],
+    lastViewOperators: [],
     showService: true,
     dayNav: false,
     userColor: "",
@@ -208,7 +210,7 @@
     try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
   }
   function resetPrefs() {
-    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], showService: true, dayNav: false, userColor: "" };
+    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], lastViewOperators: [], showService: true, dayNav: false, userColor: "" };
     SLOT_MIN = 30;
     multiUser = false;
     savePrefs();
@@ -249,6 +251,216 @@
       prefDefaultDots.appendChild(t);
     }
   }
+
+  // =========================
+  // Availability (weekly template, per user)
+  // =========================
+  const avBack = document.querySelector("[data-av-back]");
+  const avClose = document.querySelector("[data-av-close]");
+  const avGrid = document.querySelector("[data-av-grid]");
+  const avCount = document.querySelector("[data-av-count]");
+  const avTypeNon = document.querySelector("[data-av-type-non]");
+  const avTypeWork = document.querySelector("[data-av-type-work]");
+  const avLocation = document.querySelector("[data-av-location]");
+  const avApply = document.querySelector("[data-av-apply]");
+
+  const DOW_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+  function availabilityKey() {
+    const email = getUserEmail() || "anon";
+    return `fp_agenda_availability_${email}`;
+  }
+
+  function emptyTemplate() {
+    const t = {};
+    for (const k of DOW_KEYS) t[k] = {};
+    return t;
+  }
+
+  let availability = emptyTemplate(); // { mon: { "08:00": { work:true, location:"" } } ... }
+  let avSelected = new Set(); // keys "dayIndex|HH:MM"
+  let avIsSelecting = false;
+
+  function loadAvailability() {
+    try {
+      const raw = localStorage.getItem(availabilityKey());
+      if (!raw) { availability = emptyTemplate(); return; }
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object") availability = { ...emptyTemplate(), ...obj };
+      else availability = emptyTemplate();
+    } catch {
+      availability = emptyTemplate();
+    }
+  }
+
+  function saveAvailability() {
+    try { localStorage.setItem(availabilityKey(), JSON.stringify(availability)); } catch {}
+  }
+
+  function timeSlots() {
+    const out = [];
+    const totalMin = (END_HOUR - START_HOUR) * 60;
+    for (let m = 0; m <= totalMin - SLOT_MIN; m += SLOT_MIN) {
+      const hh = START_HOUR + Math.floor(m / 60);
+      const mm = m % 60;
+      out.push(`${pad2(hh)}:${pad2(mm)}`);
+    }
+    return out;
+  }
+
+  function avCellKey(dayIndex, time) {
+    return `${dayIndex}|${time}`;
+  }
+
+  function avGet(dayIndex, time) {
+    const k = DOW_KEYS[dayIndex] || "";
+    if (!k) return null;
+    const v = availability?.[k]?.[time];
+    return v && typeof v === "object" ? v : null;
+  }
+
+  function avSetMany(keys, next) {
+    for (const key of keys) {
+      const [dayIndexRaw, time] = String(key).split("|");
+      const dayIndex = Number(dayIndexRaw);
+      const dow = DOW_KEYS[dayIndex] || "";
+      if (!dow || !time) continue;
+      if (!availability[dow]) availability[dow] = {};
+      availability[dow][time] = { ...next };
+    }
+  }
+
+  function avStyleForCell(dayIndex, time) {
+    const v = avGet(dayIndex, time);
+    const selected = avSelected.has(avCellKey(dayIndex, time));
+    // Default: NON working (grey) unless explicitly working.
+    const work = v?.work === true;
+    const bg = work
+      ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
+      : "rgba(255,255,255,.10)";
+    const outline = selected ? "2px solid rgba(255,255,255,.75)" : "1px solid rgba(255,255,255,.08)";
+    return { bg, outline, work };
+  }
+
+  function renderAvailabilityGrid() {
+    if (!avGrid) return;
+
+    const start = startOfWeekMonday(anchorDate);
+    const days = view === "workweek" ? 6 : 7;
+    const times = timeSlots();
+
+    // grid structure
+    const wrap = document.createElement("div");
+    wrap.style.display = "grid";
+    wrap.style.gridTemplateColumns = `76px repeat(${days}, minmax(140px, 1fr))`;
+    wrap.style.borderTop = "1px solid rgba(255,255,255,.10)";
+
+    // header row
+    const corner = document.createElement("div");
+    corner.style.height = "54px";
+    corner.style.borderRight = "1px solid rgba(255,255,255,.10)";
+    corner.style.background = "rgba(255,255,255,.03)";
+    wrap.appendChild(corner);
+
+    for (let dIdx = 0; dIdx < days; dIdx++) {
+      const d = addDays(start, dIdx);
+      const h = document.createElement("div");
+      h.style.height = "54px";
+      h.style.padding = "10px 10px";
+      h.style.borderRight = "1px solid rgba(255,255,255,.10)";
+      h.style.background = "rgba(255,255,255,.03)";
+      h.innerHTML = `<div style="font-weight:900; font-size:12px; letter-spacing:.08em; opacity:.75;">${itDayLabel(d)}</div>
+                     <div style="font-weight:900; font-size:15px;">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
+      wrap.appendChild(h);
+    }
+
+    // body rows
+    times.forEach((t) => {
+      const timeCell = document.createElement("div");
+      timeCell.style.height = "28px";
+      timeCell.style.display = "flex";
+      timeCell.style.alignItems = "center";
+      timeCell.style.justifyContent = "center";
+      timeCell.style.fontSize = "12px";
+      timeCell.style.fontWeight = "900";
+      timeCell.style.opacity = ".75";
+      timeCell.style.borderRight = "1px solid rgba(255,255,255,.10)";
+      timeCell.style.borderBottom = "1px solid rgba(255,255,255,.08)";
+      timeCell.textContent = t;
+      wrap.appendChild(timeCell);
+
+      for (let dIdx = 0; dIdx < days; dIdx++) {
+        const cell = document.createElement("div");
+        cell.dataset.dayIndex = String(dIdx);
+        cell.dataset.time = t;
+        cell.style.height = "28px";
+        cell.style.borderRight = "1px solid rgba(255,255,255,.10)";
+        cell.style.borderBottom = "1px solid rgba(255,255,255,.08)";
+        cell.style.cursor = "pointer";
+        cell.style.userSelect = "none";
+
+        const st = avStyleForCell(dIdx, t);
+        cell.style.background = st.bg;
+        cell.style.outline = st.outline;
+        cell.style.outlineOffset = "-1px";
+
+        // tooltip: show location if present
+        const v = avGet(dIdx, t);
+        if (v?.location) cell.title = v.location;
+
+        cell.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          avIsSelecting = true;
+          const key = avCellKey(dIdx, t);
+          if (avSelected.has(key)) avSelected.delete(key);
+          else avSelected.add(key);
+          updateAvCount();
+          renderAvailabilityGrid();
+        });
+        cell.addEventListener("mouseenter", (e) => {
+          if (!avIsSelecting) return;
+          e.preventDefault();
+          avSelected.add(avCellKey(dIdx, t));
+          updateAvCount();
+          // lightweight re-render: update cell styles only would be nicer, but keep it simple
+          renderAvailabilityGrid();
+        });
+
+        wrap.appendChild(cell);
+      }
+    });
+
+    avGrid.innerHTML = "";
+    avGrid.appendChild(wrap);
+  }
+
+  function updateAvCount() {
+    if (!avCount) return;
+    const n = avSelected.size;
+    avCount.textContent = `${n} slot selezionat${n === 1 ? "o" : "i"}`;
+  }
+
+  function openAvailability() {
+    if (!avBack) return;
+    loadAvailability();
+    avSelected = new Set();
+    avIsSelecting = false;
+    updateAvCount();
+    if (avTypeWork) avTypeWork.checked = true;
+    if (avTypeNon) avTypeNon.checked = false;
+    if (avLocation) avLocation.value = "";
+    renderAvailabilityGrid();
+    avBack.style.display = "block";
+  }
+
+  function closeAvailability() {
+    if (!avBack) return;
+    avIsSelecting = false;
+    avBack.style.display = "none";
+  }
+
+  // Stop selection when mouse released anywhere
+  window.addEventListener("mouseup", () => { avIsSelecting = false; });
 
   function getTherapists(items) {
     return Array.from(new Set(items.map((x) => x.therapist).filter(Boolean)))
@@ -371,6 +583,8 @@
       const me = getUserName();
       if (!multiUser && me) {
         selectedTherapists = new Set([me]);
+      } else if (multiUser && (prefs.lastViewOperators || []).length) {
+        selectedTherapists = new Set(prefs.lastViewOperators);
       } else if (multiUser && (prefs.defaultOperators || []).length) {
         selectedTherapists = new Set(prefs.defaultOperators);
       } else if (me) {
@@ -628,16 +842,28 @@
     renderOpsList();
   });
   opsBtnApply?.addEventListener("click", () => {
+    // Persist multi-user + selection immediately (so next login restores defaults)
+    multiUser = Boolean(opsMulti?.checked);
+    prefs.multiUser = multiUser;
+
     if (pickMode === "defaults") {
       prefs.defaultOperators = Array.from(draftSelected);
+      // If user is setting defaults, also align lastViewOperators for convenience
+      prefs.lastViewOperators = Array.from(draftSelected);
       savePrefs();
       renderDefaultDots();
       // apply immediately if multi-user is on
       if (multiUser) selectedTherapists = new Set(prefs.defaultOperators);
     } else {
       selectedTherapists = new Set(draftSelected);
+      prefs.lastViewOperators = Array.from(draftSelected);
+      // If multi-user is enabled, treat current selection as defaults too
+      if (multiUser) {
+        prefs.defaultOperators = Array.from(draftSelected);
+        renderDefaultDots();
+      }
+      savePrefs();
     }
-    multiUser = Boolean(opsMulti?.checked);
     syncOpsBar();
     closeOpsMenu();
     render();
@@ -649,6 +875,21 @@
   // Right bar buttons
   btnOpenPrefs?.addEventListener("click", openPrefs);
   btnOpenOps?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
+  btnOpenAvailability?.addEventListener("click", openAvailability);
+
+  avClose?.addEventListener("click", closeAvailability);
+  avBack?.addEventListener("click", (e) => { if (e.target === avBack) closeAvailability(); });
+  avApply?.addEventListener("click", () => {
+    const work = Boolean(avTypeWork?.checked);
+    const location = work ? String(avLocation?.value || "").trim() : "";
+    if (!avSelected.size) return closeAvailability();
+    avSetMany(avSelected, { work, location });
+    saveAvailability();
+    avSelected = new Set();
+    updateAvCount();
+    renderAvailabilityGrid();
+    closeAvailability();
+  });
 
   // Preferences modal events
   prefsClose?.addEventListener("click", closePrefs);
@@ -671,6 +912,8 @@
     if (!multiUser) {
       const me = getUserName();
       if (me) selectedTherapists = new Set([me]);
+    } else if ((prefs.lastViewOperators || []).length) {
+      selectedTherapists = new Set(prefs.lastViewOperators);
     } else if ((prefs.defaultOperators || []).length) {
       selectedTherapists = new Set(prefs.defaultOperators);
     }
