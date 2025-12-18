@@ -825,6 +825,9 @@
           cell.title = name;
           cell.style.display = "grid";
           cell.style.placeItems = "center";
+          // dark divider between days (not between operators)
+          const isDayBoundary = (oIdx === colsPerDay - 1) && (dIdx < days - 1);
+          if (isDayBoundary) cell.style.boxShadow = "inset -2px 0 0 rgba(0,0,0,.45)";
           cell.innerHTML = `<span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>`;
           gridEl.appendChild(cell);
         }
@@ -843,7 +846,9 @@
     timeCol.style.background = "rgba(15,26,44,.96)";
 
     for (let h = START_HOUR; h <= END_HOUR; h++) {
-      const y = ((h - START_HOUR) * 60 / SLOT_MIN) * SLOT_PX;
+      const y0 = ((h - START_HOUR) * 60 / SLOT_MIN) * SLOT_PX;
+      // Keep last label (END_HOUR) fully visible (avoid bottom clipping)
+      const y = (h === END_HOUR) ? Math.max(0, heightPx - 14) : y0;
       const tick = document.createElement("div");
       tick.className = "timeTick";
       tick.style.top = y + "px";
@@ -870,6 +875,10 @@
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "3" : "2";
         col.style.position = "relative";
+
+        // dark divider between days (not between operators)
+        const isDayBoundary = (oIdx === colsPerDay - 1) && (dIdx < days - 1);
+        if (isDayBoundary) col.style.boxShadow = "inset -2px 0 0 rgba(0,0,0,.45)";
 
         const isMyCol = !multiUser ? true : (me && String(ops[oIdx] || "") === me);
         if (isMyCol) {
@@ -909,7 +918,8 @@
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
           const m = s * SLOT_MIN;
-          const y = s * SLOT_PX;
+          // Keep last line visible (avoid bottom clipping)
+          const y = Math.min(heightPx - 1, s * SLOT_PX);
           const line = document.createElement("div");
           line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
           line.style.top = y + "px";
