@@ -307,7 +307,7 @@
   const avApply = document.querySelector("[data-av-apply]");
 
   const DOW_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-  const AV_DAY_INDEXES = [4, 5, 6]; // VEN, SAB, DOM only (year-round template)
+  const AV_DAY_INDEXES = [0, 1, 2, 3, 4, 5, 6]; // LUN..DOM (year-round template)
 
   function availabilityKey() {
     const email = getUserEmail() || "anon";
