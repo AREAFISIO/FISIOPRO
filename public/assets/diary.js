@@ -1117,95 +1117,89 @@
     hoverCard.style.display = "none";
   }
 
-  // ========= Create appointment modal =========
+  // ========= Create appointment modal (dark, gestionale style) =========
   const createModal = (function buildCreateModal() {
     const wrap = document.createElement("div");
-    wrap.className = "oe-modal__backdrop";
+    wrap.className = "prefsBack";
     wrap.style.display = "none";
+    wrap.style.zIndex = "120";
     wrap.innerHTML = `
-      <div class="oe-modal" role="dialog" aria-modal="true" style="width: 980px; max-width: 96vw;">
-        <div class="oe-modal__header">
-          <div class="oe-modal__title" data-cm-title>Nuovo appuntamento</div>
-          <button class="oe-modal__x" data-cm-close aria-label="Chiudi">×</button>
+      <div class="prefsPanel" role="dialog" aria-modal="true" style="width: 1100px; max-width: 96vw;">
+        <div class="prefsHead">
+          <div class="prefsTitle"><span style="font-size:18px;">🗓️</span> Nuovo appuntamento</div>
+          <button class="btn" data-cm-close>Chiudi</button>
         </div>
+        <div class="prefsBody">
+          <div class="prefsSub" data-cm-sub style="margin-top:0; margin-bottom:14px;">—</div>
 
-        <div class="oe-modal__body">
-          <div class="oe-modal__patientline" style="justify-content:space-between;">
-            <div>
-              <div class="oe-modal__patientname" data-cm-when>—</div>
-              <div style="font-size:13px; opacity:.75; margin-top:4px;" data-cm-sub>—</div>
-            </div>
-          </div>
-
-          <div class="oe-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <label class="oe-field" style="grid-column: span 1;">
-              <span>Tipologia</span>
-              <select data-cm-type>
+          <div class="formgrid">
+            <div class="field">
+              <label>Tipologia</label>
+              <select class="select" data-cm-type>
                 <option value="Appuntamento paziente">Appuntamento paziente</option>
                 <option value="Visita ortopedica">Visita ortopedica</option>
                 <option value="Altro">Altro</option>
               </select>
-            </label>
+            </div>
 
-            <label class="oe-field" style="grid-column: span 1; position:relative;">
-              <span>Paziente</span>
-              <input data-cm-patient placeholder="Cerca paziente..." autocomplete="off" />
+            <div class="field" style="position:relative;">
+              <label>Paziente</label>
+              <input class="input" data-cm-patient placeholder="Cerca paziente..." autocomplete="off" />
               <div data-cm-patient-results style="position:absolute; left:0; right:0; top: 72px; z-index: 5; display:none; border:1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(15,26,44,.98); overflow:hidden;"></div>
-            </label>
+            </div>
 
-            <label class="oe-field" style="grid-column: span 1;">
-              <span>Luogo appuntamento</span>
-              <input data-cm-location placeholder="Es. SEDE DI BOLOGNA" />
-            </label>
+            <div class="field">
+              <label>Luogo appuntamento</label>
+              <input class="input" data-cm-location placeholder="Es. SEDE DI BOLOGNA" />
+            </div>
 
-            <label class="oe-field" style="grid-column: span 2;">
-              <span>Voce prezzario</span>
-              <input data-cm-service placeholder="Es. SEDUTA DI FISIOTERAPIA" />
-            </label>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Voce prezzario</label>
+              <input class="input" data-cm-service placeholder="Es. SEDUTA DI FISIOTERAPIA" />
+            </div>
 
-            <div class="oe-field" style="grid-column: span 1;">
-              <span style="display:block;">Conferme</span>
-              <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-                <label style="display:flex;gap:8px;align-items:center;">
+            <div class="field">
+              <label>Durata</label>
+              <select class="select" data-cm-duration>
+                <option value="30">30 minuti</option>
+                <option value="60">60 minuti</option>
+                <option value="90">90 minuti</option>
+                <option value="120">120 minuti</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Agenda</label>
+              <select class="select" data-cm-operator></select>
+            </div>
+
+            <div class="field">
+              <label>Conferme</label>
+              <div style="display:flex; flex-direction:column; gap:10px; padding: 10px 0;">
+                <label style="display:flex; gap:10px; align-items:center; color: rgba(255,255,255,.85);">
                   <input type="checkbox" data-cm-conf-pat />
                   <span>Confermato dal paziente</span>
                 </label>
-                <label style="display:flex;gap:8px;align-items:center;">
+                <label style="display:flex; gap:10px; align-items:center; color: rgba(255,255,255,.85);">
                   <input type="checkbox" data-cm-conf-plat />
                   <span>Conferma in piattaforma</span>
                 </label>
               </div>
             </div>
 
-            <label class="oe-field" style="grid-column: span 1;">
-              <span>Durata</span>
-              <select data-cm-duration>
-                <option value="30">30 minuti</option>
-                <option value="60">60 minuti</option>
-                <option value="90">90 minuti</option>
-                <option value="120">120 minuti</option>
-              </select>
-            </label>
-
-            <label class="oe-field" style="grid-column: span 2;">
-              <span>Agenda</span>
-              <select data-cm-operator></select>
-            </label>
-
-            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
-              <span>Note interne</span>
-              <textarea data-cm-internal maxlength="255"></textarea>
-            </label>
-            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
-              <span>Note visibili al paziente</span>
-              <textarea data-cm-patient-note maxlength="255"></textarea>
-            </label>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Note interne</label>
+              <textarea class="textarea" data-cm-internal maxlength="255"></textarea>
+            </div>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Note visibili al paziente</label>
+              <textarea class="textarea" data-cm-patient-note maxlength="255"></textarea>
+            </div>
           </div>
         </div>
-
-        <div class="oe-modal__footer">
-          <button class="oe-btn" data-cm-cancel>Annulla</button>
-          <button class="oe-btn oe-btn--primary" data-cm-save>Salva</button>
+        <div class="prefsFoot">
+          <button class="btn" data-cm-cancel>Annulla</button>
+          <button class="btn primary" data-cm-save>Salva</button>
         </div>
       </div>
     `;
@@ -1271,7 +1265,6 @@
   }
 
   function openCreateModal({ dateObj, timeStr, therapistName }) {
-    const when = createModal.querySelector("[data-cm-when]");
     const sub = createModal.querySelector("[data-cm-sub]");
     const opSel = createModal.querySelector("[data-cm-operator]");
 
@@ -1280,8 +1273,6 @@
     const startLocal = new Date(`${ymd}T${timeStr}:00`);
     cmState = { startIso: startLocal.toISOString(), dayLabel: ymd, timeLabel: timeStr, patientId: "", patientName: "" };
 
-    const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" });
-    when.textContent = `Nuovo appuntamento`;
     sub.textContent = `${fmt.format(dateObj)} ${timeStr}`;
 
     // default location from availability template (if any)
@@ -1379,101 +1370,94 @@
 
   bindCreateModalEvents();
 
-  // ========= Details appointment modal (existing appt) =========
+  // ========= Details appointment modal (dark, gestionale style) =========
   const detailsModal = (function buildDetailsModal() {
     const wrap = document.createElement("div");
-    wrap.className = "oe-modal__backdrop";
+    wrap.className = "prefsBack";
     wrap.style.display = "none";
+    wrap.style.zIndex = "120";
     wrap.innerHTML = `
-      <div class="oe-modal" role="dialog" aria-modal="true" style="width: 1100px; max-width: 96vw;">
-        <div class="oe-modal__header" style="align-items:flex-start;">
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            <div class="oe-modal__title">Dettagli appuntamento</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-              <span class="chip" data-dm-service style="background:rgba(34,230,195,.10);border-color:rgba(34,230,195,.28);color:rgba(0,0,0,.75);">—</span>
-            </div>
-          </div>
-          <button class="oe-modal__x" data-dm-close aria-label="Chiudi">×</button>
+      <div class="prefsPanel" role="dialog" aria-modal="true" style="width: 1100px; max-width: 96vw;">
+        <div class="prefsHead">
+          <div class="prefsTitle"><span style="font-size:18px;">🗓️</span> Dettagli appuntamento</div>
+          <button class="btn" data-dm-close>Chiudi</button>
         </div>
-
-        <div class="oe-modal__body">
-          <div class="oe-modal__patientline" style="flex-direction:column; align-items:stretch; gap:10px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <div class="oe-modal__patientname" data-dm-patient>—</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <a class="oe-btn" data-dm-call href="#" style="text-decoration:none;">CHIAMA</a>
-                <a class="oe-btn" data-dm-whatsapp href="#" style="text-decoration:none;">WHATSAPP</a>
-                <a class="oe-btn" data-dm-email href="#" style="text-decoration:none;">EMAIL</a>
+        <div class="prefsBody">
+          <div class="prefsCard" style="margin-bottom:14px;">
+            <div style="display:flex; gap:12px; justify-content:space-between; align-items:flex-start; flex-wrap:wrap;">
+              <div style="min-width:0;">
+                <div style="font-weight:900; font-size:18px;" data-dm-patient>—</div>
+                <div style="margin-top:6px; color: rgba(255,255,255,.75);" data-dm-when>—</div>
+                <div style="margin-top:6px; color: rgba(255,255,255,.75);">
+                  Operatore: <strong data-dm-ther>—</strong> • Luogo: <strong data-dm-loc>—</strong>
+                </div>
+              </div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <a class="btn" data-dm-call href="#" style="text-decoration:none; display:none;">CHIAMA</a>
+                <a class="btn" data-dm-whatsapp href="#" style="text-decoration:none; display:none;">WHATSAPP</a>
+                <a class="btn" data-dm-email href="#" style="text-decoration:none; display:none;">EMAIL</a>
               </div>
             </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;opacity:.85;">
-              <div><strong data-dm-when>—</strong></div>
-              <div>•</div>
-              <div>Operatore: <strong data-dm-ther>—</strong></div>
-              <div>•</div>
-              <div>Luogo: <strong data-dm-loc>—</strong></div>
-            </div>
           </div>
 
-          <div class="oe-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <label class="oe-field" style="grid-column: span 2;">
-              <span>Voce prezzario</span>
-              <input data-dm-service-in />
-            </label>
+          <div class="formgrid">
+            <div class="field" style="grid-column:1/-1;">
+              <label>Voce prezzario</label>
+              <input class="input" data-dm-service-in />
+            </div>
 
-            <label class="oe-field" style="grid-column: span 1;">
-              <span>Esito appuntamento</span>
-              <input data-dm-status />
-            </label>
+            <div class="field">
+              <label>Esito appuntamento</label>
+              <input class="input" data-dm-status />
+            </div>
 
-            <label class="oe-field" style="grid-column: span 1;">
-              <span>Durata (min)</span>
-              <select data-dm-duration>
+            <div class="field">
+              <label>Durata (min)</label>
+              <select class="select" data-dm-duration>
                 <option value="30">30</option>
                 <option value="60">60</option>
                 <option value="90">90</option>
                 <option value="120">120</option>
               </select>
-            </label>
+            </div>
 
-            <label class="oe-field" style="grid-column: span 2;">
-              <span>Agenda</span>
-              <select data-dm-operator></select>
-            </label>
+            <div class="field">
+              <label>Agenda</label>
+              <select class="select" data-dm-operator></select>
+            </div>
 
-            <label class="oe-field" style="grid-column: 1 / -1;">
-              <span>Luogo appuntamento</span>
-              <input data-dm-location />
-            </label>
+            <div class="field">
+              <label>Luogo appuntamento</label>
+              <input class="input" data-dm-location />
+            </div>
 
-            <div class="oe-field" style="grid-column: 1 / -1;">
-              <span style="display:block;font-size:12px;color:rgba(0,0,0,.55);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Conferme</span>
-              <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
-                <label style="display:flex;gap:8px;align-items:center;">
+            <div class="field" style="grid-column:1/-1;">
+              <label>Conferme</label>
+              <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;padding: 8px 0;">
+                <label style="display:flex;gap:10px;align-items:center;color: rgba(255,255,255,.85);">
                   <input type="checkbox" data-dm-conf-pat />
                   <span>Confermato dal paziente</span>
                 </label>
-                <label style="display:flex;gap:8px;align-items:center;">
+                <label style="display:flex;gap:10px;align-items:center;color: rgba(255,255,255,.85);">
                   <input type="checkbox" data-dm-conf-plat />
                   <span>Conferma in piattaforma</span>
                 </label>
               </div>
             </div>
 
-            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
-              <span>Note interne</span>
-              <textarea data-dm-internal maxlength="255"></textarea>
-            </label>
-            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
-              <span>Note visibili al paziente</span>
-              <textarea data-dm-patient-note maxlength="255"></textarea>
-            </label>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Note interne</label>
+              <textarea class="textarea" data-dm-internal maxlength="255"></textarea>
+            </div>
+            <div class="field" style="grid-column:1/-1;">
+              <label>Note visibili al paziente</label>
+              <textarea class="textarea" data-dm-patient-note maxlength="255"></textarea>
+            </div>
           </div>
         </div>
-
-        <div class="oe-modal__footer">
-          <button class="oe-btn" data-dm-cancel>Annulla</button>
-          <button class="oe-btn oe-btn--primary" data-dm-save>Chiudi</button>
+        <div class="prefsFoot">
+          <button class="btn" data-dm-cancel>Annulla</button>
+          <button class="btn primary" data-dm-save>Salva</button>
         </div>
       </div>
     `;
