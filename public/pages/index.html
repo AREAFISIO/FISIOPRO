@@ -1,25 +1,143 @@
 <!doctype html>
 <html lang="it">
 <script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FisioPro</title>
+  <title>FisioPro • Pazienti</title>
+  <link rel="stylesheet" href="../assets/app.css" />
 </head>
 <body>
-  <script>
-    (async function () {
-      try {
-        const r = await fetch("/api/auth-me", { credentials: "include" });
-        const data = await r.json().catch(() => ({}));
-        const role = (data?.user?.role || data?.session?.role || "").toString();
-        if (role === "physio") location.replace("/agenda.html");
-        else location.replace("/pages/front-office.html");
-      } catch {
-        location.replace("/");
-      }
-    })();
-  </script>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Pazienti</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="index.html" class="active" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Pazienti <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" id="btnRefresh">Aggiorna</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Ricerca paziente</h2><span class="chip">Lista</span></div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="search">Cerca <input id="q" placeholder="Nome, email, telefono..." /></div>
+          <span class="chip" id="count">—</span>
+        </div>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Paziente</th>
+                <th>Email</th>
+                <th>Telefono</th>
+              </tr>
+            </thead>
+            <tbody id="rows">
+              <tr><td colspan="3" style="color:var(--muted);">Caricamento…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn primary" style="width:100%;" onclick="location.href='agenda.html'">Apri Agenda</button>
+      <div style="margin-top:10px;color:var(--muted);font-size:13px;line-height:1.45;">
+        Suggerimento: apri una scheda paziente per vedere lo storico.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+<script>
+  async function apiGet(url) {
+    const r = await fetch(url, { credentials: 'include' });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+    return data;
+  }
+
+  function esc(s){
+    return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  }
+
+  function render(items){
+    const rows = document.getElementById('rows');
+    const count = document.getElementById('count');
+    rows.innerHTML = '';
+    count.textContent = (items?.length || 0) + ' risultati';
+
+    if (!items?.length){
+      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);">Nessun risultato.</td></tr>';
+      return;
+    }
+
+    for (const it of items){
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => location.href = 'paziente.html?id=' + encodeURIComponent(it.id);
+      tr.innerHTML = `
+        <td><div class="rowlink">${esc(it.name || '—')}</div></td>
+        <td>${esc(it.email || '—')}</td>
+        <td>${esc(it.phone || '—')}</td>
+      `;
+      rows.appendChild(tr);
+    }
+  }
+
+  let timer = null;
+  async function load(q){
+    const url = q
+      ? '/api/airtable?op=searchPatients&q=' + encodeURIComponent(q)
+      : '/api/airtable?op=listPatients';
+    const data = await apiGet(url);
+    render(data.items || []);
+  }
+
+  const input = document.getElementById('q');
+  input.addEventListener('input', () => {
+    const q = String(input.value || '').trim();
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => load(q).catch(e => console.error(e)), 180);
+  });
+
+  document.getElementById('btnRefresh').onclick = () => load(String(input.value || '').trim()).catch(e => console.error(e));
+
+  load('').catch(e => {
+    console.error(e);
+    document.getElementById('rows').innerHTML = '<tr><td colspan="3" style="color:var(--muted);">Errore caricamento.</td></tr>';
+  });
+</script>
 </body>
 </html>
-
