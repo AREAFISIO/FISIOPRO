@@ -203,7 +203,7 @@
       if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
     } catch {}
     SLOT_MIN = Number(prefs.slotMin || 30);
-    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
   }
   function savePrefs() {
@@ -494,7 +494,8 @@
     if (!opsBack) return;
     if (pickMode === "defaults") draftSelected = new Set(prefs.defaultOperators || []);
     else draftSelected = new Set(selectedTherapists);
-    if (opsMulti) opsMulti.checked = Boolean(multiUser);
+    // When picking defaults, multi-user is implied.
+    if (opsMulti) opsMulti.checked = (pickMode === "defaults") ? true : Boolean(multiUser);
     renderOpsList();
     opsBack.style.display = "block";
   }
@@ -905,7 +906,7 @@
     savePrefs();
 
     SLOT_MIN = Number(prefs.slotMin || 30);
-    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
 
     // enforce default selection logic
@@ -921,6 +922,17 @@
     syncOpsBar();
     closePrefs();
     render();
+  });
+
+  // UX: enabling multi-user should immediately ask which operators to show by default.
+  prefMulti?.addEventListener("change", () => {
+    if (!prefMulti.checked) return;
+    pickMode = "defaults";
+    // Persist the toggle immediately so next login keeps it.
+    prefs.multiUser = true;
+    multiUser = true;
+    savePrefs();
+    openOpsMenu();
   });
 
   // Init from URL (?date=YYYY-MM-DD)

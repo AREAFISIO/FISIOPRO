@@ -65,7 +65,7 @@
       position: fixed; inset: 0;
       background: rgba(0,0,0,.45);
       display:none;
-      z-index: 60;
+      z-index: 90; /* must stay above prefs modal */
       padding: 18px;
     }
     .opsMenu{
@@ -471,8 +471,8 @@
             </div>
             <div class="prefsRight">
               <select class="selectSmall" data-pref-slot>
-                <option value="15">15 min</option>
                 <option value="30">30 min</option>
+                <option value="60">60 min</option>
               </select>
             </div>
           </div>
@@ -499,9 +499,7 @@
               </label>
             </div>
           </div>
-        </div>
 
-        <div class="prefsCard">
           <div class="prefsRow" style="align-items:flex-start;">
             <div style="min-width:0;">
               <div class="prefsLabel">Agende visualizzate di default</div>
@@ -512,7 +510,9 @@
               <button class="btn" data-pref-pick>Seleziona</button>
             </div>
           </div>
+        </div>
 
+        <div class="prefsCard">
           <div class="prefsRow">
             <div>
               <div class="prefsLabel">Visualizza tipologia prestazione in agenda</div>
