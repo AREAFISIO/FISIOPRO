@@ -1,6 +1,8 @@
 // Diary (agenda) renderer: week grid similar to OsteoEasy,
 // but styled using the existing app.css tokens.
 (function () {
+  // build marker (helps verify cache busting)
+  console.log("FISIOPRO diary build", "7e72bca");
   const root = document.querySelector("[data-diary]");
   if (!root) return;
 
