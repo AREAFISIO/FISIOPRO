@@ -142,7 +142,8 @@
       position: relative;
       display:grid;
       grid-template-columns: 64px repeat(7, minmax(160px, 1fr));
-      min-width: 1100px;
+      min-width: 0; /* allow shrinking to fit viewport (no horizontal scroll) */
+      width: 100%;
     }
 
     .calHead{

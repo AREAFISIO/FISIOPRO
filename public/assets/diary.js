@@ -35,7 +35,7 @@
   const START_HOUR = 7;
   const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
-  const SLOT_PX = 18;
+  let SLOT_PX = 18;  // computed to fill visible height
 
   let view = "week"; // week | workweek
   let anchorDate = new Date();
@@ -456,12 +456,20 @@
     return avCellKey(dayIndex, time);
   }
 
+  const avGridWrap = document.querySelector("[data-av-gridwrap]");
+
   function renderAvailabilityGrid() {
     if (!avGrid) return;
     const times = timeSlots();
     avTimesCache = times;
     avTimeIndex = new Map(times.map((t, idx) => [t, idx]));
     avCellEls = new Map();
+
+    // Fill visible height in the availability modal as well
+    const wrapH = avGridWrap ? avGridWrap.clientHeight : 520;
+    const headerPx = 54;
+    const availH = Math.max(220, wrapH - headerPx);
+    const rowH = Math.max(16, Math.min(44, availH / times.length));
 
     // grid structure
     const wrap = document.createElement("div");
@@ -491,7 +499,7 @@
     // body rows
     times.forEach((t) => {
       const timeCell = document.createElement("div");
-      timeCell.style.height = "28px";
+      timeCell.style.height = rowH + "px";
       timeCell.style.display = "flex";
       timeCell.style.alignItems = "center";
       timeCell.style.justifyContent = "center";
@@ -507,7 +515,7 @@
         const cell = document.createElement("div");
         cell.dataset.dayIndex = String(dayIndex);
         cell.dataset.time = t;
-        cell.style.height = "28px";
+        cell.style.height = rowH + "px";
         cell.style.borderRight = "1px solid rgba(255,255,255,.10)";
         cell.style.borderBottom = "1px solid rgba(255,255,255,.08)";
         cell.style.cursor = "pointer";
@@ -760,12 +768,19 @@
     // Body columns
     const totalMin = (END_HOUR - START_HOUR) * 60;
     const totalSlots = Math.ceil(totalMin / SLOT_MIN);
+    // Make the time range fill the visible vertical space
+    const outer = gridEl.parentElement; // .calGridOuter
+    const outerH = outer ? outer.clientHeight : 640;
+    const headerH = multiUser ? (58 + 34) : 58;
+    const availH = Math.max(220, outerH - headerH);
+    SLOT_PX = availH / totalSlots;
     const heightPx = totalSlots * SLOT_PX;
 
     const colsPerDay = multiUser ? Math.max(1, ops.length) : 1;
     const totalDayCols = days * colsPerDay;
 
-    gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(160px, 1fr))`;
+    // Fit all columns in one viewport: shrink columns as operators grow
+    gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(0, 1fr))`;
     if (multiUser) gridEl.style.gridTemplateRows = `58px 34px ${heightPx}px`;
     else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
 
@@ -806,10 +821,11 @@
           cell.style.padding = "6px 10px";
           cell.style.gridRow = "2";
           cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-          cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9;">${name}</span>
-          </div>`;
+          // Only dot with initials (no full name); full name in tooltip
+          cell.title = name;
+          cell.style.display = "grid";
+          cell.style.placeItems = "center";
+          cell.innerHTML = `<span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>`;
           gridEl.appendChild(cell);
         }
       }
