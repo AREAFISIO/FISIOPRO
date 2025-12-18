@@ -375,13 +375,20 @@
   function avStyleForCell(dayIndex, time) {
     const v = avGet(dayIndex, time);
     const selected = avSelected.has(avCellKey(dayIndex, time));
-    // Default: NON working (grey) unless explicitly working.
+    // Only explicitly-set slots are painted.
+    // - work=true  => operator color
+    // - work=false => grey
+    // - missing    => transparent (leave central agenda unchanged)
+    const has = Boolean(v);
     const work = v?.work === true;
-    const bg = work
-      ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
-      : "rgba(255,255,255,.10)";
+    const non = v?.work === false;
+    const bg = has
+      ? (work
+          ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
+          : (non ? "rgba(255,255,255,.10)" : "transparent"))
+      : "transparent";
     const outline = selected ? "2px solid rgba(255,255,255,.75)" : "1px solid rgba(255,255,255,.08)";
-    return { bg, outline, work };
+    return { bg, outline, work, has };
   }
 
   function renderAvailabilityGrid() {
@@ -735,6 +742,12 @@
 
     gridEl.appendChild(timeCol);
 
+    // Availability (only logged-in operator column)
+    // Ensure latest availability snapshot is used.
+    try { loadAvailability(); } catch {}
+    const me = getUserName();
+    const availTimes = timeSlots();
+
     // day/operator columns
     for (let dIdx = 0; dIdx < days; dIdx++) {
       for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
@@ -745,6 +758,42 @@
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "3" : "2";
+        col.style.position = "relative";
+
+        const isMyCol = !multiUser ? true : (me && String(ops[oIdx] || "") === me);
+        if (isMyCol) {
+          const layer = document.createElement("div");
+          layer.style.position = "absolute";
+          layer.style.inset = "0";
+          layer.style.zIndex = "0";
+          layer.style.pointerEvents = "none";
+
+          const dow = DOW_KEYS[dIdx] || "";
+          const map = (dow && availability && availability[dow]) ? availability[dow] : null;
+          if (map) {
+            availTimes.forEach((t, idx) => {
+              const v = map[t];
+              if (!v) return;
+              const work = v.work === true;
+              const non = v.work === false;
+              const bg = work
+                ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
+                : (non ? "rgba(255,255,255,.10)" : "transparent");
+              if (bg === "transparent") return;
+
+              const block = document.createElement("div");
+              block.style.position = "absolute";
+              block.style.left = "0";
+              block.style.right = "0";
+              block.style.top = (idx * SLOT_PX) + "px";
+              block.style.height = SLOT_PX + "px";
+              block.style.background = bg;
+              layer.appendChild(block);
+            });
+          }
+
+          col.appendChild(layer);
+        }
 
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
@@ -753,6 +802,7 @@
           const line = document.createElement("div");
           line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
           line.style.top = y + "px";
+          line.style.zIndex = "1";
           col.appendChild(line);
         }
 
@@ -847,6 +897,7 @@
       ev.style.top = top + "px";
       ev.style.height = height + "px";
       ev.style.background = colorForTherapist(it.therapist);
+      ev.style.zIndex = "2";
 
       const dot = `<span class="dot" style="background:${colorForTherapist(it.therapist).replace("/ 0.18", "/ 1")}"></span>`;
       const line = prefs.showService
@@ -948,6 +999,7 @@
     updateAvCount();
     renderAvailabilityGrid();
     closeAvailability();
+    render();
   });
 
   // Preferences modal events
