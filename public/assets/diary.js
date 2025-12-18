@@ -43,6 +43,7 @@
   let multiUser = false; // default: show only logged-in user
   let knownTherapists = [];
   let knownByEmail = new Map(); // email -> name
+  let knownEmailByName = new Map(); // name -> email
   let knownTherapistId = new Map(); // name -> collaborator record id
   let selectedTherapists = new Set();
   let draftSelected = new Set();
@@ -177,14 +178,39 @@
   }
 
   function solidForTherapist(name) {
+    const assigned = assignedColorForTherapist(name);
+    if (assigned) return assigned;
     const s = String(name || "");
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     const hue = h % 360;
-    // user override
-    const me = String(getUserName() || "");
-    if (prefs.userColor && me && name === me) return prefs.userColor;
     return `hsl(${hue} 85% 62% / 0.95)`;
+  }
+
+  function assignedColorForTherapist(name) {
+    const n = String(name || "").trim();
+    if (!n) return "";
+    const me = String(getUserName() || "").trim();
+    if (prefs.userColor && me && n === me) return String(prefs.userColor).trim();
+
+    const email = String(knownEmailByName.get(n) || "").trim().toLowerCase();
+    if (!email) return "";
+    try {
+      const raw = localStorage.getItem(`fp_agenda_prefs_${email}`);
+      if (!raw) return "";
+      const obj = JSON.parse(raw);
+      const c = String(obj?.userColor || "").trim();
+      return c || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function bgForTherapist(name) {
+    const solid = solidForTherapist(name);
+    if (typeof solid === "string" && solid.startsWith("#") && solid.length === 7) return `${solid}33`;
+    // fallback to deterministic pastel background
+    return colorForTherapist(name);
   }
 
   function getUserEmail() {
@@ -320,6 +346,23 @@
   function availabilityKey() {
     const email = getUserEmail() || "anon";
     return `fp_agenda_availability_${email}`;
+  }
+
+  function availabilityKeyForEmail(email) {
+    const e = String(email || "").trim().toLowerCase() || "anon";
+    return `fp_agenda_availability_${e}`;
+  }
+
+  function loadAvailabilityForEmail(email) {
+    try {
+      const raw = localStorage.getItem(availabilityKeyForEmail(email));
+      if (!raw) return emptyTemplate();
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object") return { ...emptyTemplate(), ...obj };
+      return emptyTemplate();
+    } catch {
+      return emptyTemplate();
+    }
   }
 
   function emptyTemplate() {
@@ -736,6 +779,7 @@
       if (names.length) knownTherapists = names;
       knownTherapistId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
+      knownEmailByName = new Map(items.map((x) => [String(x.name || "").trim(), String(x.email || "").trim().toLowerCase()]).filter((p) => p[0] && p[1]));
     } catch {
       // fallback to operators found in the week
     }
@@ -867,10 +911,9 @@
 
     gridEl.appendChild(timeCol);
 
-    // Availability (only logged-in operator column)
-    // Ensure latest availability snapshot is used.
-    try { loadAvailability(); } catch {}
+    // Availability (per operator column, using each operator's saved color)
     const me = getUserName();
+    const meEmail = getUserEmail();
     const availTimes = timeSlots();
 
     // day/operator columns
@@ -879,7 +922,8 @@
         const col = document.createElement("div");
         col.className = "dayCol";
         col.dataset.dayIndex = String(dIdx);
-        col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
+        const colTher = multiUser ? String(ops[oIdx] || "") : String(me || "");
+        col.dataset.therapist = multiUser ? colTher : "";
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "3" : "2";
@@ -889,40 +933,37 @@
         const isDayBoundary = (oIdx === colsPerDay - 1) && (dIdx < days - 1);
         if (isDayBoundary) col.style.boxShadow = "inset -2px 0 0 rgba(0,0,0,.45)";
 
-        const isMyCol = !multiUser ? true : (me && String(ops[oIdx] || "") === me);
-        if (isMyCol) {
-          const layer = document.createElement("div");
-          layer.style.position = "absolute";
-          layer.style.inset = "0";
-          layer.style.zIndex = "0";
-          layer.style.pointerEvents = "none";
+        const layer = document.createElement("div");
+        layer.style.position = "absolute";
+        layer.style.inset = "0";
+        layer.style.zIndex = "0";
+        layer.style.pointerEvents = "none";
 
-          const dow = DOW_KEYS[dIdx] || "";
-          const map = (dow && availability && availability[dow]) ? availability[dow] : null;
-          if (map) {
-            availTimes.forEach((t, idx) => {
-              const v = map[t];
-              if (!v) return;
-              const work = v.work === true;
-              const non = v.work === false;
-              const bg = work
-                ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
-                : (non ? "rgba(255,255,255,.10)" : "transparent");
-              if (bg === "transparent") return;
+        const dow = DOW_KEYS[dIdx] || "";
+        const colEmail = colTher ? String(knownEmailByName.get(colTher) || "").trim().toLowerCase() : "";
+        const avail = loadAvailabilityForEmail(colEmail || meEmail);
+        const map = (dow && avail && avail[dow]) ? avail[dow] : null;
+        if (map) {
+          availTimes.forEach((t, idx) => {
+            const v = map[t];
+            if (!v) return;
+            const work = v.work === true;
+            const non = v.work === false;
+            const bg = work ? bgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
+            if (bg === "transparent") return;
 
-              const block = document.createElement("div");
-              block.style.position = "absolute";
-              block.style.left = "0";
-              block.style.right = "0";
-              block.style.top = (idx * SLOT_PX) + "px";
-              block.style.height = SLOT_PX + "px";
-              block.style.background = bg;
-              layer.appendChild(block);
-            });
-          }
-
-          col.appendChild(layer);
+            const block = document.createElement("div");
+            block.style.position = "absolute";
+            block.style.left = "0";
+            block.style.right = "0";
+            block.style.top = (idx * SLOT_PX) + "px";
+            block.style.height = SLOT_PX + "px";
+            block.style.background = bg;
+            layer.appendChild(block);
+          });
         }
+
+        col.appendChild(layer);
 
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
@@ -1029,10 +1070,10 @@
       ev.dataset.itemId = String(it.id || "");
       ev.style.top = top + "px";
       ev.style.height = height + "px";
-      ev.style.background = colorForTherapist(it.therapist);
+      ev.style.background = bgForTherapist(it.therapist);
       ev.style.zIndex = "2";
 
-      const dot = `<span class="dot" style="background:${colorForTherapist(it.therapist).replace("/ 0.18", "/ 1")}"></span>`;
+      const dot = `<span class="dot" style="background:${solidForTherapist(it.therapist)}"></span>`;
       const line = prefs.showService
         ? [it.service, it.status].filter(Boolean).join(" • ")
         : [it.status].filter(Boolean).join(" • ");
@@ -1276,11 +1317,11 @@
     const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" });
     sub.textContent = `${fmt.format(dateObj)} ${timeStr}`;
 
-    // default location from availability template (if any)
-    try { loadAvailability(); } catch {}
+    // default location from operator's availability template (if any)
     const dow = DOW_KEYS[(dateObj.getDay() + 6) % 7] || ""; // mon..sun
-    const map = dow ? availability?.[dow] : null;
-    const av = map ? map[timeStr] : null;
+    const email = therapistName ? String(knownEmailByName.get(therapistName) || "").trim().toLowerCase() : getUserEmail();
+    const avail = loadAvailabilityForEmail(email);
+    const av = dow ? avail?.[dow]?.[timeStr] : null;
     createModal.querySelector("[data-cm-location]").value = av?.location || "";
 
     // operator options
@@ -1674,9 +1715,10 @@
       const existing = findItemAt(dayIndex, therapistName, minutes);
 
       // availability location preview
-      try { loadAvailability(); } catch {}
       const dow = DOW_KEYS[dayIndex] || "";
-      const av = dow ? availability?.[dow]?.[timeStr] : null;
+      const email = therapistName ? String(knownEmailByName.get(therapistName) || "").trim().toLowerCase() : getUserEmail();
+      const avail = loadAvailabilityForEmail(email);
+      const av = dow ? avail?.[dow]?.[timeStr] : null;
       const loc = av?.location || "";
 
       if (existing && existing.startAt) {
