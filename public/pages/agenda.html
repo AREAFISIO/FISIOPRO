@@ -20,6 +20,8 @@
       background: rgba(255,255,255,.03);
       overflow:hidden;
       box-shadow: var(--shadow);
+      display:flex;
+      flex-direction:column;
     }
 
     .calTop{
@@ -136,7 +138,8 @@
       background: rgba(34,230,195,.95);
     }
 
-    .calGridOuter{ height: 100%; overflow:auto; }
+    /* Scroll area must NOT be 100% (otherwise calTop + grid overflow and clip bottom hours) */
+    .calGridOuter{ flex: 1 1 auto; height: auto; overflow:auto; }
 
     .calGrid{
       position: relative;
