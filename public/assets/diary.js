@@ -43,6 +43,7 @@
   let multiUser = false; // default: show only logged-in user
   let knownTherapists = [];
   let knownByEmail = new Map(); // email -> name
+  let knownTherapistId = new Map(); // name -> collaborator record id
   let selectedTherapists = new Set();
   let draftSelected = new Set();
   let pickMode = "view"; // view | defaults
@@ -124,6 +125,7 @@
     if (typeof therapist === "string" && therapist.includes(",")) therapist = therapist.split(",")[0].trim();
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
     const status = pickField(f, ["Stato", "status"]) || "";
+    const location = pickField(f, ["Luogo appuntamento", "Sede", "Luogo", "Location", "location_name"]) || "";
 
     // patient can be link-array; attempt text variants, then fallback.
     const patient =
@@ -145,6 +147,7 @@
       therapist: String(therapist || "").trim(),
       service: String(service || "").trim(),
       status: String(status || "").trim(),
+      location: String(location || "").trim(),
       startAt: startOk ? startAt : null,
       endAt: endOk ? endAt : null,
     };
@@ -726,6 +729,7 @@
       const items = (ops.items || []);
       const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
       if (names.length) knownTherapists = names;
+      knownTherapistId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
     } catch {
       // fallback to operators found in the week
@@ -993,6 +997,8 @@
     const startMin = START_HOUR * 60;
     const endMin = END_HOUR * 60;
 
+    const byId = new Map(items.map((x) => [String(x.id), x]));
+
     items.forEach((it) => {
       let col = null;
       if (multiUser) {
@@ -1015,6 +1021,7 @@
 
       const ev = document.createElement("div");
       ev.className = "event";
+      ev.dataset.itemId = String(it.id || "");
       ev.style.top = top + "px";
       ev.style.height = height + "px";
       ev.style.background = colorForTherapist(it.therapist);
@@ -1033,6 +1040,386 @@
       ev.onclick = () => openModal(it);
 
       col.appendChild(ev);
+    });
+
+    // Slot hover + click to create
+    ensureSlotUx({ weekStart: start, days, byId });
+  }
+
+  // ========= Hover preview (slot + appointment) =========
+  const hoverCard = (function buildHoverCard() {
+    const el = document.createElement("div");
+    el.className = "oe-hovercard";
+    el.style.display = "none";
+    el.innerHTML = `
+      <div class="oe-hovercard__title" data-hc-title></div>
+      <div class="oe-hovercard__row"><span class="oe-dot"></span><span data-hc-time></span></div>
+      <div class="oe-hovercard__row" data-hc-status-row style="display:none;">
+        <span class="oe-dot oe-dot--warn"></span><span data-hc-status></span>
+      </div>
+      <div class="oe-hovercard__row" data-hc-service-row style="display:none;">
+        <span class="oe-ic">🏷️</span><span data-hc-service></span>
+      </div>
+      <div class="oe-hovercard__row" data-hc-ther-row style="display:none;">
+        <span class="oe-ic">👤</span><span data-hc-ther></span>
+      </div>
+      <div class="oe-hovercard__row" data-hc-loc-row style="display:none;">
+        <span class="oe-ic">📍</span><span data-hc-loc></span>
+      </div>
+      <div class="oe-hovercard__note" data-hc-note style="display:none;"></div>
+    `;
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  function showHover(x, y, data) {
+    hoverCard.style.left = (x + 12) + "px";
+    hoverCard.style.top = (y + 12) + "px";
+    hoverCard.querySelector("[data-hc-title]").textContent = data.title || "";
+    hoverCard.querySelector("[data-hc-time]").textContent = data.time || "";
+
+    const statusRow = hoverCard.querySelector("[data-hc-status-row]");
+    const serviceRow = hoverCard.querySelector("[data-hc-service-row]");
+    const therRow = hoverCard.querySelector("[data-hc-ther-row]");
+    const locRow = hoverCard.querySelector("[data-hc-loc-row]");
+    const noteEl = hoverCard.querySelector("[data-hc-note]");
+
+    if (data.status) { statusRow.style.display=""; hoverCard.querySelector("[data-hc-status]").textContent = data.status; }
+    else statusRow.style.display="none";
+    if (data.service) { serviceRow.style.display=""; hoverCard.querySelector("[data-hc-service]").textContent = data.service; }
+    else serviceRow.style.display="none";
+    if (data.therapist) { therRow.style.display=""; hoverCard.querySelector("[data-hc-ther]").textContent = data.therapist; }
+    else therRow.style.display="none";
+    if (data.location) { locRow.style.display=""; hoverCard.querySelector("[data-hc-loc]").textContent = data.location; }
+    else locRow.style.display="none";
+    if (data.note) { noteEl.style.display=""; noteEl.textContent = data.note; }
+    else noteEl.style.display="none";
+
+    hoverCard.style.display = "block";
+  }
+
+  function hideHover() {
+    hoverCard.style.display = "none";
+  }
+
+  // ========= Create appointment modal =========
+  const createModal = (function buildCreateModal() {
+    const wrap = document.createElement("div");
+    wrap.className = "oe-modal__backdrop";
+    wrap.style.display = "none";
+    wrap.innerHTML = `
+      <div class="oe-modal" role="dialog" aria-modal="true" style="width: 980px; max-width: 96vw;">
+        <div class="oe-modal__header">
+          <div class="oe-modal__title" data-cm-title>Nuovo appuntamento</div>
+          <button class="oe-modal__x" data-cm-close aria-label="Chiudi">×</button>
+        </div>
+
+        <div class="oe-modal__body">
+          <div class="oe-modal__patientline" style="justify-content:space-between;">
+            <div>
+              <div class="oe-modal__patientname" data-cm-when>—</div>
+              <div style="font-size:13px; opacity:.75; margin-top:4px;" data-cm-sub>—</div>
+            </div>
+          </div>
+
+          <div class="oe-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <label class="oe-field" style="grid-column: span 1;">
+              <span>Tipologia</span>
+              <select data-cm-type>
+                <option value="Appuntamento paziente">Appuntamento paziente</option>
+                <option value="Visita ortopedica">Visita ortopedica</option>
+                <option value="Altro">Altro</option>
+              </select>
+            </label>
+
+            <label class="oe-field" style="grid-column: span 1; position:relative;">
+              <span>Paziente</span>
+              <input data-cm-patient placeholder="Cerca paziente..." autocomplete="off" />
+              <div data-cm-patient-results style="position:absolute; left:0; right:0; top: 72px; z-index: 5; display:none; border:1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(15,26,44,.98); overflow:hidden;"></div>
+            </label>
+
+            <label class="oe-field" style="grid-column: span 1;">
+              <span>Luogo appuntamento</span>
+              <input data-cm-location placeholder="Es. SEDE DI BOLOGNA" />
+            </label>
+
+            <label class="oe-field" style="grid-column: span 1;">
+              <span>Durata</span>
+              <select data-cm-duration>
+                <option value="30">30 minuti</option>
+                <option value="60">60 minuti</option>
+                <option value="90">90 minuti</option>
+                <option value="120">120 minuti</option>
+              </select>
+            </label>
+
+            <label class="oe-field" style="grid-column: span 2;">
+              <span>Agenda</span>
+              <select data-cm-operator></select>
+            </label>
+
+            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
+              <span>Note interne</span>
+              <textarea data-cm-internal maxlength="255"></textarea>
+            </label>
+            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
+              <span>Note visibili al paziente</span>
+              <textarea data-cm-patient-note maxlength="255"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <div class="oe-modal__footer">
+          <button class="oe-btn" data-cm-cancel>Annulla</button>
+          <button class="oe-btn oe-btn--primary" data-cm-save>Salva</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    return wrap;
+  })();
+
+  let cmState = { startIso: "", dayLabel: "", timeLabel: "", patientId: "", patientName: "" };
+
+  function closeCreateModal() {
+    createModal.style.display = "none";
+  }
+
+  async function saveCreateModal() {
+    const type = createModal.querySelector("[data-cm-type]").value;
+    const duration = Number(createModal.querySelector("[data-cm-duration]").value || 30);
+    const location = String(createModal.querySelector("[data-cm-location]").value || "").trim();
+    const operatorName = createModal.querySelector("[data-cm-operator]").value;
+    const operatorId = knownTherapistId.get(operatorName) || "";
+    const internal_note = String(createModal.querySelector("[data-cm-internal]").value || "").trim();
+    const patient_note = String(createModal.querySelector("[data-cm-patient-note]").value || "").trim();
+
+    if (!cmState.startIso) return alert("Orario non valido.");
+    if (!cmState.patientId) return alert("Seleziona un paziente.");
+    if (!operatorName) return alert("Seleziona un operatore.");
+
+    const btn = createModal.querySelector("[data-cm-save]");
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          start_at: cmState.startIso,
+          duration_min: duration,
+          patient_id: cmState.patientId,
+          operator_id: operatorId,
+          operator_name: operatorName,
+          location_name: location,
+          type,
+          internal_note,
+          patient_note,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Errore creazione appuntamento");
+      toast?.("Salvato");
+      closeCreateModal();
+      await load();
+    } catch (e) {
+      console.error(e);
+      alert("Errore salvataggio appuntamento. Controlla Console/Network.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function openCreateModal({ dateObj, timeStr, therapistName }) {
+    const when = createModal.querySelector("[data-cm-when]");
+    const sub = createModal.querySelector("[data-cm-sub]");
+    const opSel = createModal.querySelector("[data-cm-operator]");
+
+    // Local datetime -> ISO
+    const ymd = toYmd(dateObj);
+    const startLocal = new Date(`${ymd}T${timeStr}:00`);
+    cmState = { startIso: startLocal.toISOString(), dayLabel: ymd, timeLabel: timeStr, patientId: "", patientName: "" };
+
+    const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" });
+    when.textContent = `Nuovo appuntamento`;
+    sub.textContent = `${fmt.format(dateObj)} ${timeStr}`;
+
+    // default location from availability template (if any)
+    try { loadAvailability(); } catch {}
+    const dow = DOW_KEYS[(dateObj.getDay() + 6) % 7] || ""; // mon..sun
+    const map = dow ? availability?.[dow] : null;
+    const av = map ? map[timeStr] : null;
+    createModal.querySelector("[data-cm-location]").value = av?.location || "";
+
+    // operator options
+    opSel.innerHTML = "";
+    const names = knownTherapists.slice();
+    names.forEach((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      o.textContent = n;
+      opSel.appendChild(o);
+    });
+    const me = getUserName();
+    opSel.value = therapistName || (me && names.includes(me) ? me : (names[0] || ""));
+
+    // reset patient fields
+    const pIn = createModal.querySelector("[data-cm-patient]");
+    pIn.value = "";
+    createModal.querySelector("[data-cm-internal]").value = "";
+    createModal.querySelector("[data-cm-patient-note]").value = "";
+
+    createModal.style.display = "flex";
+  }
+
+  // Patient search dropdown
+  let patientTimer = null;
+  async function searchPatients(q) {
+    const url = `/api/airtable?op=searchPatients&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { credentials: "include" });
+    const data = await r.json().catch(() => ({}));
+    return data?.items || [];
+  }
+
+  function bindCreateModalEvents() {
+    createModal.querySelector("[data-cm-close]").onclick = closeCreateModal;
+    createModal.querySelector("[data-cm-cancel]").onclick = closeCreateModal;
+    createModal.onclick = (e) => { if (e.target === createModal) closeCreateModal(); };
+    createModal.querySelector("[data-cm-save]").onclick = saveCreateModal;
+
+    const pIn = createModal.querySelector("[data-cm-patient]");
+    const results = createModal.querySelector("[data-cm-patient-results]");
+
+    function hideResults() { results.style.display = "none"; results.innerHTML = ""; }
+
+    pIn.addEventListener("input", () => {
+      const q = String(pIn.value || "").trim();
+      cmState.patientId = "";
+      cmState.patientName = "";
+      if (patientTimer) clearTimeout(patientTimer);
+      if (!q) return hideResults();
+      patientTimer = setTimeout(async () => {
+        try {
+          const items = await searchPatients(q);
+          results.innerHTML = "";
+          items.slice(0, 8).forEach((it) => {
+            const row = document.createElement("div");
+            row.style.padding = "10px 12px";
+            row.style.cursor = "pointer";
+            row.style.borderBottom = "1px solid rgba(255,255,255,.08)";
+            row.innerHTML = `<div style="font-weight:900;">${it.name || "Paziente"}</div>
+                             <div style="font-size:12px;opacity:.7;">${[it.phone, it.email].filter(Boolean).join(" • ")}</div>`;
+            row.onclick = () => {
+              cmState.patientId = it.id;
+              cmState.patientName = it.name || "";
+              pIn.value = cmState.patientName;
+              hideResults();
+            };
+            results.appendChild(row);
+          });
+          if (!items.length) {
+            const row = document.createElement("div");
+            row.style.padding = "10px 12px";
+            row.style.opacity = ".75";
+            row.textContent = "Nessun risultato";
+            results.appendChild(row);
+          }
+          results.style.display = "block";
+        } catch {
+          hideResults();
+        }
+      }, 180);
+    });
+
+    pIn.addEventListener("blur", () => setTimeout(hideResults, 150));
+  }
+
+  bindCreateModalEvents();
+
+  // ========= Slot UX wiring =========
+  let slotUxBound = false;
+  let slotCtx = { weekStart: new Date(), days: 7, byId: new Map() };
+  function ensureSlotUx(ctx) {
+    slotCtx = ctx || slotCtx;
+    if (slotUxBound) return;
+    slotUxBound = true;
+
+    document.addEventListener("mousemove", (e) => {
+      const t = e.target;
+      const ev = t?.closest?.(".event");
+      if (ev) {
+        const id = String(ev.dataset.itemId || "");
+        const it = slotCtx.byId?.get(id) || null;
+        if (!it || !it.startAt) return hideHover();
+        const st = it.startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        showHover(e.clientX, e.clientY, {
+          title: it.patient || "Paziente",
+          time: st,
+          status: it.status || "",
+          service: it.service || "",
+          therapist: it.therapist || "",
+          location: it.location || "",
+          note: "",
+        });
+        return;
+      }
+
+      const col = t?.closest?.(".dayCol");
+      if (!col) return hideHover();
+
+      const rect = col.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      if (y < 0) return hideHover();
+
+      const totalMin = (END_HOUR - START_HOUR) * 60;
+      const totalSlots = Math.ceil(totalMin / SLOT_MIN);
+      const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
+      const minutes = START_HOUR * 60 + idx * SLOT_MIN;
+      const timeStr = `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+
+      const dayIndex = Number(col.dataset.dayIndex || "0");
+      const d = addDays(slotCtx.weekStart, dayIndex);
+
+      // availability location preview
+      try { loadAvailability(); } catch {}
+      const dow = DOW_KEYS[dayIndex] || "";
+      const av = dow ? availability?.[dow]?.[timeStr] : null;
+      const loc = av?.location || "";
+
+      showHover(e.clientX, e.clientY, {
+        title: timeStr,
+        time: d.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "2-digit" }),
+        location: loc ? loc : "",
+      });
+    });
+
+    document.addEventListener("mouseleave", hideHover);
+
+    document.addEventListener("click", (e) => {
+      const t = e.target;
+      // don't hijack clicks on buttons/modals
+      if (t?.closest?.(".oe-modal") || t?.closest?.(".prefsPanel") || t?.closest?.(".opsMenu")) return;
+
+      const ev = t?.closest?.(".event");
+      if (ev) return; // existing appointment opens its own modal via onclick
+
+      const col = t?.closest?.(".dayCol");
+      if (!col) return;
+      const rect = col.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      if (y < 0) return;
+
+      const totalMin = (END_HOUR - START_HOUR) * 60;
+      const totalSlots = Math.ceil(totalMin / SLOT_MIN);
+      const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
+      const minutes = START_HOUR * 60 + idx * SLOT_MIN;
+      const timeStr = `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
+
+      const dayIndex = Number(col.dataset.dayIndex || "0");
+      const d = addDays(slotCtx.weekStart, dayIndex);
+
+      const therapistName = multiUser ? String(col.dataset.therapist || "") : getUserName();
+      openCreateModal({ dateObj: d, timeStr, therapistName });
     });
   }
 
