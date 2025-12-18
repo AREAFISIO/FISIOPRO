@@ -1135,7 +1135,7 @@
           <div class="formgrid">
             <div class="field">
               <label>Tipologia</label>
-              <select class="select" data-cm-type>
+              <select class="select" data-cm-type style="height:44px; font-size:16px; padding: 10px 12px;">
                 <option value="Appuntamento paziente">Appuntamento paziente</option>
                 <option value="Visita ortopedica">Visita ortopedica</option>
                 <option value="Altro">Altro</option>
@@ -1160,7 +1160,7 @@
 
             <div class="field">
               <label>Durata</label>
-              <select class="select" data-cm-duration>
+              <select class="select" data-cm-duration style="height:44px; font-size:16px; padding: 10px 12px;">
                 <option value="30">30 minuti</option>
                 <option value="60">60 minuti</option>
                 <option value="90">90 minuti</option>
@@ -1170,7 +1170,7 @@
 
             <div class="field">
               <label>Agenda</label>
-              <select class="select" data-cm-operator></select>
+              <select class="select" data-cm-operator style="height:44px; font-size:16px; padding: 10px 12px;"></select>
             </div>
 
             <div class="field">
@@ -1414,7 +1414,7 @@
 
             <div class="field">
               <label>Durata (min)</label>
-              <select class="select" data-dm-duration>
+              <select class="select" data-dm-duration style="height:44px; font-size:16px; padding: 10px 12px;">
                 <option value="30">30</option>
                 <option value="60">60</option>
                 <option value="90">90</option>
@@ -1424,7 +1424,7 @@
 
             <div class="field">
               <label>Agenda</label>
-              <select class="select" data-dm-operator></select>
+              <select class="select" data-dm-operator style="height:44px; font-size:16px; padding: 10px 12px;"></select>
             </div>
 
             <div class="field">
