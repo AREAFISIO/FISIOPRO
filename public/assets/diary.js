@@ -1273,6 +1273,7 @@
     const startLocal = new Date(`${ymd}T${timeStr}:00`);
     cmState = { startIso: startLocal.toISOString(), dayLabel: ymd, timeLabel: timeStr, patientId: "", patientName: "" };
 
+    const fmt = new Intl.DateTimeFormat("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit" });
     sub.textContent = `${fmt.format(dateObj)} ${timeStr}`;
 
     // default location from availability template (if any)
@@ -1303,7 +1304,7 @@
     createModal.querySelector("[data-cm-conf-pat]").checked = false;
     createModal.querySelector("[data-cm-conf-plat]").checked = false;
 
-    createModal.style.display = "flex";
+    createModal.style.display = "block";
   }
 
   // Patient search dropdown
@@ -1537,7 +1538,7 @@
       }
     } catch {}
 
-    detailsModal.style.display = "flex";
+    detailsModal.style.display = "block";
   }
 
   async function saveDetailsModal() {
