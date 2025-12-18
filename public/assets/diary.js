@@ -36,6 +36,7 @@
   const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
   let SLOT_PX = 18;  // computed to fill visible height
+  const NON_WORK_BG = "rgba(255,255,255,.10)"; // must match base grid background
 
   let view = "week"; // week | workweek
   let anchorDate = new Date();
@@ -477,7 +478,7 @@
     const bg = has
       ? (work
           ? workAvailabilityBgForTherapist(getUserName())
-          : (non ? "rgba(255,255,255,.10)" : "transparent"))
+          : (non ? NON_WORK_BG : "transparent"))
       : "transparent";
     const outline = selected ? "2px solid rgba(255,255,255,.75)" : "1px solid rgba(255,255,255,.08)";
     return { bg, outline, work, has };
@@ -972,7 +973,8 @@
             if (!v) return;
             const work = v.work === true;
             const non = v.work === false;
-            const bg = work ? workAvailabilityBgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
+            // NOTE: base grid background is already NON_WORK_BG, so don't double-tint non-working.
+            const bg = work ? workAvailabilityBgForTherapist(colTher || me) : (non ? "transparent" : "transparent");
             if (bg === "transparent") return;
 
             const block = document.createElement("div");
