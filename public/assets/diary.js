@@ -307,6 +307,7 @@
   const avApply = document.querySelector("[data-av-apply]");
 
   const DOW_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  const AV_DAY_INDEXES = [4, 5, 6]; // VEN, SAB, DOM only (year-round template)
 
   function availabilityKey() {
     const email = getUserEmail() || "anon";
@@ -320,8 +321,18 @@
   }
 
   let availability = emptyTemplate(); // { mon: { "08:00": { work:true, location:"" } } ... }
-  let avSelected = new Set(); // keys "dayIndex|HH:MM"
+  let avSelected = new Set(); // keys "dayIndex|HH:MM" (touched in this session)
+  let avPending = new Map();  // key -> { work:boolean, location:string } (preview + will be saved on OK)
   let avIsSelecting = false;
+
+  function cloneAvailability(src) {
+    try {
+      // structuredClone is supported in modern browsers; fallback to JSON.
+      return (typeof structuredClone === "function") ? structuredClone(src) : JSON.parse(JSON.stringify(src));
+    } catch {
+      return emptyTemplate();
+    }
+  }
 
   function loadAvailability() {
     try {
@@ -361,6 +372,12 @@
     return v && typeof v === "object" ? v : null;
   }
 
+  function avGetEffective(dayIndex, time) {
+    const key = avCellKey(dayIndex, time);
+    if (avPending.has(key)) return avPending.get(key);
+    return avGet(dayIndex, time);
+  }
+
   function avSetMany(keys, next) {
     for (const key of keys) {
       const [dayIndexRaw, time] = String(key).split("|");
@@ -373,12 +390,9 @@
   }
 
   function avStyleForCell(dayIndex, time) {
-    const v = avGet(dayIndex, time);
-    const selected = avSelected.has(avCellKey(dayIndex, time));
-    // Only explicitly-set slots are painted.
-    // - work=true  => operator color
-    // - work=false => grey
-    // - missing    => transparent (leave central agenda unchanged)
+    const v = avGetEffective(dayIndex, time);
+    const key = avCellKey(dayIndex, time);
+    const selected = avSelected.has(key);
     const has = Boolean(v);
     const work = v?.work === true;
     const non = v?.work === false;
@@ -391,17 +405,29 @@
     return { bg, outline, work, has };
   }
 
+  function currentAvChoice() {
+    const work = Boolean(avTypeWork?.checked);
+    const location = work ? String(avLocation?.value || "").trim() : "";
+    return { work, location };
+  }
+
+  function applyPendingToCell(dayIndex, time) {
+    const dow = DOW_KEYS[dayIndex] || "";
+    if (!dow) return;
+    const key = avCellKey(dayIndex, time);
+    const next = currentAvChoice();
+    avPending.set(key, { work: next.work, location: next.location });
+    avSelected.add(key);
+  }
+
   function renderAvailabilityGrid() {
     if (!avGrid) return;
-
-    const start = startOfWeekMonday(anchorDate);
-    const days = view === "workweek" ? 6 : 7;
     const times = timeSlots();
 
     // grid structure
     const wrap = document.createElement("div");
     wrap.style.display = "grid";
-    wrap.style.gridTemplateColumns = `76px repeat(${days}, minmax(140px, 1fr))`;
+    wrap.style.gridTemplateColumns = `76px repeat(${AV_DAY_INDEXES.length}, minmax(140px, 1fr))`;
     wrap.style.borderTop = "1px solid rgba(255,255,255,.10)";
 
     // header row
@@ -411,17 +437,16 @@
     corner.style.background = "rgba(255,255,255,.03)";
     wrap.appendChild(corner);
 
-    for (let dIdx = 0; dIdx < days; dIdx++) {
-      const d = addDays(start, dIdx);
+    AV_DAY_INDEXES.forEach((dayIndex) => {
       const h = document.createElement("div");
       h.style.height = "54px";
       h.style.padding = "10px 10px";
       h.style.borderRight = "1px solid rgba(255,255,255,.10)";
       h.style.background = "rgba(255,255,255,.03)";
-      h.innerHTML = `<div style="font-weight:900; font-size:12px; letter-spacing:.08em; opacity:.75;">${itDayLabel(d)}</div>
-                     <div style="font-weight:900; font-size:15px;">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
+      const labels = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
+      h.innerHTML = `<div style="font-weight:900; font-size:12px; letter-spacing:.08em; opacity:.75;">${labels[dayIndex] || ""}</div>`;
       wrap.appendChild(h);
-    }
+    });
 
     // body rows
     times.forEach((t) => {
@@ -438,9 +463,9 @@
       timeCell.textContent = t;
       wrap.appendChild(timeCell);
 
-      for (let dIdx = 0; dIdx < days; dIdx++) {
+      AV_DAY_INDEXES.forEach((dayIndex) => {
         const cell = document.createElement("div");
-        cell.dataset.dayIndex = String(dIdx);
+        cell.dataset.dayIndex = String(dayIndex);
         cell.dataset.time = t;
         cell.style.height = "28px";
         cell.style.borderRight = "1px solid rgba(255,255,255,.10)";
@@ -448,35 +473,33 @@
         cell.style.cursor = "pointer";
         cell.style.userSelect = "none";
 
-        const st = avStyleForCell(dIdx, t);
+        const st = avStyleForCell(dayIndex, t);
         cell.style.background = st.bg;
         cell.style.outline = st.outline;
         cell.style.outlineOffset = "-1px";
 
         // tooltip: show location if present
-        const v = avGet(dIdx, t);
+        const v = avGetEffective(dayIndex, t);
         if (v?.location) cell.title = v.location;
 
         cell.addEventListener("mousedown", (e) => {
           e.preventDefault();
           avIsSelecting = true;
-          const key = avCellKey(dIdx, t);
-          if (avSelected.has(key)) avSelected.delete(key);
-          else avSelected.add(key);
+          applyPendingToCell(dayIndex, t);
           updateAvCount();
           renderAvailabilityGrid();
         });
         cell.addEventListener("mouseenter", (e) => {
           if (!avIsSelecting) return;
           e.preventDefault();
-          avSelected.add(avCellKey(dIdx, t));
+          applyPendingToCell(dayIndex, t);
           updateAvCount();
           // lightweight re-render: update cell styles only would be nicer, but keep it simple
           renderAvailabilityGrid();
         });
 
         wrap.appendChild(cell);
-      }
+      });
     });
 
     avGrid.innerHTML = "";
@@ -485,14 +508,18 @@
 
   function updateAvCount() {
     if (!avCount) return;
-    const n = avSelected.size;
+    const n = avPending.size;
     avCount.textContent = `${n} slot selezionat${n === 1 ? "o" : "i"}`;
   }
 
   function openAvailability() {
     if (!avBack) return;
     loadAvailability();
+    // start from current saved availability but allow preview changes before OK
+    // (pending changes live in avPending)
+    void cloneAvailability(availability); // ensure clone helper is loaded (no-op)
     avSelected = new Set();
+    avPending = new Map();
     avIsSelecting = false;
     updateAvCount();
     if (avTypeWork) avTypeWork.checked = true;
@@ -990,12 +1017,14 @@
   avClose?.addEventListener("click", closeAvailability);
   avBack?.addEventListener("click", (e) => { if (e.target === avBack) closeAvailability(); });
   avApply?.addEventListener("click", () => {
-    const work = Boolean(avTypeWork?.checked);
-    const location = work ? String(avLocation?.value || "").trim() : "";
-    if (!avSelected.size) return closeAvailability();
-    avSetMany(avSelected, { work, location });
+    if (!avPending.size) return closeAvailability();
+    // Commit pending changes (per-slot type + location) to the year-round template.
+    for (const [key, v] of avPending.entries()) {
+      avSetMany([key], { work: v.work, location: v.work ? String(v.location || "").trim() : "" });
+    }
     saveAvailability();
     avSelected = new Set();
+    avPending = new Map();
     updateAvCount();
     renderAvailabilityGrid();
     closeAvailability();
