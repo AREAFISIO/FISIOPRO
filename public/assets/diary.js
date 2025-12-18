@@ -203,17 +203,10 @@
     return s;
   }
 
-  function slotBgForTherapist(name) {
-    // background tint for the whole column + working availability
+  function workAvailabilityBgForTherapist(name) {
+    // Working availability should match operator dot color (with alpha).
     const solid = solidForTherapist(name);
-    const tinted = alphaFromSolid(solid, 0.14);
-    return tinted || colorForTherapist(name);
-  }
-
-  function apptBgForTherapist(name) {
-    // slightly stronger tint for appointment blocks
-    const solid = solidForTherapist(name);
-    const tinted = alphaFromSolid(solid, 0.22);
+    const tinted = alphaFromSolid(solid, 0.18);
     return tinted || colorForTherapist(name);
   }
 
@@ -238,7 +231,9 @@
 
   function bgForTherapist(name) {
     // Backward compat: keep using appointment tint in places that used bgForTherapist.
-    return apptBgForTherapist(name);
+    const solid = solidForTherapist(name);
+    const tinted = alphaFromSolid(solid, 0.22);
+    return tinted || colorForTherapist(name);
   }
 
   function getUserEmail() {
@@ -481,7 +476,7 @@
     const non = v?.work === false;
     const bg = has
       ? (work
-          ? (prefs.userColor ? `${prefs.userColor}33` : "rgba(34,230,195,.18)")
+          ? workAvailabilityBgForTherapist(getUserName())
           : (non ? "rgba(255,255,255,.10)" : "transparent"))
       : "transparent";
     const outline = selected ? "2px solid rgba(255,255,255,.75)" : "1px solid rgba(255,255,255,.08)";
@@ -956,8 +951,6 @@
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "3" : "2";
         col.style.position = "relative";
-        // column background tint matches operator dot color
-        col.style.background = slotBgForTherapist(colTher || me);
 
         // dark divider between days (not between operators)
         const isDayBoundary = (oIdx === colsPerDay - 1) && (dIdx < days - 1);
@@ -979,7 +972,7 @@
             if (!v) return;
             const work = v.work === true;
             const non = v.work === false;
-            const bg = work ? slotBgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
+            const bg = work ? workAvailabilityBgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
             if (bg === "transparent") return;
 
             const block = document.createElement("div");
@@ -1100,7 +1093,7 @@
       ev.dataset.itemId = String(it.id || "");
       ev.style.top = top + "px";
       ev.style.height = height + "px";
-      ev.style.background = apptBgForTherapist(it.therapist);
+      ev.style.background = bgForTherapist(it.therapist);
       ev.style.zIndex = "2";
 
       const dot = `<span class="dot" style="background:${solidForTherapist(it.therapist)}"></span>`;
