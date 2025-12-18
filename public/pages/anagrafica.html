@@ -49,12 +49,12 @@
         <div class="tablewrap" data-table>
           <table>
             <thead><tr><th>Paziente</th><th>Email</th><th>Telefono</th><th>Stato</th></tr></thead>
-            <tbody>
-              <tr onclick="location.href='paziente.html?id=RECORD_ID'"><td><div class="rowlink">Apri scheda</div><div class="subcell">placeholder</div></td><td>—</td><td>—</td><td><span class="chip">Attivo</span></td></tr>
+            <tbody data-rows>
+              <tr><td colspan="4" style="color:var(--muted);">Caricamento…</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="mini" style="margin-top:10px;color:var(--muted);">Qui colleghiamo i dati reali da /api/patients.</div>
+        <div class="mini" style="margin-top:10px;color:var(--muted);">Ricerca ottimizzata (server-side) su Airtable.</div>
       </div>
     </section>
   </main>
@@ -69,5 +69,87 @@
 
 <div class="toast"></div>
 <script src="../assets/app.js"></script>
+<script>
+  (function () {
+    const input = document.querySelector("[data-search]");
+    const rowsEl = document.querySelector("[data-rows]");
+
+    function escHtml(s) {
+      return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setLoading() {
+      rowsEl.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">Caricamento…</td></tr>`;
+    }
+
+    function setEmpty() {
+      rowsEl.innerHTML = `<tr><td colspan="4" style="color:var(--muted);">Nessun paziente trovato.</td></tr>`;
+    }
+
+    function setError(msg) {
+      rowsEl.innerHTML = `<tr><td colspan="4" style="color:rgba(255,214,222,.95);">Errore: ${escHtml(msg || "caricamento")}</td></tr>`;
+    }
+
+    function render(items) {
+      if (!items || !items.length) return setEmpty();
+      rowsEl.innerHTML = items
+        .map((p) => {
+          const name = p.name || "—";
+          const email = p.email || "—";
+          const phone = p.phone || "—";
+          return `
+            <tr style="cursor:pointer" onclick="location.href='paziente.html?id=${encodeURIComponent(p.id)}'">
+              <td>
+                <div class="rowlink">${escHtml(name)}</div>
+                <div class="subcell">${escHtml(p.id)}</div>
+              </td>
+              <td>${escHtml(email)}</td>
+              <td>${escHtml(phone)}</td>
+              <td><span class="chip">—</span></td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    async function fetchPatients(q) {
+      const url = new URL("/api/airtable", location.origin);
+      url.searchParams.set("op", "searchPatients");
+      if (q) url.searchParams.set("q", q);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+      return data.items || [];
+    }
+
+    let t = null;
+    let lastReq = 0;
+    async function run(q) {
+      const reqId = ++lastReq;
+      setLoading();
+      try {
+        const items = await fetchPatients(q);
+        if (reqId !== lastReq) return; // outdated response
+        render(items);
+      } catch (e) {
+        if (reqId !== lastReq) return;
+        setError(e?.message || "server_error");
+      }
+    }
+
+    function schedule() {
+      clearTimeout(t);
+      t = setTimeout(() => run(String(input?.value || "").trim()), 220);
+    }
+
+    input?.addEventListener("input", schedule);
+    run("").catch(() => {});
+  })();
+</script>
 </body>
 </html>

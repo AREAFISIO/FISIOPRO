@@ -26,6 +26,7 @@ export default async function handler(req, res) {
     const FIELD_EMAIL = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD || "E-mail";
 
     const table = encodeURIComponent(TABLE_PATIENTS);
+    const patientFields = [FIELD_NAME, FIELD_PHONE, FIELD_EMAIL].filter(Boolean);
 
     if (op === "health") {
       const data = await airtableFetch(`${table}?pageSize=1`);
@@ -46,26 +47,34 @@ export default async function handler(req, res) {
     }
 
     if (op === "listPatients") {
-      const data = await airtableFetch(`${table}?pageSize=10`);
+      const qs = new URLSearchParams({ pageSize: "20" });
+      for (const f of patientFields) qs.append("fields[]", f);
+      const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
         id: r.id,
         name: r.fields?.[FIELD_NAME] ?? "",
         phone: r.fields?.[FIELD_PHONE] ?? "",
         email: r.fields?.[FIELD_EMAIL] ?? "",
       }));
+      res.setHeader("Cache-Control", "private, max-age=30");
+      res.setHeader("Vary", "Cookie");
       return res.status(200).json({ ok: true, items });
     }
 
     if (op === "searchPatients") {
       const qRaw = String(req.query?.q || "").trim();
       if (!qRaw) {
-        const data = await airtableFetch(`${table}?pageSize=10`);
+        const qs = new URLSearchParams({ pageSize: "20" });
+        for (const f of patientFields) qs.append("fields[]", f);
+        const data = await airtableFetch(`${table}?${qs.toString()}`);
         const items = (data.records || []).map((r) => ({
           id: r.id,
           name: r.fields?.[FIELD_NAME] ?? "",
           phone: r.fields?.[FIELD_PHONE] ?? "",
           email: r.fields?.[FIELD_EMAIL] ?? "",
         }));
+        res.setHeader("Cache-Control", "private, max-age=30");
+        res.setHeader("Vary", "Cookie");
         return res.status(200).json({ ok: true, items });
       }
 
@@ -81,6 +90,7 @@ export default async function handler(req, res) {
         maxRecords: "20",
         pageSize: "20",
       });
+      for (const f of patientFields) qs.append("fields[]", f);
 
       const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
@@ -90,6 +100,8 @@ export default async function handler(req, res) {
         email: r.fields?.[FIELD_EMAIL] ?? "",
       }));
 
+      res.setHeader("Cache-Control", "private, max-age=30");
+      res.setHeader("Vary", "Cookie");
       return res.status(200).json({ ok: true, items });
     }
 
