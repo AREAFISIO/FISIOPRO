@@ -4,17 +4,116 @@ function enc(x) {
   return encodeURIComponent(String(x));
 }
 
-async function physioCanAccessPatient({ patientId, email }) {
-  // Must have at least one appointment linked to that patient AND assigned to that physio email.
-  const formula = `AND(FIND("${String(patientId).replace(/"/g, '\\"')}", ARRAYJOIN({Paziente})), LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}"))`;
-  const qs = new URLSearchParams({
-    filterByFormula: formula,
-    maxRecords: "1",
-    pageSize: "1",
-  });
+function isUnknownFieldError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return s.includes("unknown field name") || s.includes("unknown field names");
+}
 
-  const table = enc("APPUNTAMENTI");
-  const data = await airtableFetch(`${table}?${qs.toString()}`);
+async function probeField(tableEnc, candidate) {
+  const name = String(candidate || "").trim();
+  if (!name) return false;
+  const qs = new URLSearchParams({ pageSize: "1" });
+  qs.append("fields[]", name);
+  try {
+    await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    return true;
+  } catch (e) {
+    if (isUnknownFieldError(e?.message)) return false;
+    throw e;
+  }
+}
+
+async function resolveFieldNameByProbe(tableEnc, candidates) {
+  for (const c of (candidates || []).filter(Boolean)) {
+    if (await probeField(tableEnc, c)) return String(c).trim();
+  }
+  return "";
+}
+
+async function discoverFieldNames(tableEnc) {
+  const found = new Set();
+  const qs = new URLSearchParams({ pageSize: "100" });
+  const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+  for (const r of data.records || []) {
+    const f = r.fields || {};
+    for (const k of Object.keys(f)) found.add(k);
+  }
+  return Array.from(found);
+}
+
+function scoreField(name, keywords) {
+  const n = String(name || "").toLowerCase();
+  let score = 0;
+  for (const k of keywords) {
+    const kk = String(k || "").toLowerCase();
+    if (!kk) continue;
+    if (n === kk) score += 100;
+    else if (n.includes(kk)) score += 10;
+  }
+  return score;
+}
+
+function resolveFieldNameHeuristic(fieldNames, keywords) {
+  let best = "";
+  let bestScore = -1;
+  for (const name of fieldNames || []) {
+    const s = scoreField(name, keywords);
+    if (s > bestScore) {
+      bestScore = s;
+      best = name;
+    }
+  }
+  return bestScore >= 10 ? best : "";
+}
+
+async function physioCanAccessPatient({ patientId, email }) {
+  // Robust RBAC:
+  // Prefer linking via {Collaboratore} (linked to COLLABORATORI) by matching the current user's record id.
+  // Fallback to an appointments email field only if it exists.
+  const APPTS_TABLE = process.env.AGENDA_TABLE || "APPUNTAMENTI";
+  const COLLAB_TABLE = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
+
+  const apptsEnc = enc(APPTS_TABLE);
+  const collabEnc = enc(COLLAB_TABLE);
+
+  // Resolve current user collaborator record id by email
+  const fEmail = `LOWER({Email}) = LOWER("${String(email || "").replace(/"/g, '\\"')}")`;
+  const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+  const userData = await airtableFetch(`${collabEnc}?${qsUser.toString()}`);
+  const userRecId = userData.records?.[0]?.id || "";
+
+  // Resolve operator field name in APPUNTAMENTI
+  const operatorCandidates = [
+    process.env.AGENDA_OPERATOR_FIELD,
+    "Collaboratore",
+    "Collaboratori",
+    "Operatore",
+    "Fisioterapista",
+  ].filter(Boolean);
+  const emailCandidates = [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean);
+
+  let FIELD_OPERATOR = await resolveFieldNameByProbe(apptsEnc, operatorCandidates);
+  let FIELD_EMAIL = await resolveFieldNameByProbe(apptsEnc, emailCandidates);
+
+  if (!FIELD_OPERATOR && !FIELD_EMAIL) {
+    const discovered = await discoverFieldNames(apptsEnc);
+    FIELD_OPERATOR = resolveFieldNameHeuristic(discovered, ["collaboratore", "operatore", "fisioterapista"]) || "";
+    FIELD_EMAIL = resolveFieldNameHeuristic(discovered, ["email", "e-mail"]) || "";
+  }
+
+  const patientIdEsc = String(patientId).replace(/"/g, '\\"');
+  const baseFilter = `FIND("${patientIdEsc}", ARRAYJOIN({Paziente}))`;
+
+  let roleFilter = "FALSE()";
+  if (userRecId && FIELD_OPERATOR) {
+    roleFilter = `FIND("${String(userRecId).replace(/"/g, '\\"')}", ARRAYJOIN({${FIELD_OPERATOR}}))`;
+  } else if (FIELD_EMAIL) {
+    roleFilter = `LOWER({${FIELD_EMAIL}}) = LOWER("${String(email || "").replace(/"/g, '\\"')}")`;
+  }
+
+  const formula = `AND(${baseFilter}, ${roleFilter})`;
+  const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
+  const data = await airtableFetch(`${apptsEnc}?${qs.toString()}`);
   return Boolean(data?.records?.length);
 }
 
