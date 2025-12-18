@@ -59,6 +59,7 @@
   const prefPick = document.querySelector("[data-pref-pick]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
+  const prefDefaultRow = document.querySelector("[data-pref-default-row]");
 
   let prefs = {
     slotMin: 30,
@@ -191,6 +192,12 @@
     return String(u?.nome || "").trim();
   }
 
+  function ensureMeSelected(setLike) {
+    const me = getUserName();
+    if (me) setLike.add(me);
+    return setLike;
+  }
+
   function prefsKey() {
     const email = getUserEmail() || "anon";
     return `fp_agenda_prefs_${email}`;
@@ -222,6 +229,8 @@
     if (prefShowService) prefShowService.checked = Boolean(prefs.showService);
     if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
+    // show/hide default operators section based on multi-user
+    if (prefDefaultRow) prefDefaultRow.style.display = prefs.multiUser ? "" : "none";
     renderDefaultDots();
   }
   function openPrefs() {
@@ -492,8 +501,8 @@
 
   function openOpsMenu() {
     if (!opsBack) return;
-    if (pickMode === "defaults") draftSelected = new Set(prefs.defaultOperators || []);
-    else draftSelected = new Set(selectedTherapists);
+    if (pickMode === "defaults") draftSelected = ensureMeSelected(new Set(prefs.defaultOperators || []));
+    else draftSelected = ensureMeSelected(new Set(selectedTherapists));
     // When picking defaults, multi-user is implied.
     if (opsMulti) opsMulti.checked = (pickMode === "defaults") ? true : Boolean(multiUser);
     renderOpsList();
@@ -509,6 +518,8 @@
     if (!opsList) return;
     opsList.innerHTML = "";
 
+    const me = getUserName();
+
     if (!knownTherapists.length) {
       const empty = document.createElement("div");
       empty.className = "opsRow";
@@ -520,21 +531,25 @@
     knownTherapists.forEach((name) => {
       const row = document.createElement("div");
       row.className = "opsRow";
-      const on = draftSelected.has(name);
+      const isMe = Boolean(me && name === me);
+      const on = isMe ? true : draftSelected.has(name);
       const check = `<div class="opsCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
       row.innerHTML = `
         <div class="opsRowLeft">
           ${check}
           <div style="min-width:0;">
-            <div class="opsName">${name}</div>
+            <div class="opsName">${name}${isMe ? ` <span style="opacity:.75;font-weight:800;">(tu)</span>` : ""}</div>
             <div class="opsMini">${therapistKey(name) || ""}</div>
           </div>
         </div>
-        <div class="opsDot" style="background:${solidForTherapist(name)}">${therapistKey(name) || ""}</div>
+        <div class="opsDot" style="background:${solidForTherapist(name)}">${isMe ? "🔒" : (therapistKey(name) || "")}</div>
       `;
       row.addEventListener("click", () => {
+        // Logged-in operator is always selected and cannot be deselected.
+        if (isMe) return;
         if (draftSelected.has(name)) draftSelected.delete(name);
         else draftSelected.add(name);
+        ensureMeSelected(draftSelected);
         renderOpsList();
       });
       opsList.appendChild(row);
@@ -585,9 +600,9 @@
       if (!multiUser && me) {
         selectedTherapists = new Set([me]);
       } else if (multiUser && (prefs.lastViewOperators || []).length) {
-        selectedTherapists = new Set(prefs.lastViewOperators);
+        selectedTherapists = ensureMeSelected(new Set(prefs.lastViewOperators));
       } else if (multiUser && (prefs.defaultOperators || []).length) {
-        selectedTherapists = new Set(prefs.defaultOperators);
+        selectedTherapists = ensureMeSelected(new Set(prefs.defaultOperators));
       } else if (me) {
         selectedTherapists = new Set([me]);
       } else {
@@ -597,6 +612,8 @@
 
     // keep selection valid
     if (selectedTherapists.size === 0 && knownTherapists.length) selectedTherapists.add(knownTherapists[0]);
+    // Always include current operator
+    ensureMeSelected(selectedTherapists);
 
     syncOpsBar();
     render();
@@ -839,30 +856,38 @@
   opsBtnClose?.addEventListener("click", closeOpsMenu);
   opsBack?.addEventListener("click", (e) => { if (e.target === opsBack) closeOpsMenu(); });
   opsBtnAll?.addEventListener("click", () => {
-    draftSelected = new Set(knownTherapists);
+    draftSelected = ensureMeSelected(new Set(knownTherapists));
     renderOpsList();
   });
   opsBtnApply?.addEventListener("click", () => {
     // Persist multi-user + selection immediately (so next login restores defaults)
     multiUser = Boolean(opsMulti?.checked);
     prefs.multiUser = multiUser;
+    ensureMeSelected(draftSelected);
 
     if (pickMode === "defaults") {
-      prefs.defaultOperators = Array.from(draftSelected);
+      prefs.defaultOperators = Array.from(ensureMeSelected(draftSelected));
       // If user is setting defaults, also align lastViewOperators for convenience
-      prefs.lastViewOperators = Array.from(draftSelected);
+      prefs.lastViewOperators = Array.from(ensureMeSelected(draftSelected));
       savePrefs();
       renderDefaultDots();
       // apply immediately if multi-user is on
       if (multiUser) selectedTherapists = new Set(prefs.defaultOperators);
     } else {
-      selectedTherapists = new Set(draftSelected);
-      prefs.lastViewOperators = Array.from(draftSelected);
+      selectedTherapists = ensureMeSelected(new Set(draftSelected));
+      prefs.lastViewOperators = Array.from(ensureMeSelected(new Set(draftSelected)));
       // If multi-user is enabled, treat current selection as defaults too
       if (multiUser) {
-        prefs.defaultOperators = Array.from(draftSelected);
+        prefs.defaultOperators = Array.from(ensureMeSelected(new Set(draftSelected)));
         renderDefaultDots();
       }
+      savePrefs();
+    }
+    // If multi-user is off, enforce only "me"
+    if (!multiUser) {
+      const me = getUserName();
+      if (me) selectedTherapists = new Set([me]);
+      prefs.lastViewOperators = me ? [me] : prefs.lastViewOperators;
       savePrefs();
     }
     syncOpsBar();
@@ -914,11 +939,12 @@
       const me = getUserName();
       if (me) selectedTherapists = new Set([me]);
     } else if ((prefs.lastViewOperators || []).length) {
-      selectedTherapists = new Set(prefs.lastViewOperators);
+      selectedTherapists = ensureMeSelected(new Set(prefs.lastViewOperators));
     } else if ((prefs.defaultOperators || []).length) {
-      selectedTherapists = new Set(prefs.defaultOperators);
+      selectedTherapists = ensureMeSelected(new Set(prefs.defaultOperators));
     }
 
+    ensureMeSelected(selectedTherapists);
     syncOpsBar();
     closePrefs();
     render();
@@ -926,7 +952,23 @@
 
   // UX: enabling multi-user should immediately ask which operators to show by default.
   prefMulti?.addEventListener("change", () => {
-    if (!prefMulti.checked) return;
+    if (prefDefaultRow) prefDefaultRow.style.display = prefMulti.checked ? "" : "none";
+
+    if (!prefMulti.checked) {
+      // turning off -> revert to only me
+      prefs.multiUser = false;
+      multiUser = false;
+      const me = getUserName();
+      if (me) {
+        selectedTherapists = new Set([me]);
+        prefs.lastViewOperators = [me];
+      }
+      savePrefs();
+      syncOpsBar();
+      render();
+      return;
+    }
+
     pickMode = "defaults";
     // Persist the toggle immediately so next login keeps it.
     prefs.multiUser = true;
