@@ -7,6 +7,73 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro • Pazienti</title>
   <link rel="stylesheet" href="../assets/app.css" />
+  <style>
+    /* OsteoEasy-like patient list enhancements (minimal, local) */
+    .oe-listTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      padding: 10px 0 12px;
+    }
+    .oe-actionsRight{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .oe-filterBtn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      cursor: pointer;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    .oe-filterBtn:hover{ background: rgba(255,255,255,.09); transform: translateY(-1px); }
+    .oe-ico{
+      width: 16px; height: 16px; display:inline-block;
+      border-radius: 6px;
+      background: rgba(255,255,255,.12);
+    }
+    .oe-channels{ display:flex; align-items:center; gap:8px; justify-content:center; }
+    .oe-ch{ width: 18px; height: 18px; border-radius: 6px; border: 1px solid rgba(255,255,255,.14); display:grid; place-items:center; font-size: 11px; }
+    .oe-ch.on{ background: rgba(34,230,195,.18); border-color: rgba(34,230,195,.35); color: rgba(255,255,255,.92); }
+    .oe-ch.off{ background: rgba(0,0,0,.14); color: rgba(255,255,255,.55); }
+    .oe-miniBtn{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      cursor:pointer;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .oe-miniBtn.orange{
+      border-color: rgba(255,140,0,.55);
+      background: rgba(255,140,0,.16);
+    }
+    .oe-miniBtn:hover{ background: rgba(255,255,255,.09); transform: translateY(-1px); }
+    .oe-rowActions{ display:flex; align-items:center; gap:10px; justify-content:flex-end; }
+    .oe-call{ width: 18px; height: 18px; opacity: .9; }
+    .oe-call.off{ opacity: .35; }
+    .oe-pager{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      color: rgba(255,255,255,.70);
+      font-size: 13px;
+    }
+    .oe-pager select{ height: 32px; border-radius: 10px; border: 1px solid var(--border); background: rgba(0,0,0,.18); color: var(--text); padding: 0 10px; }
+    .oe-pagerBtn{ width: 36px; height: 32px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,.06); color: var(--text); cursor:pointer; }
+    .oe-pagerBtn:disabled{ opacity:.4; cursor:not-allowed; }
+    table{ min-width: 1200px; }
+    th.oe-check, td.oe-check{ width: 44px; text-align:center; }
+    th.oe-actions, td.oe-actions{ width: 220px; }
+  </style>
 </head>
 <body>
 <div class="app">
@@ -42,26 +109,54 @@
     </div>
 
     <section class="card">
-      <div class="head"><h2>Ricerca paziente</h2><span class="chip">Lista</span></div>
+      <div class="head"><h2>Ricerca</h2><span class="chip">Pazienti</span></div>
       <div class="body">
-        <div class="toolbar">
-          <div class="search">Cerca <input id="q" placeholder="Nome, email, telefono..." /></div>
-          <span class="chip" id="count">—</span>
+        <div class="oe-listTop">
+          <div class="search">Ricerca <input id="q" placeholder="Nome, cognome, CF, email, cellulare..." /></div>
+          <div class="oe-actionsRight">
+            <button class="oe-filterBtn" id="btnFilter">
+              <span class="oe-ico"></span> Aggiungi filtro
+            </button>
+            <span class="chip" id="count">—</span>
+          </div>
         </div>
 
         <div class="tablewrap">
           <table>
             <thead>
               <tr>
-                <th>Paziente</th>
+                <th class="oe-check"><input type="checkbox" id="chkAll" /></th>
+                <th>Nome</th>
+                <th>Cognome</th>
+                <th>Codice fiscale</th>
                 <th>Email</th>
-                <th>Telefono</th>
+                <th>Cellulare</th>
+                <th>Data di nascita</th>
+                <th style="text-align:center;">Notifiche</th>
+                <th>Prossima notifica</th>
+                <th class="oe-actions" style="text-align:right;">&nbsp;</th>
               </tr>
             </thead>
             <tbody id="rows">
-              <tr><td colspan="3" style="color:var(--muted);">Caricamento…</td></tr>
+              <tr><td colspan="10" style="color:var(--muted);">Caricamento…</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="oe-pager">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span>Righe per pagina:</span>
+            <select id="pageSize">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span id="rangeLabel">—</span>
+            <button class="oe-pagerBtn" id="btnPrev" title="Indietro">‹</button>
+            <button class="oe-pagerBtn" id="btnNext" title="Avanti">›</button>
+          </div>
         </div>
       </div>
     </section>
@@ -92,51 +187,152 @@
     return String(s ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
   }
 
-  function render(items){
+  function fmtDob(raw){
+    const s = String(raw || '').trim();
+    if (!s) return '—';
+    // Airtable date can be YYYY-MM-DD
+    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)){
+      const [y,m,d] = s.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return s;
+  }
+
+  function render(items, pageInfo){
     const rows = document.getElementById('rows');
     const count = document.getElementById('count');
     rows.innerHTML = '';
-    count.textContent = (items?.length || 0) + ' risultati';
+    count.textContent = (pageInfo?.totalLabel || ((items?.length || 0) + ' risultati'));
 
     if (!items?.length){
-      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);">Nessun risultato.</td></tr>';
+      rows.innerHTML = '<tr><td colspan="10" style="color:var(--muted);">Nessun risultato.</td></tr>';
       return;
     }
 
     for (const it of items){
       const tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
-      tr.onclick = () => location.href = 'paziente.html?id=' + encodeURIComponent(it.id);
       tr.innerHTML = `
-        <td><div class="rowlink">${esc(it.name || '—')}</div></td>
+        <td class="oe-check" onclick="event.stopPropagation();"><input type="checkbox" class="rowChk" data-id="${esc(it.id)}" /></td>
+        <td><div class="rowlink">${esc(it.nome || '—')}</div></td>
+        <td><div class="rowlink">${esc(it.cognome || '—')}</div></td>
+        <td>${esc(it.codice_fiscale || '—')}</td>
         <td>${esc(it.email || '—')}</td>
-        <td>${esc(it.phone || '—')}</td>
+        <td>${esc(it.cellulare || '—')}</td>
+        <td>${esc(fmtDob(it.data_nascita))}</td>
+        <td style="text-align:center;">
+          <div class="oe-channels" onclick="event.stopPropagation();">
+            <span class="oe-ch ${it.notify?.sms ? 'on' : 'off'}">S</span>
+            <span class="oe-ch ${it.notify?.email ? 'on' : 'off'}">M</span>
+            <span class="oe-ch ${it.notify?.whatsapp ? 'on' : 'off'}">W</span>
+          </div>
+        </td>
+        <td>${esc(it.prossima_notifica || '—')}</td>
+        <td class="oe-actions" style="text-align:right;" onclick="event.stopPropagation();">
+          <div class="oe-rowActions">
+            <button class="oe-miniBtn orange" data-plan="${esc(it.id)}">Pianifica</button>
+            <button class="oe-miniBtn" data-open="${esc(it.id)}">Apri</button>
+          </div>
+        </td>
       `;
+      tr.onclick = () => location.href = 'paziente.html?id=' + encodeURIComponent(it.id);
       rows.appendChild(tr);
     }
+
+    // Bind row buttons
+    rows.querySelectorAll('[data-open]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-open');
+        location.href = 'paziente.html?id=' + encodeURIComponent(id);
+      });
+    });
+    rows.querySelectorAll('[data-plan]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-plan');
+        // store planned patient for agenda (prefill on slot click)
+        try {
+          localStorage.setItem('fp_planned_patient', JSON.stringify({ id }));
+        } catch {}
+        location.href = 'agenda.html';
+      });
+    });
   }
 
   let timer = null;
-  async function load(q){
-    const url = q
-      ? '/api/airtable?op=searchPatients&q=' + encodeURIComponent(q)
-      : '/api/airtable?op=listPatients';
-    const data = await apiGet(url);
-    render(data.items || []);
+  let nextOffset = null;
+  let prevOffsets = []; // stack
+  let currentQ = '';
+
+  function apiUrl(q, offset){
+    const ps = document.getElementById('pageSize').value || '10';
+    const base = q
+      ? '/api/airtable?op=searchPatientsRich&q=' + encodeURIComponent(q)
+      : '/api/airtable?op=listPatientsRich';
+    const u = new URL(base, location.origin);
+    u.searchParams.set('pageSize', ps);
+    if (offset) u.searchParams.set('offset', offset);
+    return u.pathname + u.search;
+  }
+
+  async function loadPage(q, offset){
+    currentQ = q || '';
+    const data = await apiGet(apiUrl(currentQ, offset));
+    nextOffset = data.offset || null;
+    const items = data.items || [];
+
+    // pager labels
+    const rangeLabel = document.getElementById('rangeLabel');
+    const pageSize = Number(data.pageSize || items.length || 10);
+    const startIdx = prevOffsets.length * pageSize + (items.length ? 1 : 0);
+    const endIdx = prevOffsets.length * pageSize + items.length;
+    rangeLabel.textContent = items.length ? `${startIdx}-${endIdx}` : '—';
+
+    document.getElementById('btnPrev').disabled = prevOffsets.length === 0;
+    document.getElementById('btnNext').disabled = !nextOffset;
+
+    render(items, { totalLabel: `${items.length} risultati` });
   }
 
   const input = document.getElementById('q');
   input.addEventListener('input', () => {
     const q = String(input.value || '').trim();
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => load(q).catch(e => console.error(e)), 180);
+    timer = setTimeout(() => {
+      prevOffsets = [];
+      nextOffset = null;
+      loadPage(q, null).catch(e => console.error(e));
+    }, 180);
   });
 
-  document.getElementById('btnRefresh').onclick = () => load(String(input.value || '').trim()).catch(e => console.error(e));
+  document.getElementById('btnRefresh').onclick = () => {
+    prevOffsets = [];
+    nextOffset = null;
+    loadPage(String(input.value || '').trim(), null).catch(e => console.error(e));
+  };
 
-  load('').catch(e => {
+  document.getElementById('btnPrev').onclick = () => {
+    if (!prevOffsets.length) return;
+    const prev = prevOffsets.pop();
+    loadPage(currentQ, prev || null).catch(e => console.error(e));
+  };
+  document.getElementById('btnNext').onclick = () => {
+    if (!nextOffset) return;
+    prevOffsets.push(nextOffset); // store where we are going from (good-enough back stack)
+    loadPage(currentQ, nextOffset).catch(e => console.error(e));
+  };
+  document.getElementById('pageSize').onchange = () => {
+    prevOffsets = [];
+    nextOffset = null;
+    loadPage(String(input.value || '').trim(), null).catch(e => console.error(e));
+  };
+
+  document.getElementById('btnFilter').onclick = () => {
+    if (typeof toast === 'function') toast('Filtri in arrivo');
+  };
+
+  loadPage('', null).catch(e => {
     console.error(e);
-    document.getElementById('rows').innerHTML = '<tr><td colspan="3" style="color:var(--muted);">Errore caricamento.</td></tr>';
+    document.getElementById('rows').innerHTML = '<tr><td colspan="10" style="color:var(--muted);">Errore caricamento.</td></tr>';
   });
 </script>
 </body>

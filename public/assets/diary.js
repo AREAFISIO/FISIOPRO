@@ -1419,6 +1419,21 @@
     createModal.querySelector("[data-cm-conf-pat]").checked = false;
     createModal.querySelector("[data-cm-conf-plat]").checked = false;
 
+    // If coming from "PIANIFICA" in patient list, prefill patient id (name will appear in input)
+    try {
+      const raw = localStorage.getItem("fp_planned_patient");
+      if (raw) {
+        const obj = JSON.parse(raw);
+        const pid = String(obj?.id || "").trim();
+        if (pid) {
+          cmState.patientId = pid;
+          // Try to display patient's name (best-effort, without extra API call)
+          pIn.value = "(Paziente selezionato)";
+        }
+        localStorage.removeItem("fp_planned_patient");
+      }
+    } catch {}
+
     createModal.style.display = "block";
   }
 
