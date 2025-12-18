@@ -192,6 +192,39 @@
     return String(u?.nome || "").trim();
   }
 
+  async function ensureUserReady() {
+    // auth-guard.js sets FP_USER/FP_SESSION asynchronously; diary.js must not read prefs as "anon".
+    if (getUserEmail()) return;
+    try {
+      const r = await fetch("/api/auth-me", { credentials: "include" });
+      const data = await r.json().catch(() => ({}));
+      if (data?.ok) {
+        if (data.session) window.FP_SESSION = data.session;
+        if (data.user) window.FP_USER = data.user;
+      }
+    } catch {}
+  }
+
+  function migrateAnonStorageIfNeeded() {
+    const email = getUserEmail();
+    if (!email) return;
+    try {
+      const anonPrefsKey = "fp_agenda_prefs_anon";
+      const targetPrefsKey = `fp_agenda_prefs_${email}`;
+      const anonAvailKey = "fp_agenda_availability_anon";
+      const targetAvailKey = `fp_agenda_availability_${email}`;
+
+      if (!localStorage.getItem(targetPrefsKey) && localStorage.getItem(anonPrefsKey)) {
+        localStorage.setItem(targetPrefsKey, localStorage.getItem(anonPrefsKey));
+        localStorage.removeItem(anonPrefsKey);
+      }
+      if (!localStorage.getItem(targetAvailKey) && localStorage.getItem(anonAvailKey)) {
+        localStorage.setItem(targetAvailKey, localStorage.getItem(anonAvailKey));
+        localStorage.removeItem(anonAvailKey);
+      }
+    } catch {}
+  }
+
   function ensureMeSelected(setLike) {
     const me = getUserName();
     if (me) setLike.add(me);
@@ -984,7 +1017,11 @@
     if (d) anchorDate = d;
   } catch {}
 
-  loadPrefs();
-  setView("week");
+  (async function init() {
+    await ensureUserReady();
+    migrateAnonStorageIfNeeded();
+    loadPrefs();
+    setView("week");
+  })();
 })();
 
