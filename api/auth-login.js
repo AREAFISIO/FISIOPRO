@@ -37,7 +37,10 @@ export default async function handler(req, res) {
     const attivo = Boolean(f.Attivo);
     const ruolo = String(f.Ruolo || "").trim();
     const codiceDb = String(f["Codice accesso"] || "").trim();
-    const nome = String(f.Nome || "").trim();
+    // Prefer full name (Nome + Cognome) for UI labels
+    const nome0 = String(f.Nome || "").trim();
+    const cognome0 = String(f.Cognome || "").trim();
+    const nome = [nome0, cognome0].filter(Boolean).join(" ").trim() || nome0;
 
     const ruoloValido = ruolo === "Fisioterapista" || ruolo === "Front office" || ruolo === "Manager";
     if (!attivo || !ruoloValido || !codiceDb || codiceDb !== codice) {

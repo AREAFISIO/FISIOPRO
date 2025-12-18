@@ -26,6 +26,7 @@
   const btnPrev = document.querySelector("[data-cal-prev]");
   const btnNext = document.querySelector("[data-cal-next]");
   const btnToday = document.querySelector("[data-cal-today]");
+  const viewLabelEl = document.querySelector("[data-cal-view-label]");
 
   const modalBack = document.querySelector("[data-cal-modal]");
   const modalTitle = document.querySelector("[data-cal-modal-title]");
@@ -38,7 +39,7 @@
   let SLOT_PX = 18;  // computed to fill visible height
   const NON_WORK_BG = "rgba(255,255,255,.10)"; // must match base grid background
 
-  let view = "week"; // week | workweek
+  let view = "week"; // day | five | week
   let anchorDate = new Date();
   let rawItems = [];
   let multiUser = false; // default: show only logged-in user
@@ -95,12 +96,18 @@
     return x;
   }
   function fmtMonth(d) {
-    try { return d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }); }
+    try { return d.toLocaleDateString("it-IT", { month: "long", year: "numeric" }).toUpperCase(); }
     catch { return "Agenda"; }
   }
-  function fmtWeekRange(start, days) {
-    const end = addDays(start, days - 1);
-    return `${pad2(start.getDate())}/${pad2(start.getMonth() + 1)} → ${pad2(end.getDate())}/${pad2(end.getMonth() + 1)}`;
+  function itMonthShort(d) {
+    const m = ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"];
+    return m[d.getMonth()] || "";
+  }
+  function fmtRangeShort(start, end) {
+    // "15 DIC 2025-21 DIC 2025"
+    const a = `${pad2(start.getDate())} ${itMonthShort(start)} ${start.getFullYear()}`;
+    const b = `${pad2(end.getDate())} ${itMonthShort(end)} ${end.getFullYear()}`;
+    return `${a}-${b}`;
   }
   function itDayLabel(d) {
     const days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
@@ -784,18 +791,45 @@
     return data;
   }
 
-  async function load() {
-    const start = startOfWeekMonday(anchorDate);
-    const days = view === "workweek" ? 6 : 7;
+  function viewDays() {
+    if (view === "day") return 1;
+    if (view === "five") return 5;
+    return 7;
+  }
+
+  function viewLabel() {
+    if (view === "day") return "Giorno";
+    if (view === "five") return "5 giorni";
+    return "Settimana";
+  }
+
+  function rangeStartForView() {
+    if (view === "day") {
+      const x = new Date(anchorDate);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    }
+    return startOfWeekMonday(anchorDate);
+  }
+
+  function updateHeaderUI() {
+    const start = rangeStartForView();
+    const days = viewDays();
+    const end = addDays(start, days - 1);
     const from = toYmd(start);
-    const to = toYmd(addDays(start, days - 1));
+    const to = toYmd(end);
 
-    if (rangeEl) rangeEl.textContent = `${from} → ${to}`;
+    if (rangeEl) rangeEl.textContent = fmtRangeShort(start, end);
     if (monthEl) monthEl.textContent = fmtMonth(start);
-    if (weekEl) weekEl.textContent = fmtWeekRange(start, days);
+    if (weekEl) weekEl.textContent = fmtRangeShort(start, end);
+    if (viewLabelEl) viewLabelEl.textContent = viewLabel();
+    return { start, days, from, to };
+  }
 
-    // Load known operators from COLLABORATORI (preferred),
-    // then load appointments for the selected week.
+  let opsLoadedOnce = false;
+  async function loadOperatorsOnce() {
+    if (opsLoadedOnce) return;
+    opsLoadedOnce = true;
     try {
       const ops = await apiGet("/api/operators");
       const items = (ops.items || []);
@@ -805,10 +839,25 @@
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
       knownEmailByName = new Map(items.map((x) => [String(x.name || "").trim(), String(x.email || "").trim().toLowerCase()]).filter((p) => p[0] && p[1]));
     } catch {
-      // fallback to operators found in the week
+      // ignore; we can still proceed with operators inferred from appointments
     }
+  }
 
-    const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  async function load() {
+    // Update UI immediately (fast), then fetch data in background.
+    const { start, days, from, to } = updateHeaderUI();
+
+    // If we have a selection already, show the grid immediately
+    try {
+      buildGridSkeleton(start, days, Array.from(selectedTherapists));
+      render();
+    } catch {}
+
+    // Fetch operators only once + appointments for current range (in parallel)
+    const opsP = loadOperatorsOnce();
+    const apptP = apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    const [data] = await Promise.all([apptP, opsP]).then((arr) => [arr[0]]);
+
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
 
@@ -1038,8 +1087,8 @@
   }
 
   function render() {
-    const start = startOfWeekMonday(anchorDate);
-    const days = view === "workweek" ? 6 : 7;
+    const start = rangeStartForView();
+    const days = viewDays();
     const ops = Array.from(selectedTherapists);
 
     const q = String(qEl?.value || "").trim().toLowerCase();
@@ -1821,8 +1870,16 @@
 
   // Events
   qEl?.addEventListener("input", () => render());
-  btnPrev?.addEventListener("click", () => { anchorDate = addDays(anchorDate, view === "workweek" ? -6 : -7); load().catch(()=>{}); });
-  btnNext?.addEventListener("click", () => { anchorDate = addDays(anchorDate, view === "workweek" ? 6 : 7); load().catch(()=>{}); });
+  btnPrev?.addEventListener("click", () => {
+    const step = (view === "day") ? -1 : (view === "five" ? -5 : -7);
+    anchorDate = addDays(anchorDate, step);
+    load().catch(()=>{});
+  });
+  btnNext?.addEventListener("click", () => {
+    const step = (view === "day") ? 1 : (view === "five" ? 5 : 7);
+    anchorDate = addDays(anchorDate, step);
+    load().catch(()=>{});
+  });
   btnToday?.addEventListener("click", () => { anchorDate = new Date(); load().catch(()=>{}); });
   document.querySelectorAll("[data-cal-view]").forEach((el) => {
     el.addEventListener("click", () => setView(el.getAttribute("data-cal-view")));
