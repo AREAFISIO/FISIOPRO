@@ -187,6 +187,36 @@
     return `hsl(${hue} 85% 62% / 0.95)`;
   }
 
+  function alphaFromSolid(solid, alpha) {
+    const a = Math.max(0, Math.min(1, Number(alpha)));
+    const s = String(solid || "").trim();
+    if (!s) return "";
+    if (s.startsWith("#") && s.length === 7) {
+      const hex = Math.round(a * 255).toString(16).padStart(2, "0");
+      return `${s}${hex}`;
+    }
+    // hsl(... / X) -> replace alpha
+    if (s.startsWith("hsl(") && s.includes("/")) {
+      return s.replace(/\/\s*([0-9.]+)\s*\)/, `/ ${a})`);
+    }
+    // fallback: keep original (browser will ignore alpha conversion)
+    return s;
+  }
+
+  function slotBgForTherapist(name) {
+    // background tint for the whole column + working availability
+    const solid = solidForTherapist(name);
+    const tinted = alphaFromSolid(solid, 0.14);
+    return tinted || colorForTherapist(name);
+  }
+
+  function apptBgForTherapist(name) {
+    // slightly stronger tint for appointment blocks
+    const solid = solidForTherapist(name);
+    const tinted = alphaFromSolid(solid, 0.22);
+    return tinted || colorForTherapist(name);
+  }
+
   function assignedColorForTherapist(name) {
     const n = String(name || "").trim();
     if (!n) return "";
@@ -207,10 +237,8 @@
   }
 
   function bgForTherapist(name) {
-    const solid = solidForTherapist(name);
-    if (typeof solid === "string" && solid.startsWith("#") && solid.length === 7) return `${solid}33`;
-    // fallback to deterministic pastel background
-    return colorForTherapist(name);
+    // Backward compat: keep using appointment tint in places that used bgForTherapist.
+    return apptBgForTherapist(name);
   }
 
   function getUserEmail() {
@@ -928,6 +956,8 @@
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "3" : "2";
         col.style.position = "relative";
+        // column background tint matches operator dot color
+        col.style.background = slotBgForTherapist(colTher || me);
 
         // dark divider between days (not between operators)
         const isDayBoundary = (oIdx === colsPerDay - 1) && (dIdx < days - 1);
@@ -949,7 +979,7 @@
             if (!v) return;
             const work = v.work === true;
             const non = v.work === false;
-            const bg = work ? bgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
+            const bg = work ? slotBgForTherapist(colTher || me) : (non ? "rgba(255,255,255,.10)" : "transparent");
             if (bg === "transparent") return;
 
             const block = document.createElement("div");
@@ -1070,7 +1100,7 @@
       ev.dataset.itemId = String(it.id || "");
       ev.style.top = top + "px";
       ev.style.height = height + "px";
-      ev.style.background = bgForTherapist(it.therapist);
+      ev.style.background = apptBgForTherapist(it.therapist);
       ev.style.zIndex = "2";
 
       const dot = `<span class="dot" style="background:${solidForTherapist(it.therapist)}"></span>`;
