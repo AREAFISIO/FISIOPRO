@@ -131,6 +131,10 @@
     const patient =
       pickField(f, ["Paziente (testo)", "Paziente", "Patient", "patient_name", "Nome Paziente", "Cognome e Nome"]) ||
       (Array.isArray(f.Paziente) ? `Paziente (${f.Paziente[0] || ""})` : "");
+    const patientId =
+      Array.isArray(f.Paziente) && f.Paziente.length && typeof f.Paziente[0] === "string"
+        ? String(f.Paziente[0])
+        : "";
 
     let startAt = null;
     let endAt = null;
@@ -144,6 +148,7 @@
       id: x.id,
       fields: f,
       patient: String(patient || "").trim(),
+      patientId,
       therapist: String(therapist || "").trim(),
       service: String(service || "").trim(),
       status: String(status || "").trim(),
@@ -1037,13 +1042,16 @@
         <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
-      ev.onclick = () => openModal(it);
+      ev.onclick = (e) => {
+        e.stopPropagation();
+        openDetailsModal(it);
+      };
 
       col.appendChild(ev);
     });
 
     // Slot hover + click to create
-    ensureSlotUx({ weekStart: start, days, byId });
+    ensureSlotUx({ weekStart: start, days, byId, items });
   }
 
   // ========= Hover preview (slot + appointment) =========
@@ -1053,15 +1061,15 @@
     el.style.display = "none";
     el.innerHTML = `
       <div class="oe-hovercard__title" data-hc-title></div>
-      <div class="oe-hovercard__row"><span class="oe-dot"></span><span data-hc-time></span></div>
-      <div class="oe-hovercard__row" data-hc-status-row style="display:none;">
-        <span class="oe-dot oe-dot--warn"></span><span data-hc-status></span>
-      </div>
+      <div class="oe-hovercard__row" data-hc-time-row><span class="oe-dot"></span><span data-hc-time></span></div>
       <div class="oe-hovercard__row" data-hc-service-row style="display:none;">
         <span class="oe-ic">🏷️</span><span data-hc-service></span>
       </div>
       <div class="oe-hovercard__row" data-hc-ther-row style="display:none;">
         <span class="oe-ic">👤</span><span data-hc-ther></span>
+      </div>
+      <div class="oe-hovercard__row" data-hc-status-row style="display:none;">
+        <span class="oe-dot oe-dot--warn"></span><span data-hc-status></span>
       </div>
       <div class="oe-hovercard__row" data-hc-loc-row style="display:none;">
         <span class="oe-ic">📍</span><span data-hc-loc></span>
@@ -1076,7 +1084,14 @@
     hoverCard.style.left = (x + 12) + "px";
     hoverCard.style.top = (y + 12) + "px";
     hoverCard.querySelector("[data-hc-title]").textContent = data.title || "";
-    hoverCard.querySelector("[data-hc-time]").textContent = data.time || "";
+    const timeRow = hoverCard.querySelector("[data-hc-time-row]");
+    if (data.time) {
+      timeRow.style.display = "";
+      hoverCard.querySelector("[data-hc-time]").textContent = data.time || "";
+    } else {
+      timeRow.style.display = "none";
+      hoverCard.querySelector("[data-hc-time]").textContent = "";
+    }
 
     const statusRow = hoverCard.querySelector("[data-hc-status-row]");
     const serviceRow = hoverCard.querySelector("[data-hc-service-row]");
@@ -1143,6 +1158,25 @@
               <input data-cm-location placeholder="Es. SEDE DI BOLOGNA" />
             </label>
 
+            <label class="oe-field" style="grid-column: span 2;">
+              <span>Voce prezzario</span>
+              <input data-cm-service placeholder="Es. SEDUTA DI FISIOTERAPIA" />
+            </label>
+
+            <div class="oe-field" style="grid-column: span 1;">
+              <span style="display:block;">Conferme</span>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+                <label style="display:flex;gap:8px;align-items:center;">
+                  <input type="checkbox" data-cm-conf-pat />
+                  <span>Confermato dal paziente</span>
+                </label>
+                <label style="display:flex;gap:8px;align-items:center;">
+                  <input type="checkbox" data-cm-conf-plat />
+                  <span>Conferma in piattaforma</span>
+                </label>
+              </div>
+            </div>
+
             <label class="oe-field" style="grid-column: span 1;">
               <span>Durata</span>
               <select data-cm-duration>
@@ -1189,10 +1223,13 @@
     const type = createModal.querySelector("[data-cm-type]").value;
     const duration = Number(createModal.querySelector("[data-cm-duration]").value || 30);
     const location = String(createModal.querySelector("[data-cm-location]").value || "").trim();
+    const service_name = String(createModal.querySelector("[data-cm-service]").value || "").trim();
     const operatorName = createModal.querySelector("[data-cm-operator]").value;
     const operatorId = knownTherapistId.get(operatorName) || "";
     const internal_note = String(createModal.querySelector("[data-cm-internal]").value || "").trim();
     const patient_note = String(createModal.querySelector("[data-cm-patient-note]").value || "").trim();
+    const confirmed_by_patient = Boolean(createModal.querySelector("[data-cm-conf-pat]").checked);
+    const confirmed_in_platform = Boolean(createModal.querySelector("[data-cm-conf-plat]").checked);
 
     if (!cmState.startIso) return alert("Orario non valido.");
     if (!cmState.patientId) return alert("Seleziona un paziente.");
@@ -1213,6 +1250,9 @@
           operator_name: operatorName,
           location_name: location,
           type,
+          service_name,
+          confirmed_by_patient,
+          confirmed_in_platform,
           internal_note,
           patient_note,
         }),
@@ -1268,6 +1308,9 @@
     pIn.value = "";
     createModal.querySelector("[data-cm-internal]").value = "";
     createModal.querySelector("[data-cm-patient-note]").value = "";
+    createModal.querySelector("[data-cm-service]").value = "";
+    createModal.querySelector("[data-cm-conf-pat]").checked = false;
+    createModal.querySelector("[data-cm-conf-plat]").checked = false;
 
     createModal.style.display = "flex";
   }
@@ -1336,13 +1379,268 @@
 
   bindCreateModalEvents();
 
+  // ========= Details appointment modal (existing appt) =========
+  const detailsModal = (function buildDetailsModal() {
+    const wrap = document.createElement("div");
+    wrap.className = "oe-modal__backdrop";
+    wrap.style.display = "none";
+    wrap.innerHTML = `
+      <div class="oe-modal" role="dialog" aria-modal="true" style="width: 1100px; max-width: 96vw;">
+        <div class="oe-modal__header" style="align-items:flex-start;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="oe-modal__title">Dettagli appuntamento</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+              <span class="chip" data-dm-service style="background:rgba(34,230,195,.10);border-color:rgba(34,230,195,.28);color:rgba(0,0,0,.75);">—</span>
+            </div>
+          </div>
+          <button class="oe-modal__x" data-dm-close aria-label="Chiudi">×</button>
+        </div>
+
+        <div class="oe-modal__body">
+          <div class="oe-modal__patientline" style="flex-direction:column; align-items:stretch; gap:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+              <div class="oe-modal__patientname" data-dm-patient>—</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <a class="oe-btn" data-dm-call href="#" style="text-decoration:none;">CHIAMA</a>
+                <a class="oe-btn" data-dm-whatsapp href="#" style="text-decoration:none;">WHATSAPP</a>
+                <a class="oe-btn" data-dm-email href="#" style="text-decoration:none;">EMAIL</a>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;opacity:.85;">
+              <div><strong data-dm-when>—</strong></div>
+              <div>•</div>
+              <div>Operatore: <strong data-dm-ther>—</strong></div>
+              <div>•</div>
+              <div>Luogo: <strong data-dm-loc>—</strong></div>
+            </div>
+          </div>
+
+          <div class="oe-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <label class="oe-field" style="grid-column: span 2;">
+              <span>Voce prezzario</span>
+              <input data-dm-service-in />
+            </label>
+
+            <label class="oe-field" style="grid-column: span 1;">
+              <span>Esito appuntamento</span>
+              <input data-dm-status />
+            </label>
+
+            <label class="oe-field" style="grid-column: span 1;">
+              <span>Durata (min)</span>
+              <select data-dm-duration>
+                <option value="30">30</option>
+                <option value="60">60</option>
+                <option value="90">90</option>
+                <option value="120">120</option>
+              </select>
+            </label>
+
+            <label class="oe-field" style="grid-column: span 2;">
+              <span>Agenda</span>
+              <select data-dm-operator></select>
+            </label>
+
+            <label class="oe-field" style="grid-column: 1 / -1;">
+              <span>Luogo appuntamento</span>
+              <input data-dm-location />
+            </label>
+
+            <div class="oe-field" style="grid-column: 1 / -1;">
+              <span style="display:block;font-size:12px;color:rgba(0,0,0,.55);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Conferme</span>
+              <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
+                <label style="display:flex;gap:8px;align-items:center;">
+                  <input type="checkbox" data-dm-conf-pat />
+                  <span>Confermato dal paziente</span>
+                </label>
+                <label style="display:flex;gap:8px;align-items:center;">
+                  <input type="checkbox" data-dm-conf-plat />
+                  <span>Conferma in piattaforma</span>
+                </label>
+              </div>
+            </div>
+
+            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
+              <span>Note interne</span>
+              <textarea data-dm-internal maxlength="255"></textarea>
+            </label>
+            <label class="oe-field oe-field--wide" style="grid-column: 1 / -1;">
+              <span>Note visibili al paziente</span>
+              <textarea data-dm-patient-note maxlength="255"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <div class="oe-modal__footer">
+          <button class="oe-btn" data-dm-cancel>Annulla</button>
+          <button class="oe-btn oe-btn--primary" data-dm-save>Chiudi</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    return wrap;
+  })();
+
+  let dmItem = null;
+  function closeDetailsModal() { detailsModal.style.display = "none"; dmItem = null; }
+
+  async function openDetailsModal(it) {
+    dmItem = it;
+    const st = it.startAt ? it.startAt.toLocaleString("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    detailsModal.querySelector("[data-dm-patient]").textContent = it.patient || "Paziente";
+    detailsModal.querySelector("[data-dm-when]").textContent = st;
+    detailsModal.querySelector("[data-dm-ther]").textContent = it.therapist ? `Dott. ${it.therapist}` : "—";
+    detailsModal.querySelector("[data-dm-loc]").textContent = it.location || "—";
+
+    // top chip
+    const chip = detailsModal.querySelector("[data-dm-service]");
+    chip.textContent = it.service || "—";
+
+    // form defaults
+    detailsModal.querySelector("[data-dm-service-in]").value = it.service || "";
+    detailsModal.querySelector("[data-dm-status]").value = it.status || "";
+    detailsModal.querySelector("[data-dm-location]").value = it.location || "";
+    detailsModal.querySelector("[data-dm-internal]").value = "";
+    detailsModal.querySelector("[data-dm-patient-note]").value = "";
+    detailsModal.querySelector("[data-dm-conf-pat]").checked = false;
+    detailsModal.querySelector("[data-dm-conf-plat]").checked = false;
+
+    // duration best-effort
+    let dur = 30;
+    if (it.startAt && it.endAt) {
+      const d = Math.max(15, Math.round((it.endAt.getTime() - it.startAt.getTime()) / 60000));
+      dur = [30, 60, 90, 120].includes(d) ? d : 30;
+    }
+    detailsModal.querySelector("[data-dm-duration]").value = String(dur);
+
+    // operator options
+    const opSel = detailsModal.querySelector("[data-dm-operator]");
+    opSel.innerHTML = "";
+    knownTherapists.forEach((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      o.textContent = n;
+      opSel.appendChild(o);
+    });
+    opSel.value = it.therapist || getUserName() || (knownTherapists[0] || "");
+
+    // patient contact (fetch from /api/patient if we have a linked id)
+    const callA = detailsModal.querySelector("[data-dm-call]");
+    const waA = detailsModal.querySelector("[data-dm-whatsapp]");
+    const emA = detailsModal.querySelector("[data-dm-email]");
+    callA.style.display = "none";
+    waA.style.display = "none";
+    emA.style.display = "none";
+    try {
+      if (it.patientId) {
+        const r = await fetch(`/api/patient?id=${encodeURIComponent(it.patientId)}`, { credentials: "include" });
+        const p = await r.json().catch(() => ({}));
+        const tel = String(p.Telefono || "").trim();
+        const email = String(p.Email || "").trim();
+        if (tel) {
+          callA.href = `tel:${tel}`;
+          callA.textContent = `CHIAMA ${tel}`;
+          callA.style.display = "";
+          waA.href = `https://wa.me/${tel.replace(/[^\d]/g, "")}`;
+          waA.textContent = "WHATSAPP";
+          waA.style.display = "";
+        }
+        if (email) {
+          emA.href = `mailto:${email}`;
+          emA.textContent = email.toUpperCase();
+          emA.style.display = "";
+        }
+      }
+    } catch {}
+
+    detailsModal.style.display = "flex";
+  }
+
+  async function saveDetailsModal() {
+    if (!dmItem) return closeDetailsModal();
+    const btn = detailsModal.querySelector("[data-dm-save]");
+    btn.disabled = true;
+    try {
+      const payload = {
+        service_name: String(detailsModal.querySelector("[data-dm-service-in]").value || ""),
+        status: String(detailsModal.querySelector("[data-dm-status]").value || ""),
+        location_name: String(detailsModal.querySelector("[data-dm-location]").value || ""),
+        duration_min: Number(detailsModal.querySelector("[data-dm-duration]").value || 30),
+        confirmed_by_patient: Boolean(detailsModal.querySelector("[data-dm-conf-pat]").checked),
+        confirmed_in_platform: Boolean(detailsModal.querySelector("[data-dm-conf-plat]").checked),
+        internal_note: String(detailsModal.querySelector("[data-dm-internal]").value || ""),
+        patient_note: String(detailsModal.querySelector("[data-dm-patient-note]").value || ""),
+      };
+      const r = await fetch(`/api/appointments?id=${encodeURIComponent(dmItem.id)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Errore aggiornamento");
+      toast?.("Salvato");
+      closeDetailsModal();
+      await load();
+    } catch (e) {
+      console.error(e);
+      alert("Errore salvataggio. Controlla Console/Network.");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // bind details modal events
+  detailsModal.querySelector("[data-dm-close]").onclick = closeDetailsModal;
+  detailsModal.querySelector("[data-dm-cancel]").onclick = closeDetailsModal;
+  detailsModal.querySelector("[data-dm-save]").onclick = saveDetailsModal;
+  detailsModal.onclick = (e) => { if (e.target === detailsModal) closeDetailsModal(); };
+
   // ========= Slot UX wiring =========
   let slotUxBound = false;
-  let slotCtx = { weekStart: new Date(), days: 7, byId: new Map() };
+  let slotCtx = { weekStart: new Date(), days: 7, byId: new Map(), items: [] };
   function ensureSlotUx(ctx) {
     slotCtx = ctx || slotCtx;
     if (slotUxBound) return;
     slotUxBound = true;
+
+    let slotHl = document.createElement("div");
+    slotHl.style.position = "absolute";
+    slotHl.style.left = "6px";
+    slotHl.style.right = "6px";
+    slotHl.style.borderRadius = "10px";
+    slotHl.style.background = "rgba(34,230,195,.08)";
+    slotHl.style.outline = "1px solid rgba(34,230,195,.22)";
+    slotHl.style.pointerEvents = "none";
+    slotHl.style.zIndex = "1";
+    slotHl.style.display = "none";
+    let slotHlCol = null;
+
+    function highlightSlot(col, idx) {
+      if (!col) return;
+      if (slotHlCol !== col) {
+        try { slotHl.remove(); } catch {}
+        slotHlCol = col;
+        col.appendChild(slotHl);
+      }
+      slotHl.style.top = (idx * SLOT_PX) + "px";
+      slotHl.style.height = SLOT_PX + "px";
+      slotHl.style.display = "block";
+    }
+
+    function findItemAt(dayIndex, therapistName, minutes) {
+      const list = slotCtx.items || [];
+      for (const it of list) {
+        if (!it || it._dayIndex !== dayIndex) continue;
+        if (therapistName && it.therapist && it.therapist !== therapistName) continue;
+        if (!it.startAt) continue;
+        const st = minutesOfDay(it.startAt);
+        let en = st + 30;
+        if (it.endAt) en = minutesOfDay(it.endAt);
+        if (minutes >= st && minutes < en) return it;
+      }
+      return null;
+    }
 
     document.addEventListener("mousemove", (e) => {
       const t = e.target;
@@ -1352,12 +1650,18 @@
         const it = slotCtx.byId?.get(id) || null;
         if (!it || !it.startAt) return hideHover();
         const st = it.startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        // Highlight the slot where the appointment starts
+        const col = ev.closest?.(".dayCol");
+        if (col) {
+          const idx = Math.max(0, Math.floor((minutesOfDay(it.startAt) - START_HOUR * 60) / SLOT_MIN));
+          highlightSlot(col, idx);
+        }
         showHover(e.clientX, e.clientY, {
           title: it.patient || "Paziente",
           time: st,
-          status: it.status || "",
           service: it.service || "",
-          therapist: it.therapist || "",
+          therapist: it.therapist ? `Dott. ${it.therapist}` : "",
+          status: it.status || "",
           location: it.location || "",
           note: "",
         });
@@ -1379,6 +1683,10 @@
 
       const dayIndex = Number(col.dataset.dayIndex || "0");
       const d = addDays(slotCtx.weekStart, dayIndex);
+      highlightSlot(col, idx);
+
+      const therapistName = multiUser ? String(col.dataset.therapist || "") : getUserName();
+      const existing = findItemAt(dayIndex, therapistName, minutes);
 
       // availability location preview
       try { loadAvailability(); } catch {}
@@ -1386,14 +1694,27 @@
       const av = dow ? availability?.[dow]?.[timeStr] : null;
       const loc = av?.location || "";
 
-      showHover(e.clientX, e.clientY, {
-        title: timeStr,
-        time: d.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "2-digit" }),
-        location: loc ? loc : "",
-      });
+      if (existing && existing.startAt) {
+        const st = existing.startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        showHover(e.clientX, e.clientY, {
+          title: existing.patient || "Paziente",
+          time: st,
+          service: existing.service || "",
+          therapist: existing.therapist ? `Dott. ${existing.therapist}` : "",
+          status: existing.status || "",
+          location: existing.location || loc || "",
+          note: "",
+        });
+      } else {
+        showHover(e.clientX, e.clientY, {
+          title: timeStr,
+          time: "",
+          location: loc ? loc : "",
+        });
+      }
     });
 
-    document.addEventListener("mouseleave", hideHover);
+    document.addEventListener("mouseleave", () => { hideHover(); slotHl.style.display = "none"; });
 
     document.addEventListener("click", (e) => {
       const t = e.target;
@@ -1419,7 +1740,22 @@
       const d = addDays(slotCtx.weekStart, dayIndex);
 
       const therapistName = multiUser ? String(col.dataset.therapist || "") : getUserName();
-      openCreateModal({ dateObj: d, timeStr, therapistName });
+      const existing = (function () {
+        const list = slotCtx.items || [];
+        for (const it of list) {
+          if (!it || it._dayIndex !== dayIndex) continue;
+          if (therapistName && it.therapist && it.therapist !== therapistName) continue;
+          if (!it.startAt) continue;
+          const st = minutesOfDay(it.startAt);
+          let en = st + 30;
+          if (it.endAt) en = minutesOfDay(it.endAt);
+          if (minutes >= st && minutes < en) return it;
+        }
+        return null;
+      })();
+
+      if (existing) openDetailsModal(existing);
+      else openCreateModal({ dateObj: d, timeStr, therapistName });
     });
   }
 

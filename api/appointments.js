@@ -145,6 +145,110 @@ async function createAirtableRecord({ tableName, fields }) {
   return rec;
 }
 
+async function updateAirtableRecord({ tableName, id, fields }) {
+  const tableEnc = encodeURIComponent(tableName);
+  const body = JSON.stringify({ fields });
+  const data = await airtableFetch(`${tableEnc}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  return data || null;
+}
+
+async function resolveAppointmentsSchema(tableName) {
+  const tableEnc = encodeURIComponent(tableName);
+  const discovered = await discoverFieldNames(tableEnc);
+
+  const FIELD_START =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_START_FIELD, "Data e ora INIZIO", "Inizio", "Start", "Start at"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["data e ora inizio", "inizio", "start"]) ||
+    "";
+
+  const FIELD_END =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_END_FIELD, "Data e ora FINE", "Fine", "End", "End at"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["data e ora fine", "fine", "end"]) ||
+    "";
+
+  const FIELD_OPERATOR =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["collaboratore", "operatore", "fisioterapista"]) ||
+    "";
+
+  const FIELD_PATIENT =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Patient"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["paziente", "patient"]) ||
+    "";
+
+  const FIELD_EMAIL =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["email", "e-mail"]) ||
+    "";
+
+  const FIELD_DUR =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["durata", "min"]) ||
+    "";
+
+  const FIELD_LOCATION =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_LOCATION_FIELD, "Luogo appuntamento", "Luogo di lavoro", "Sede", "Location"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["luogo", "sede", "location"]) ||
+    "";
+
+  const FIELD_TYPE =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_TYPE_FIELD, "Tipologia", "Tipo"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["tipologia", "tipo"]) ||
+    "";
+
+  const FIELD_SERVICE =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Voce prezzario", "service_name"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["prestazione", "servizio", "prezzario", "service"]) ||
+    "";
+
+  const FIELD_STATUS =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_STATUS_FIELD, "Esito appuntamento", "Stato", "status"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["esito", "stato", "status"]) ||
+    "";
+
+  const FIELD_INTERNAL_NOTE =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_INTERNAL_NOTE_FIELD, "Nota interna", "Note interne", "internal_note"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["nota interna", "note interne", "internal"]) ||
+    "";
+
+  const FIELD_PATIENT_NOTE =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_PATIENT_NOTE_FIELD, "Note paziente", "Note visibili al paziente", "patient_note"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["note paziente", "visibili", "patient"]) ||
+    "";
+
+  const FIELD_CONF_PAT =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_CONFIRMED_BY_PATIENT_FIELD, "Confermato dal paziente", "confirmed_by_patient"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["confermato", "paziente"]) ||
+    "";
+
+  const FIELD_CONF_PLATFORM =
+    (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_CONFIRMED_IN_PLATFORM_FIELD, "Conferma in InBuoneMani", "confirmed_in_platform"].filter(Boolean))) ||
+    resolveFieldNameHeuristic(discovered, ["conferma", "piattaforma", "inbuonemani"]) ||
+    "";
+
+  return {
+    table: tableName,
+    FIELD_START,
+    FIELD_END,
+    FIELD_OPERATOR,
+    FIELD_PATIENT,
+    FIELD_EMAIL,
+    FIELD_DUR,
+    FIELD_LOCATION,
+    FIELD_TYPE,
+    FIELD_SERVICE,
+    FIELD_STATUS,
+    FIELD_INTERNAL_NOTE,
+    FIELD_PATIENT_NOTE,
+    FIELD_CONF_PAT,
+    FIELD_CONF_PLATFORM,
+  };
+}
+
 export default async function handler(req, res) {
   ensureRes(res);
   try {
@@ -155,6 +259,7 @@ export default async function handler(req, res) {
 
     const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
     const APPTS_TABLE = process.env.AGENDA_TABLE || "APPUNTAMENTI";
+    const schema = await resolveAppointmentsSchema(APPTS_TABLE);
 
     // CREATE appointment (OsteoEasy-like agenda)
     if (req.method === "POST") {
@@ -168,8 +273,12 @@ export default async function handler(req, res) {
       const operator_name = String(req.body?.operator_name || "").trim();
       const location_name = String(req.body?.location_name || "").trim();
       const type_label = String(req.body?.type || "").trim();
+      const service_name = String(req.body?.service_name || "").trim();
+      const status = String(req.body?.status || "").trim();
       const internal_note = String(req.body?.internal_note || "").trim();
       const patient_note = String(req.body?.patient_note || "").trim();
+      const confirmed_by_patient = req.body?.confirmed_by_patient;
+      const confirmed_in_platform = req.body?.confirmed_in_platform;
 
       if (!start_at) return res.status(400).json({ error: "Missing start_at" });
       if (!Number.isFinite(duration_min) || duration_min <= 0) return res.status(400).json({ error: "Invalid duration_min" });
@@ -178,87 +287,68 @@ export default async function handler(req, res) {
       if (isNaN(startDT.getTime())) return res.status(400).json({ error: "Invalid start_at" });
       const endDT = new Date(startDT.getTime() + duration_min * 60000);
 
-      const tableEnc = encodeURIComponent(APPTS_TABLE);
-      const discovered = await discoverFieldNames(tableEnc);
-
-      const FIELD_START =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_START_FIELD, "Data e ora INIZIO", "Inizio", "Start", "Start at"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["data e ora inizio", "inizio", "start"]) ||
-        "";
-
-      const FIELD_END =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_END_FIELD, "Data e ora FINE", "Fine", "End", "End at"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["data e ora fine", "fine", "end"]) ||
-        "";
-
-      const FIELD_OPERATOR =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["collaboratore", "operatore", "fisioterapista"]) ||
-        "";
-
-      const FIELD_PATIENT =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Patient"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["paziente", "patient"]) ||
-        "";
-
-      const FIELD_EMAIL =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["email", "e-mail"]) ||
-        "";
-
-      const FIELD_DUR =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["durata", "min"]) ||
-        "";
-
-      const FIELD_LOCATION =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_LOCATION_FIELD, "Luogo appuntamento", "Luogo di lavoro", "Sede", "Location"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["luogo", "sede", "location"]) ||
-        "";
-
-      const FIELD_TYPE =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_TYPE_FIELD, "Tipologia", "Tipo"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["tipologia", "tipo"]) ||
-        "";
-
-      const FIELD_INTERNAL_NOTE =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_INTERNAL_NOTE_FIELD, "Nota interna", "Note interne", "internal_note"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["nota interna", "note interne", "internal"]) ||
-        "";
-
-      const FIELD_PATIENT_NOTE =
-        (await resolveFieldNameByProbe(tableEnc, [process.env.AGENDA_PATIENT_NOTE_FIELD, "Note paziente", "Note visibili al paziente", "patient_note"].filter(Boolean))) ||
-        resolveFieldNameHeuristic(discovered, ["note paziente", "visibili", "patient"]) ||
-        "";
-
-      if (!FIELD_START || !FIELD_END) {
+      if (!schema.FIELD_START || !schema.FIELD_END) {
         return res.status(500).json({
           error: "agenda_schema_mismatch",
-          details: { table: APPTS_TABLE, resolved: { FIELD_START, FIELD_END } },
+          details: { table: APPTS_TABLE, resolved: { FIELD_START: schema.FIELD_START, FIELD_END: schema.FIELD_END } },
         });
       }
 
       const fields = {
-        [FIELD_START]: startDT.toISOString(),
-        [FIELD_END]: endDT.toISOString(),
+        [schema.FIELD_START]: startDT.toISOString(),
+        [schema.FIELD_END]: endDT.toISOString(),
       };
 
-      if (FIELD_DUR) fields[FIELD_DUR] = duration_min;
-      if (FIELD_EMAIL) fields[FIELD_EMAIL] = String(session.email || "").toLowerCase();
-      if (FIELD_LOCATION && location_name) fields[FIELD_LOCATION] = location_name;
-      if (FIELD_TYPE && type_label) fields[FIELD_TYPE] = type_label;
-      if (FIELD_INTERNAL_NOTE && internal_note) fields[FIELD_INTERNAL_NOTE] = internal_note;
-      if (FIELD_PATIENT_NOTE && patient_note) fields[FIELD_PATIENT_NOTE] = patient_note;
+      if (schema.FIELD_DUR) fields[schema.FIELD_DUR] = duration_min;
+      if (schema.FIELD_EMAIL) fields[schema.FIELD_EMAIL] = String(session.email || "").toLowerCase();
+      if (schema.FIELD_LOCATION && location_name) fields[schema.FIELD_LOCATION] = location_name;
+      if (schema.FIELD_TYPE && type_label) fields[schema.FIELD_TYPE] = type_label;
+      if (schema.FIELD_SERVICE && service_name) fields[schema.FIELD_SERVICE] = service_name;
+      if (schema.FIELD_STATUS && status) fields[schema.FIELD_STATUS] = status;
+      if (schema.FIELD_INTERNAL_NOTE && internal_note) fields[schema.FIELD_INTERNAL_NOTE] = internal_note;
+      if (schema.FIELD_PATIENT_NOTE && patient_note) fields[schema.FIELD_PATIENT_NOTE] = patient_note;
+      if (schema.FIELD_CONF_PAT && confirmed_by_patient != null) fields[schema.FIELD_CONF_PAT] = Boolean(confirmed_by_patient);
+      if (schema.FIELD_CONF_PLATFORM && confirmed_in_platform != null) fields[schema.FIELD_CONF_PLATFORM] = Boolean(confirmed_in_platform);
 
-      if (FIELD_PATIENT && patient_id) fields[FIELD_PATIENT] = [patient_id];
+      if (schema.FIELD_PATIENT && patient_id) fields[schema.FIELD_PATIENT] = [patient_id];
 
-      if (FIELD_OPERATOR) {
-        if (operator_id) fields[FIELD_OPERATOR] = [operator_id];
-        else if (operator_name) fields[FIELD_OPERATOR] = operator_name;
+      if (schema.FIELD_OPERATOR) {
+        if (operator_id) fields[schema.FIELD_OPERATOR] = [operator_id];
+        else if (operator_name) fields[schema.FIELD_OPERATOR] = operator_name;
       }
 
       const rec = await createAirtableRecord({ tableName: APPTS_TABLE, fields });
       return res.status(201).json({ ok: true, id: rec?.id || null, fields: rec?.fields || null });
+    }
+
+    // UPDATE appointment fields (used by the agenda modal)
+    if (req.method === "PATCH") {
+      const id = String(req.query?.id || "").trim();
+      if (!id) return res.status(400).json({ error: "Missing id" });
+
+      const role = normalizeRole(session.role || "");
+      if (!["physio", "front", "manager"].includes(role)) return res.status(403).json({ error: "Forbidden" });
+
+      const patch = req.body || {};
+      const fields = {};
+
+      if (schema.FIELD_STATUS && patch.status != null) fields[schema.FIELD_STATUS] = String(patch.status || "");
+      if (schema.FIELD_SERVICE && patch.service_name != null) fields[schema.FIELD_SERVICE] = String(patch.service_name || "");
+      if (schema.FIELD_INTERNAL_NOTE && patch.internal_note != null) fields[schema.FIELD_INTERNAL_NOTE] = String(patch.internal_note || "");
+      if (schema.FIELD_PATIENT_NOTE && patch.patient_note != null) fields[schema.FIELD_PATIENT_NOTE] = String(patch.patient_note || "");
+      if (schema.FIELD_LOCATION && patch.location_name != null) fields[schema.FIELD_LOCATION] = String(patch.location_name || "");
+
+      if (schema.FIELD_DUR && patch.duration_min != null && Number.isFinite(Number(patch.duration_min))) {
+        fields[schema.FIELD_DUR] = Number(patch.duration_min);
+      }
+
+      // Confirmation toggles (if present in the base)
+      if (schema.FIELD_CONF_PAT && patch.confirmed_by_patient != null) fields[schema.FIELD_CONF_PAT] = Boolean(patch.confirmed_by_patient);
+      if (schema.FIELD_CONF_PLATFORM && patch.confirmed_in_platform != null) fields[schema.FIELD_CONF_PLATFORM] = Boolean(patch.confirmed_in_platform);
+
+      if (!Object.keys(fields).length) return res.status(400).json({ error: "No fields to update" });
+      const updated = await updateAirtableRecord({ tableName: APPTS_TABLE, id, fields });
+      return res.status(200).json({ ok: true, id: updated?.id || id, fields: updated?.fields || null });
     }
 
     // existing behavior: GET by date (legacy)
