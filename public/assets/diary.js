@@ -2,7 +2,7 @@
 // but styled using the existing app.css tokens.
 (function () {
   // build marker (helps verify cache busting)
-  console.log("FISIOPRO diary build", "7e72bca");
+  console.log("FISIOPRO diary build", "20251219");
   const root = document.querySelector("[data-diary]");
   if (!root) return;
 
