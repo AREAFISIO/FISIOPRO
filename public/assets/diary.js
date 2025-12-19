@@ -59,13 +59,19 @@
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
 
-  let prefs = {
+  const PREFS_VERSION = 2; // bump when defaults/schema change
+  const DEFAULT_PREFS = {
+    __v: PREFS_VERSION,
     slotMin: 30,
     multiUser: false,
     defaultOperators: [],
     showService: true,
     dayNav: false,
     userColor: "",
+  };
+
+  let prefs = {
+    ...DEFAULT_PREFS,
   };
 
   function pad2(n) { return String(n).padStart(2, "0"); }
@@ -198,17 +204,28 @@
       const raw = localStorage.getItem(prefsKey());
       if (!raw) return;
       const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
+      if (obj && typeof obj === "object") {
+        // If preferences schema/version changed, discard old ones to avoid "impostazioni vecchie".
+        if (obj.__v !== PREFS_VERSION) {
+          prefs = { ...DEFAULT_PREFS };
+          // overwrite stored value so the UI matches immediately
+          try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
+        } else {
+          prefs = { ...DEFAULT_PREFS, ...obj };
+        }
+      }
     } catch {}
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
   }
   function savePrefs() {
-    try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
+    // always persist version marker
+    const toSave = { ...prefs, __v: PREFS_VERSION };
+    try { localStorage.setItem(prefsKey(), JSON.stringify(toSave)); } catch {}
   }
   function resetPrefs() {
-    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], showService: true, dayNav: false, userColor: "" };
+    prefs = { ...DEFAULT_PREFS };
     SLOT_MIN = 30;
     multiUser = false;
     savePrefs();
