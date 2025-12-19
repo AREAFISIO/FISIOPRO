@@ -6,6 +6,54 @@ const {
   AIRTABLE_COLLABORATORI_TABLE = "COLLABORATORI",
 } = process.env;
 
+function escAirtableString(s) {
+  return String(s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ")
+    .trim();
+}
+
+// Best-effort warm cache (helps if multiple logins or retries happen quickly).
+const __loginLookupCache = new Map(); // email -> { ts:number, rec:any|null }
+const CACHE_TTL_MS = 60_000;
+
+async function fetchCollaboratorByEmail(emailRaw) {
+  const email = String(emailRaw || "").trim().toLowerCase();
+  if (!email) return null;
+
+  const cached = __loginLookupCache.get(email);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.rec;
+
+  const table = encodeURIComponent(AIRTABLE_COLLABORATORI_TABLE);
+  const formula = `LOWER({Email}) = LOWER("${escAirtableString(email)}")`;
+  const qs = new URLSearchParams({
+    filterByFormula: formula,
+    maxRecords: "1",
+    pageSize: "1",
+  });
+
+  // Only fetch fields needed for login validation + display.
+  ["Email", "Attivo", "Ruolo", "Codice accesso", "Nome"].forEach((f) => qs.append("fields[]", f));
+
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}?${qs.toString()}`;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
+  });
+
+  if (!r.ok) {
+    // cache negative briefly to avoid hammering in case of repeated invalid attempts
+    __loginLookupCache.set(email, { ts: Date.now(), rec: null });
+    return null;
+  }
+
+  const data = await r.json().catch(() => ({}));
+  const rec = data.records?.[0] || null;
+  __loginLookupCache.set(email, { ts: Date.now(), rec });
+  return rec;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return setJson(res, 405, { ok: false, error: "method_not_allowed" });
 
@@ -19,18 +67,7 @@ export default async function handler(req, res) {
 
     if (!email || !codice) return setJson(res, 400, { ok: false, error: "missing_fields" });
 
-    const table = encodeURIComponent(AIRTABLE_COLLABORATORI_TABLE);
-    const filter = encodeURIComponent(`LOWER({Email}) = LOWER("${email}")`);
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}?filterByFormula=${filter}&maxRecords=1`;
-
-    const r = await fetch(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
-    });
-
-    if (!r.ok) return setJson(res, 401, { ok: false, error: "invalid" });
-
-    const data = await r.json();
-    const rec = data.records?.[0];
+    const rec = await fetchCollaboratorByEmail(email);
     if (!rec) return setJson(res, 401, { ok: false, error: "invalid" });
 
     const f = rec.fields || {};
