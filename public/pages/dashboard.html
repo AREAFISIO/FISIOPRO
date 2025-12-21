@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Dashboard</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+
+  <style>
+    body{ overflow:auto; background:#f4fbff; }
+    .app{ grid-template-columns: 300px 1fr; }
+
+    /* Light sidebar/topbar like screenshot */
+    .sidebar.light{
+      background: linear-gradient(180deg, #bfeaff 0%, #cfefff 55%, #bde9ff 100%);
+      border-right: 1px solid rgba(0,0,0,.06);
+    }
+    .sidebar.light .brand{
+      background: rgba(255,255,255,.60);
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 10px 26px rgba(0,0,0,.08);
+    }
+    .sidebar.light .brand .title{ color:#0b2c3d; }
+    .sidebar.light .brand .sub{ color: rgba(11,44,61,.65); }
+    .sidebar.light .nav .section{ color: rgba(11,44,61,.55); }
+    .sidebar.light .nav a{ color: rgba(11,44,61,.80); border-color: transparent; }
+    .sidebar.light .nav a:hover{ background: rgba(255,255,255,.45); border-color: rgba(0,0,0,.06); }
+    .sidebar.light .nav a.active{ background: rgba(255,255,255,.68); border-color: rgba(0,0,0,.08); color:#0b2c3d; }
+    .sidebar.light .badge{ background: rgba(255,255,255,.70); border-color: rgba(0,0,0,.08); color:#0b2c3d; }
+
+    .topbar.light{
+      background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70), transparent);
+      color:#0b2c3d;
+    }
+    .topbar.light .pill{
+      background: rgba(0,0,0,.04);
+      border-color: rgba(0,0,0,.06);
+      color: rgba(11,44,61,.65);
+    }
+
+    .card.soft{
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(0,0,0,.06);
+      box-shadow: 0 12px 30px rgba(0,0,0,.08);
+      color:#0b2c3d;
+    }
+
+    .dashTop{
+      display:grid;
+      grid-template-columns: 1fr 1.15fr 1.15fr;
+      gap:14px;
+      align-items:start;
+    }
+    @media (max-width: 1100px){
+      .dashTop{ grid-template-columns: 1fr; }
+    }
+
+    .ctaCol{ display:flex; flex-direction:column; gap:14px; }
+    .ctaBtn{
+      display:flex; align-items:center; justify-content:center;
+      height: 62px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: #00a98f;
+      color: white;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor:pointer;
+      box-shadow: 0 10px 20px rgba(0,169,143,.18);
+    }
+    .ctaBtn:hover{ filter: brightness(.98); transform: translateY(-1px); }
+
+    .fieldLine{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .lightInput, .lightSelect{
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.14);
+      background: rgba(255,255,255,.96);
+      color: #0b2c3d;
+      outline:none;
+      font-size: 16px;
+    }
+    .lightSelect{ padding-right: 36px; }
+    .lightLabel{ font-size: 14px; color: rgba(11,44,61,.70); font-weight: 800; margin-top: 6px; }
+    .lightBtn{
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.10);
+      background: rgba(0,0,0,.04);
+      color:#0b2c3d;
+      cursor:pointer;
+      font-weight: 800;
+    }
+    .lightBtn.primary{
+      background: #00a98f;
+      border-color: rgba(0,0,0,.10);
+      color: white;
+    }
+    .lightBtn:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .mutedLight{ color: rgba(11,44,61,.65); }
+
+    .apptList{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+    .apptItem{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.06);
+      background: rgba(191,234,255,.35);
+    }
+    .apptLeft{ min-width:0; }
+    .apptName{ font-weight: 900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .apptMeta{ margin-top:4px; font-size: 14px; color: rgba(11,44,61,.70); }
+
+    .tbl{ width:100%; border-collapse:collapse; }
+    .tbl th, .tbl td{ padding: 12px 12px; border-bottom: 1px solid rgba(0,0,0,.08); font-size: 15px; }
+    .tbl th{ text-align:left; font-size: 12px; letter-spacing:.08em; text-transform:uppercase; color: rgba(11,44,61,.60); }
+    .tblWrap{
+      overflow:auto;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.06);
+      background: rgba(255,255,255,.88);
+      margin-top: 10px;
+    }
+    .waBtn{
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,169,143,.35);
+      background: rgba(0,169,143,.08);
+      color: #0b2c3d;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 12px;
+      cursor:pointer;
+    }
+    .iconBtn{
+      width: 38px; height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: rgba(0,0,0,.03);
+      cursor:pointer;
+      display:grid; place-items:center;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar light">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOPRO</div>
+        <div class="sub">Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" class="active" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <a data-nav href="archivio-documenti.html" data-role="front,manager">Archivio documenti</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar light" style="position:sticky; top:0; z-index:10; padding:10px 10px 14px;">
+      <div class="toprow">
+        <div class="h1" style="color:#0b2c3d;">Dashboard <span class="pill" data-dash-date>—</span> <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="lightBtn" onclick="history.back()">← Indietro</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashTop">
+      <div class="ctaCol">
+        <button class="ctaBtn" onclick="location.href='anagrafica.html'">Nuovo paziente</button>
+        <button class="ctaBtn" onclick="location.href='agenda.html'">Nuovo appuntamento</button>
+      </div>
+
+      <section class="card soft">
+        <div class="head">
+          <h2>Stampa moduli</h2>
+          <span class="iconBtn" title="Stampa" onclick="window.__dashPrint?.()">
+            Stampa
+          </span>
+        </div>
+        <div class="body" style="padding-top:6px;">
+          <div class="lightLabel">Paziente o Società</div>
+          <input class="lightInput" placeholder="Cerca paziente..." data-print-patient />
+          <datalist id="dlPatientsPrint"></datalist>
+
+          <div class="fieldLine">
+            <select class="lightSelect" data-print-module style="flex:1 1 240px;">
+              <option value="Consenso informato">Consenso informato</option>
+              <option value="Privacy">Privacy</option>
+              <option value="Anamnesi">Anamnesi</option>
+            </select>
+            <button class="lightBtn primary" type="button" onclick="window.__dashPrint?.()">Stampa</button>
+          </div>
+          <div class="mutedLight" style="margin-top:10px; font-size:14px;">Seleziona paziente + modulo e invia in stampa.</div>
+        </div>
+      </section>
+
+      <section class="card soft">
+        <div class="head">
+          <h2>Ricerca paziente o società</h2>
+        </div>
+        <div class="body" style="padding-top:6px;">
+          <div class="lightLabel">Paziente o Società</div>
+          <input class="lightInput" placeholder="Nome, cognome, email, telefono..." data-search-patient list="dlPatientsSearch" />
+          <datalist id="dlPatientsSearch"></datalist>
+
+          <div class="fieldLine">
+            <button class="lightBtn" type="button" onclick="window.__dashGoPatient?.()">Apri scheda</button>
+            <button class="lightBtn" type="button" onclick="location.href='anagrafica.html'">Vai ad Anagrafica</button>
+          </div>
+          <div class="mutedLight" style="margin-top:10px; font-size:14px;">Suggerimenti automatici mentre scrivi (min 2 caratteri).</div>
+        </div>
+      </section>
+    </div>
+
+    <div style="height:14px;"></div>
+
+    <section class="card soft">
+      <div class="head">
+        <h2>Appuntamenti di <span data-appt-date>—</span></h2>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="iconBtn" title="Scarica CSV" onclick="window.__dashExportAppointments?.()">CSV</button>
+        </div>
+      </div>
+      <div class="body" style="padding-top:6px;">
+        <div data-appt-empty class="mutedLight" style="padding:12px 12px; border-radius:14px; border:1px solid rgba(0,0,0,.06); background:rgba(255,255,255,.70);">
+          Nessun appuntamento oggi
+        </div>
+        <div class="apptList" data-appt-list style="display:none;"></div>
+      </div>
+    </section>
+
+    <div style="height:14px;"></div>
+
+    <section class="card soft">
+      <div class="head">
+        <h2>Compleanni di oggi</h2>
+      </div>
+      <div class="body" style="padding-top:6px;">
+        <div data-bday-empty class="mutedLight" style="padding:12px 12px; border-radius:14px; border:1px solid rgba(0,0,0,.06); background:rgba(255,255,255,.70);">
+          Nessun compleanno oggi
+        </div>
+        <div class="tblWrap" data-bday-table style="display:none;">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Cognome</th>
+                <th>Email</th>
+                <th>Cellulare</th>
+                <th>Data di nascita</th>
+                <th style="width:240px;"></th>
+              </tr>
+            </thead>
+            <tbody data-bday-tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+
+<script>
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function ymd(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+  function itDate(d){
+    try { return d.toLocaleDateString("it-IT", { day:"2-digit", month:"2-digit", year:"numeric" }); }
+    catch { return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}`; }
+  }
+  function itTime(iso){
+    if (!iso) return "";
+    try { return new Date(iso).toLocaleTimeString("it-IT", { hour:"2-digit", minute:"2-digit" }); }
+    catch { return ""; }
+  }
+  function digitsPhone(x){ return String(x || "").replace(/[^\d]/g, ""); }
+  function waLink(phone, name){
+    const p = digitsPhone(phone);
+    if (!p) return "";
+    const msg = encodeURIComponent(`Ciao ${name || ""}! Tanti auguri di buon compleanno.`);
+    return `https://wa.me/${p}?text=${msg}`;
+  }
+
+  const today = new Date();
+  const todayYMD = ymd(today);
+  const dateLabel = itDate(today);
+
+  document.querySelector("[data-dash-date]").textContent = dateLabel;
+  document.querySelector("[data-appt-date]").textContent = dateLabel;
+
+  const apptEmpty = document.querySelector("[data-appt-empty]");
+  const apptList = document.querySelector("[data-appt-list]");
+  const bdayEmpty = document.querySelector("[data-bday-empty]");
+  const bdayTable = document.querySelector("[data-bday-table]");
+  const bdayTbody = document.querySelector("[data-bday-tbody]");
+
+  let __appointments = [];
+  let __searchMap = new Map(); // label -> patientId
+  let __printMap = new Map();  // label -> patientId
+
+  async function api(path){
+    const res = await fetch(path, { credentials:"include" });
+    const txt = await res.text();
+    let data = {};
+    try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function renderAppointments(list){
+    __appointments = list || [];
+    if (!__appointments.length){
+      apptEmpty.style.display = "block";
+      apptList.style.display = "none";
+      apptList.innerHTML = "";
+      return;
+    }
+
+    apptEmpty.style.display = "none";
+    apptList.style.display = "flex";
+    apptList.innerHTML = "";
+
+    for (const a of __appointments){
+      const p = a.patient || {};
+      const full = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente";
+      const time = itTime(a.start);
+      const dur = a.durata ? ` • ${a.durata}` : "";
+      const el = document.createElement("div");
+      el.className = "apptItem";
+      el.innerHTML = `
+        <div class="apptLeft">
+          <div class="apptName">${full}</div>
+          <div class="apptMeta">${time}${dur}</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex:0 0 auto;">
+          <button class="lightBtn" type="button">Apri</button>
+        </div>
+      `;
+      el.querySelector("button").onclick = () => {
+        if (p?.id) location.href = `paziente.html?id=${encodeURIComponent(p.id)}`;
+      };
+      apptList.appendChild(el);
+    }
+  }
+
+  function renderBirthdays(list){
+    const arr = list || [];
+    if (!arr.length){
+      bdayEmpty.style.display = "block";
+      bdayTable.style.display = "none";
+      bdayTbody.innerHTML = "";
+      return;
+    }
+    bdayEmpty.style.display = "none";
+    bdayTable.style.display = "block";
+    bdayTbody.innerHTML = "";
+
+    for (const p of arr){
+      const tr = document.createElement("tr");
+      const full = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim();
+      const tel = p.Telefono || "";
+      const wa = waLink(tel, p.Nome || "");
+      const telDigits = digitsPhone(tel);
+
+      tr.innerHTML = `
+        <td>${p.Nome || "—"}</td>
+        <td>${p.Cognome || "—"}</td>
+        <td>${p.Email || "—"}</td>
+        <td>${tel || "—"}</td>
+        <td>${p["Data di nascita"] || "—"}</td>
+        <td style="text-align:right;">
+          <button class="waBtn" type="button" ${wa ? "" : "disabled"}>Invia auguri</button>
+          <button class="iconBtn" type="button" title="Chiama" ${telDigits ? "" : "disabled"} style="margin-left:10px;">Tel</button>
+        </td>
+      `;
+      const waBtn = tr.querySelector(".waBtn");
+      const callBtn = tr.querySelector(".iconBtn");
+
+      waBtn.onclick = () => { if (wa) window.open(wa, "_blank"); };
+      callBtn.onclick = () => { if (telDigits) location.href = `tel:${telDigits}`; };
+
+      bdayTbody.appendChild(tr);
+    }
+  }
+
+  window.__dashExportAppointments = function(){
+    const rows = [["Ora", "Paziente", "Durata", "Email operatore"]];
+    for (const a of (__appointments || [])){
+      const p = a.patient || {};
+      rows.push([itTime(a.start), [p.Nome, p.Cognome].filter(Boolean).join(" ").trim(), String(a.durata ?? ""), String(a.email ?? "")]);
+    }
+    const csv = rows.map(r => r.map(x => `"${String(x || "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type:"text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `appuntamenti_${todayYMD}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // Search (typeahead) for "Ricerca paziente"
+  const searchInput = document.querySelector("[data-search-patient]");
+  const dlSearch = document.querySelector("#dlPatientsSearch");
+  let searchTimer = null;
+
+  async function refreshSearch(q){
+    const data = await api(`/api/patients-search?q=${encodeURIComponent(q)}`);
+    __searchMap = new Map();
+    dlSearch.innerHTML = "";
+    for (const p of (data.records || [])){
+      const label = `${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim()} • ${p.Email || p.Telefono || p.id}`;
+      __searchMap.set(label, p.id);
+      const opt = document.createElement("option");
+      opt.value = label;
+      dlSearch.appendChild(opt);
+    }
+  }
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const q = (searchInput.value || "").trim();
+    if (q.length < 2) { dlSearch.innerHTML = ""; __searchMap = new Map(); return; }
+    searchTimer = setTimeout(() => refreshSearch(q).catch(()=>{}), 220);
+  });
+
+  window.__dashGoPatient = function(){
+    const v = (searchInput.value || "").trim();
+    const id = __searchMap.get(v);
+    if (id) location.href = `paziente.html?id=${encodeURIComponent(id)}`;
+  };
+
+  // Print area: reuse same search API
+  const printInput = document.querySelector("[data-print-patient]");
+  const dlPrint = document.querySelector("#dlPatientsPrint");
+  const selModule = document.querySelector("[data-print-module]");
+  let printTimer = null;
+
+  async function refreshPrint(q){
+    const data = await api(`/api/patients-search?q=${encodeURIComponent(q)}`);
+    __printMap = new Map();
+    dlPrint.innerHTML = "";
+    for (const p of (data.records || [])){
+      const label = `${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim()} • ${p.Email || p.Telefono || p.id}`;
+      __printMap.set(label, p.id);
+      const opt = document.createElement("option");
+      opt.value = label;
+      dlPrint.appendChild(opt);
+    }
+  }
+
+  printInput.setAttribute("list", "dlPatientsPrint");
+  printInput.addEventListener("input", () => {
+    clearTimeout(printTimer);
+    const q = (printInput.value || "").trim();
+    if (q.length < 2) { dlPrint.innerHTML = ""; __printMap = new Map(); return; }
+    printTimer = setTimeout(() => refreshPrint(q).catch(()=>{}), 220);
+  });
+
+  window.__dashPrint = async function(){
+    const v = (printInput.value || "").trim();
+    const id = __printMap.get(v);
+    const moduleName = (selModule.value || "").trim();
+    if (!id) return alert("Seleziona un paziente dalla lista.");
+
+    const p = await api(`/api/patient?id=${encodeURIComponent(id)}`);
+    const full = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim();
+    const w = window.open("", "_blank");
+    w.document.write(`
+      <html lang="it">
+      <head>
+        <meta charset="utf-8" />
+        <title>${moduleName} • ${full}</title>
+        <style>
+          body{ font-family: Arial, sans-serif; padding: 28px; }
+          h1{ margin:0; font-size: 22px; }
+          .sub{ margin-top: 6px; color:#333; }
+          .box{ margin-top: 16px; border:1px solid #ddd; padding: 14px; border-radius: 10px; }
+          .row{ margin: 6px 0; }
+          .k{ display:inline-block; width: 160px; color:#444; }
+        </style>
+      </head>
+      <body>
+        <h1>${moduleName}</h1>
+        <div class="sub">Paziente: <b>${full || "—"}</b></div>
+        <div class="box">
+          <div class="row"><span class="k">Email</span> ${p.Email || "—"}</div>
+          <div class="row"><span class="k">Telefono</span> ${p.Telefono || "—"}</div>
+          <div class="row"><span class="k">Data di nascita</span> ${p["Data di nascita"] || "—"}</div>
+        </div>
+        <div style="margin-top:22px; color:#555;">
+          (Template base) – qui inseriremo i campi del modulo reale.
+        </div>
+        <script>window.print();<\/script>
+      </body>
+      </html>
+    `);
+    w.document.close();
+  };
+
+  async function load(){
+    try{
+      const data = await api(`/api/dashboard?date=${encodeURIComponent(todayYMD)}`);
+      renderAppointments(data.appointments || []);
+      renderBirthdays(data.birthdays || []);
+    } catch(e){
+      console.error(e);
+      apptEmpty.textContent = "Errore caricamento appuntamenti.";
+      bdayEmpty.textContent = "Errore caricamento compleanni.";
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>
+
