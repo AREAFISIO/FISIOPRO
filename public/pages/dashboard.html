@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Dashboard</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+  <style>
+    .dashGrid{
+      display:grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 1100px){
+      .dashGrid{ grid-template-columns: 1fr; }
+    }
+    .kpiRow{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 1100px){
+      .kpiRow{ grid-template-columns: 1fr; }
+    }
+    .kpi{
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      box-shadow: var(--shadow);
+    }
+    .kpi .label{ color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .kpi .value{ font-size: 28px; font-weight: 900; margin-top: 6px; letter-spacing: -.2px; }
+    .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+
+    .quickGrid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    @media (max-width: 900px){
+      .quickGrid{ grid-template-columns: 1fr; }
+    }
+    .quick{
+      cursor:pointer;
+      user-select:none;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      box-shadow: var(--shadow);
+      transition: transform .08s ease, border-color .08s ease, background .08s ease;
+    }
+    .quick:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.05);
+      border-color: rgba(34,230,195,.28);
+    }
+    .quick .title{ font-weight: 900; letter-spacing:-.2px; }
+    .quick .sub{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOPRO</div>
+        <div class="sub">Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
+      <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Dashboard <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='agenda.html'">Apri Agenda</button>
+          <button class="btn primary" onclick="location.href='index.html'">Apri Pazienti</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpiRow" style="margin-bottom:14px;">
+      <div class="kpi">
+        <div class="label">Oggi</div>
+        <div class="value">—</div>
+        <div class="mini">Placeholder KPI (prossimo step: appuntamenti e incassi).</div>
+      </div>
+      <div class="kpi" data-role="front,manager">
+        <div class="label">Front Office</div>
+        <div class="value">—</div>
+        <div class="mini">Anagrafica, vendite, erogato, assicurazioni.</div>
+      </div>
+      <div class="kpi" data-role="manager">
+        <div class="label">Setup</div>
+        <div class="value">—</div>
+        <div class="mini">Configurazioni e parametri di sistema.</div>
+      </div>
+    </div>
+
+    <div class="dashGrid">
+      <section class="card">
+        <div class="head"><h2>Scorciatoie</h2><span class="chip">Operativo</span></div>
+        <div class="body">
+          <div class="quickGrid">
+            <div class="quick" onclick="location.href='index.html'">
+              <div class="title">Pazienti</div>
+              <div class="sub">Ricerca, schede paziente, percorsi.</div>
+            </div>
+            <div class="quick" onclick="location.href='agenda.html'">
+              <div class="title">Agenda</div>
+              <div class="sub">Calendario settimanale e appuntamenti.</div>
+            </div>
+            <div class="quick" onclick="location.href='casi-clinici.html'" data-role="physio,manager">
+              <div class="title">Casi clinici</div>
+              <div class="sub">Lista casi, bozze, definitivi.</div>
+            </div>
+            <div class="quick" onclick="location.href='front-office.html'" data-role="front,manager">
+              <div class="title">Dashboard Front-Office</div>
+              <div class="sub">Flusso operativo rapido per segreteria.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="head"><h2>Note</h2><span class="chip">Info</span></div>
+        <div class="body" style="line-height:1.6; color: var(--muted);">
+          Questa pagina è la landing principale dal menù laterale.
+          <br/>
+          Se vuoi, nel prossimo step la collego a dati reali (appuntamenti di oggi, nuovi pazienti, incassi).
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn primary" style="width:100%;" onclick="location.href='agenda.html'">🗓️ Agenda</button>
+      <div style="height:10px;"></div>
+      <button class="btn" style="width:100%;" onclick="location.href='index.html'">👥 Pazienti</button>
+      <div style="height:10px;"></div>
+      <button class="btn" style="width:100%; display:none;" data-role="manager" onclick="location.href='impostazioni.html'">⚙️ Configurazione</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+</body>
+</html>
