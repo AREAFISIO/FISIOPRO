@@ -22,7 +22,7 @@
       <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
       <div class="section">Generale</div>
       <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
-      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
       <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
       <div class="section">Sistema</div>
       <a data-nav href="login.html">Logout</a>
@@ -35,7 +35,7 @@
         <div class="h1">Anagrafica <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
           <button class="btn">Export</button>
-          <button class="btn primary">Nuovo paziente</button>
+          <button class="btn primary" onclick="location.href='nuovo-paziente.html'">Nuovo paziente</button>
         </div>
       </div>
     </div>
@@ -44,18 +44,38 @@
       <div class="head"><h2>Ricerca paziente</h2><span class="chip">Front Office</span></div>
       <div class="body">
         <div class="toolbar">
-          <div class="search">Cerca <input data-search placeholder="Nome, email, telefono..." /></div>
-          <span class="chip">Filtri</span>
+          <div class="search">Cerca <input data-search placeholder="Nome, cognome, email, telefono..." /></div>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <span class="chip">Filtro</span>
+            <select class="select" data-filter-channel style="width:auto; min-width:200px;">
+              <option value="">Canali: tutti</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="sms">SMS</option>
+              <option value="email">Email</option>
+              <option value="telefono">Telefono</option>
+            </select>
+          </div>
         </div>
         <div class="tablewrap" data-table>
           <table>
-            <thead><tr><th>Paziente</th><th>Email</th><th>Telefono</th><th>Stato</th></tr></thead>
-            <tbody>
-              <tr onclick="location.href='paziente.html?id=RECORD_ID'"><td><div class="rowlink">Apri scheda</div><div class="subcell">placeholder</div></td><td>—</td><td>—</td><td><span class="chip">Attivo</span></td></tr>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Cognome</th>
+                <th>Codice fiscale</th>
+                <th>Email</th>
+                <th>Cellulare</th>
+                <th>Data di nascita</th>
+                <th>Canali preferiti</th>
+                <th style="min-width:150px;">Azioni</th>
+              </tr>
+            </thead>
+            <tbody data-patients-body>
+              <tr><td colspan="8" class="muted">Caricamento…</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="mini" style="margin-top:10px;color:var(--muted);">Qui colleghiamo i dati reali da /api/patients.</div>
+        <div class="mini" style="margin-top:10px;color:var(--muted);" data-patients-meta>Collego i dati reali da Airtable.</div>
       </div>
     </section>
   </main>

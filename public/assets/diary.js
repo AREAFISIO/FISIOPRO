@@ -31,20 +31,91 @@
   const modalBody = document.querySelector("[data-cal-modal-body]");
   const modalClose = document.querySelector("[data-cal-modal-close]");
 
-  const START_HOUR = 8;
-  const END_HOUR = 20;
+  const START_HOUR = 7;
+  const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
   const SLOT_PX = 18;
 
-  let view = "week"; // week | workweek
+  let view = "7days"; // 7days | 5days | day
   let anchorDate = new Date();
   let rawItems = [];
   let multiUser = false; // default: show only logged-in user
   let knownTherapists = [];
   let knownByEmail = new Map(); // email -> name
+  let knownOperators = []; // [{id,name,email,...}] from /api/operators
+  let operatorNameToId = new Map(); // name -> recId
+  let locationsCache = null; // [{id,name}]
+  let servicesCache = null; // [{id,name}]
+  let insuranceCache = new Map(); // patientId -> string
   let selectedTherapists = new Set();
   let draftSelected = new Set();
   let pickMode = "view"; // view | defaults
+
+  // Hover card (info rapida)
+  const hoverCard = document.createElement("div");
+  hoverCard.className = "fpHover";
+  document.body.appendChild(hoverCard);
+  function hideHover() { hoverCard.style.display = "none"; }
+  function showHover(item, x, y) {
+    if (!item) return;
+    if (modalBack && modalBack.style.display !== "none") return;
+
+    const startStr = item.startAt ? item.startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
+    const endStr = item.endAt ? item.endAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
+    const when = startStr + (endStr ? " → " + endStr : "");
+
+    const sede = pickField(item.fields || {}, ["Sede", "Sedi", "Sede appuntamento", "Location", "Luogo", "Sede Bologna"]);
+    const note = pickField(item.fields || {}, ["Note interne", "Note", "Nota", "Note interne (preview)", "Note paziente"]);
+
+    const roleRaw = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).toLowerCase();
+    const canSeeInsurance = roleRaw.includes("front") || roleRaw.includes("manager") || roleRaw.includes("admin") || roleRaw.includes("amministr");
+    const insurance = canSeeInsurance && item.patientId ? (insuranceCache.get(item.patientId) || "Carico…") : "";
+
+    hoverCard.dataset.patientId = String(item.patientId || "");
+    hoverCard.innerHTML = `
+      <div class="t">${item.patient || "Appuntamento"}</div>
+      <div class="r"><span class="k">Orario</span><span>${when || "—"}</span></div>
+      <div class="r"><span class="k">Stato</span><span>${item.status || "—"}</span></div>
+      ${canSeeInsurance ? `<div class="r"><span class="k">Assicurazione</span><span>${insurance || "—"}</span></div>` : ""}
+      <div class="r"><span class="k">Operatore</span><span>${item.therapist || "—"}</span></div>
+      <div class="r"><span class="k">Sede</span><span>${sede ? String(sede) : "—"}</span></div>
+      <div class="note">${note ? String(note) : ""}</div>
+    `;
+    hoverCard.querySelector(".note").style.display = note ? "" : "none";
+
+    // Lazy-load insurance/practice label (front/manager only)
+    if (canSeeInsurance && item.patientId && !insuranceCache.has(item.patientId)) {
+      insuranceCache.set(item.patientId, "Carico…");
+      fetch(`/api/insurance?patientId=${encodeURIComponent(item.patientId)}`, { credentials: "include" })
+        .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+        .then(({ ok, j }) => {
+          if (!ok) throw new Error(j?.error || "insurance_error");
+          const first = (j.items || [])[0] || null;
+          const label = String(first?.pratica || first?.stato || "").trim();
+          insuranceCache.set(item.patientId, label || "—");
+          if (hoverCard.style.display === "block" && hoverCard.dataset.patientId === String(item.patientId)) {
+            // aggiorna al volo la riga assicurazione (2° span dell'ultima riga assicurazione)
+            const rows = hoverCard.querySelectorAll(".r");
+            rows.forEach((r) => {
+              const k = r.querySelector(".k")?.textContent || "";
+              if (k.trim().toLowerCase() === "assicurazione") {
+                const spans = r.querySelectorAll("span");
+                if (spans[1]) spans[1].textContent = (label || "—");
+              }
+            });
+          }
+        })
+        .catch(() => {
+          insuranceCache.set(item.patientId, "—");
+        });
+    }
+
+    const left = Math.min(window.innerWidth - 340, x + 12);
+    const top = Math.min(window.innerHeight - 180, y + 12);
+    hoverCard.style.left = Math.max(12, left) + "px";
+    hoverCard.style.top = Math.max(12, top) + "px";
+    hoverCard.style.display = "block";
+  }
 
   // Preferences
   const prefsBack = document.querySelector("[data-prefs-back]");
@@ -102,6 +173,10 @@
   }
 
   function minutesOfDay(dt) { return dt.getHours() * 60 + dt.getMinutes(); }
+  function toLocalDateTimeISO(dt) {
+    // Airtable accetta ISO; usiamo toISOString (UTC) per coerenza
+    return dt instanceof Date ? dt.toISOString() : "";
+  }
 
   function pickField(fields, keys) {
     for (const k of keys) {
@@ -127,6 +202,11 @@
       pickField(f, ["Paziente (testo)", "Paziente", "Patient", "patient_name", "Nome Paziente", "Cognome e Nome"]) ||
       (Array.isArray(f.Paziente) ? `Paziente (${f.Paziente[0] || ""})` : "");
 
+    let patientId = "";
+    if (Array.isArray(f.Paziente) && f.Paziente.length && typeof f.Paziente[0] === "string") {
+      patientId = String(f.Paziente[0] || "").trim();
+    }
+
     let startAt = null;
     let endAt = null;
     try { if (start) startAt = new Date(start); } catch {}
@@ -139,6 +219,7 @@
       id: x.id,
       fields: f,
       patient: String(patient || "").trim(),
+      patientId,
       therapist: String(therapist || "").trim(),
       service: String(service || "").trim(),
       status: String(status || "").trim(),
@@ -338,14 +419,51 @@
     return data;
   }
 
+  async function loadLocations() {
+    if (Array.isArray(locationsCache)) return locationsCache;
+    try {
+      const data = await apiGet("/api/locations");
+      locationsCache = data.items || [];
+    } catch {
+      locationsCache = [];
+    }
+    return locationsCache;
+  }
+
+  async function loadServices() {
+    if (Array.isArray(servicesCache)) return servicesCache;
+    try {
+      const data = await apiGet("/api/services");
+      servicesCache = data.items || [];
+    } catch {
+      servicesCache = [];
+    }
+    return servicesCache;
+  }
+
+  async function searchPatients(q) {
+    const qq = String(q || "").trim();
+    if (!qq) return [];
+    const data = await apiGet(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(qq)}`);
+    const items = (data.items || []).map((x) => {
+      const nome = String(x.Nome || "").trim();
+      const cognome = String(x.Cognome || "").trim();
+      const full = [nome, cognome].filter(Boolean).join(" ").trim() || String(x["Cognome e Nome"] || "").trim();
+      return { id: x.id, label: full || "Paziente", phone: x.Telefono || "", email: x.Email || "" };
+    });
+    return items;
+  }
+
   async function load() {
-    const start = startOfWeekMonday(anchorDate);
-    const days = view === "workweek" ? 6 : 7;
+    const start = view === "day"
+      ? new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate())
+      : startOfWeekMonday(anchorDate);
+    const days = view === "day" ? 1 : (view === "5days" ? 5 : 7);
     const from = toYmd(start);
     const to = toYmd(addDays(start, days - 1));
 
-    if (rangeEl) rangeEl.textContent = `${from} → ${to}`;
-    if (monthEl) monthEl.textContent = fmtMonth(start);
+    if (rangeEl) rangeEl.textContent = ""; // UI: non mostrare date in alto
+    if (monthEl) monthEl.textContent = String(fmtMonth(start) || "").toUpperCase();
     if (weekEl) weekEl.textContent = fmtWeekRange(start, days);
 
     // Load known operators from COLLABORATORI (preferred),
@@ -353,9 +471,11 @@
     try {
       const ops = await apiGet("/api/operators");
       const items = (ops.items || []);
+      knownOperators = items;
       const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
       if (names.length) knownTherapists = names;
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
+      operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
     } catch {
       // fallback to operators found in the week
     }
@@ -398,7 +518,8 @@
     const colsPerDay = multiUser ? Math.max(1, ops.length) : 1;
     const totalDayCols = days * colsPerDay;
 
-    gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(160px, 1fr))`;
+    // Colonne sempre visibili: si stringono (no orizzontale) quando aggiungo operatori
+    gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(0, 1fr))`;
     if (multiUser) gridEl.style.gridTemplateRows = `58px 34px ${heightPx}px`;
     else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
 
@@ -491,12 +612,43 @@
           col.appendChild(line);
         }
 
+        // Hover slot highlight + click to create
+        const hover = document.createElement("div");
+        hover.className = "slotHover";
+        hover.style.height = SLOT_PX + "px";
+        col.appendChild(hover);
+
+        const updateHover = (clientY) => {
+          const r = col.getBoundingClientRect();
+          const y = clientY - r.top;
+          const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
+          hover.style.top = (idx * SLOT_PX) + "px";
+          hover.style.display = "";
+          col.dataset._slotIndex = String(idx);
+        };
+
+        col.addEventListener("mousemove", (e) => updateHover(e.clientY));
+        col.addEventListener("mouseleave", () => { hover.style.display = "none"; });
+
+        col.addEventListener("click", (e) => {
+          if (e.target && e.target.closest && e.target.closest(".event")) return;
+          const idx = Number(col.dataset._slotIndex || "0");
+          const slotStartMin = START_HOUR * 60 + idx * SLOT_MIN;
+
+          const day = addDays(start, dIdx);
+          const dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+          dt.setMinutes(slotStartMin);
+
+          const therapistName = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
+          openCreateModal({ startAt: dt, therapistName });
+        });
+
         gridEl.appendChild(col);
       }
     }
   }
 
-  function openModal(item) {
+  function openDetailsModal(item) {
     if (!modalBack) return;
     modalTitle.textContent = item.patient || "Dettagli appuntamento";
 
@@ -521,14 +673,219 @@
     modalBack.style.display = "flex";
   }
 
+  function openCreateModal(ctx) {
+    if (!modalBack) return;
+    const startAt = ctx?.startAt instanceof Date ? ctx.startAt : new Date();
+    const therapistName = String(ctx?.therapistName || "").trim();
+
+    // calcola durata max fino al prossimo appuntamento (stesso giorno e stesso operatore)
+    const startMin = minutesOfDay(startAt);
+    const endDayMin = END_HOUR * 60;
+    let nextMin = endDayMin;
+    for (const it of rawItems || []) {
+      if (!it.startAt) continue;
+      if (therapistName && String(it.therapist || "").trim() !== therapistName) continue;
+      const sameDay =
+        it.startAt.getFullYear() === startAt.getFullYear() &&
+        it.startAt.getMonth() === startAt.getMonth() &&
+        it.startAt.getDate() === startAt.getDate();
+      if (!sameDay) continue;
+      const m = minutesOfDay(it.startAt);
+      if (m > startMin && m < nextMin) nextMin = m;
+    }
+    const maxDur = Math.max(30, Math.min(360, nextMin - startMin)); // fino a 6h per sicurezza UI
+    const durOptions = [];
+    for (let m = 30; m <= maxDur; m += 30) durOptions.push(m);
+
+    modalTitle.textContent = "Nuovo appuntamento";
+    modalBody.innerHTML = `
+      <div class="fp-kv"><div class="k">Inizio</div><div class="v">${startAt.toLocaleString("it-IT", { weekday:"short", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })}</div></div>
+      <div style="height:10px;"></div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+        <label class="field" style="gap:6px;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Tipologia</span>
+          <select class="select" data-f-type>
+            <option value="Appuntamento paziente">Appuntamento paziente</option>
+            <option value="Indisponibilità">Indisponibilità</option>
+            <option value="Appuntamento società">Appuntamento società</option>
+            <option value="Ferie">Ferie</option>
+            <option value="Appuntamento di gruppo">Appuntamento di gruppo</option>
+            <option value="Proposta di appuntamento">Proposta di appuntamento</option>
+          </select>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Durata</span>
+          <select class="select" data-f-duration>
+            ${durOptions.map((m) => `<option value="${m}">${m === 30 ? "30 min" : (m % 60 === 0 ? (m/60) + " h" : (Math.floor(m/60) + " h " + (m%60) + " min"))}</option>`).join("")}
+          </select>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Paziente</span>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input class="input" data-f-patient-q placeholder="Cerca paziente..." />
+            <button class="btn" data-f-patient-clear type="button">Svuota</button>
+          </div>
+          <div data-f-patient-picked style="margin-top:8px; color: rgba(255,255,255,.90); font-weight:800; display:none;"></div>
+          <div data-f-patient-results style="margin-top:8px; display:none; border:1px solid rgba(255,255,255,.10); border-radius:12px; overflow:hidden;"></div>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Sede</span>
+          <select class="select" data-f-location><option value="">Carico…</option></select>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Prestazione</span>
+          <select class="select" data-f-service><option value="">Carico…</option></select>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Operatore</span>
+          <select class="select" data-f-operator></select>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Note interne</span>
+          <textarea class="textarea" data-f-internal placeholder="Note interne..."></textarea>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+        <button class="btn" data-f-cancel type="button">Annulla</button>
+        <button class="btn primary" data-f-save type="button">Salva</button>
+      </div>
+    `;
+
+    const elType = modalBody.querySelector("[data-f-type]");
+    const elDur = modalBody.querySelector("[data-f-duration]");
+    const elLoc = modalBody.querySelector("[data-f-location]");
+    const elServ = modalBody.querySelector("[data-f-service]");
+    const elOp = modalBody.querySelector("[data-f-operator]");
+    const elInternal = modalBody.querySelector("[data-f-internal]");
+
+    // operator select
+    const ops = (knownOperators || []).slice();
+    elOp.innerHTML = ops.map((o) => `<option value="${String(o.id || "")}">${String(o.name || "").trim()}</option>`).join("");
+    const defaultOpId = therapistName ? (operatorNameToId.get(therapistName) || "") : "";
+    if (defaultOpId) elOp.value = defaultOpId;
+
+    // locations + services
+    loadLocations().then((arr) => {
+      elLoc.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+    });
+    loadServices().then((arr) => {
+      elServ.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+    });
+
+    // patient search
+    let patientPicked = { id: "", label: "" };
+    const qInput = modalBody.querySelector("[data-f-patient-q]");
+    const pickedEl = modalBody.querySelector("[data-f-patient-picked]");
+    const resultsEl = modalBody.querySelector("[data-f-patient-results]");
+    const clearBtn = modalBody.querySelector("[data-f-patient-clear]");
+    let t = null;
+
+    function setPicked(p) {
+      patientPicked = p || { id: "", label: "" };
+      if (patientPicked.id) {
+        pickedEl.style.display = "";
+        pickedEl.textContent = patientPicked.label;
+      } else {
+        pickedEl.style.display = "none";
+        pickedEl.textContent = "";
+      }
+    }
+    function hideResults() {
+      resultsEl.style.display = "none";
+      resultsEl.innerHTML = "";
+    }
+    async function doSearch() {
+      const q = String(qInput.value || "").trim();
+      if (q.length < 2) return hideResults();
+      const results = await searchPatients(q);
+      if (!results.length) return hideResults();
+      resultsEl.innerHTML = results.slice(0, 10).map((r) => `
+        <div data-pick="${r.id}" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); cursor:pointer;">
+          <div style="font-weight:900;">${r.label}</div>
+          <div style="opacity:.75; font-size:12px; margin-top:2px;">${[r.phone, r.email].filter(Boolean).join(" • ")}</div>
+        </div>
+      `).join("");
+      resultsEl.querySelectorAll("[data-pick]").forEach((row) => {
+        row.addEventListener("click", () => {
+          const id = row.getAttribute("data-pick");
+          const picked = results.find((x) => x.id === id);
+          setPicked(picked);
+          hideResults();
+          qInput.value = picked?.label || "";
+        });
+      });
+      resultsEl.style.display = "";
+    }
+
+    qInput.addEventListener("input", () => {
+      clearTimeout(t);
+      t = setTimeout(() => doSearch().catch(()=>{}), 250);
+    });
+    qInput.addEventListener("focus", () => doSearch().catch(()=>{}));
+    clearBtn.addEventListener("click", () => { qInput.value = ""; setPicked({ id:"", label:"" }); hideResults(); });
+
+    // cancel/save
+    modalBody.querySelector("[data-f-cancel]").onclick = closeModal;
+    modalBody.querySelector("[data-f-save]").onclick = async () => {
+      const btn = modalBody.querySelector("[data-f-save]");
+      btn.disabled = true;
+      try {
+        const durMin = Number(elDur.value || "30");
+        const endAt = new Date(startAt.getTime() + durMin * 60000);
+
+        const payload = {
+          startAt: toLocalDateTimeISO(startAt),
+          endAt: toLocalDateTimeISO(endAt),
+          therapistId: String(elOp.value || ""),
+          patientId: patientPicked.id || "",
+          locationId: String(elLoc.value || ""),
+          serviceId: String(elServ.value || ""),
+          type: String(elType.value || ""),
+          durationMin: durMin,
+          internalNote: String(elInternal.value || ""),
+        };
+
+        // create uses POST; use fetch directly.
+        const res = await fetch("/api/appointment-create", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data.error || ("HTTP " + res.status));
+
+        closeModal();
+        load().catch(()=>{});
+      } catch (e) {
+        console.error(e);
+        alert(e.message || "Errore salvataggio appuntamento");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    modalBack.style.display = "flex";
+  }
+
   function closeModal() {
     if (!modalBack) return;
     modalBack.style.display = "none";
   }
 
   function render() {
-    const start = startOfWeekMonday(anchorDate);
-    const days = view === "workweek" ? 6 : 7;
+    const start = view === "day"
+      ? new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate())
+      : startOfWeekMonday(anchorDate);
+    const days = view === "day" ? 1 : (view === "5days" ? 5 : 7);
     const ops = Array.from(selectedTherapists);
 
     const q = String(qEl?.value || "").trim().toLowerCase();
@@ -593,7 +950,9 @@
         <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
-      ev.onclick = () => openModal(it);
+      ev.onclick = () => openDetailsModal(it);
+      ev.addEventListener("mousemove", (e) => showHover(it, e.clientX, e.clientY));
+      ev.addEventListener("mouseleave", hideHover);
 
       col.appendChild(ev);
     });
@@ -609,8 +968,16 @@
 
   // Events
   qEl?.addEventListener("input", () => render());
-  btnPrev?.addEventListener("click", () => { anchorDate = addDays(anchorDate, view === "workweek" ? -6 : -7); load().catch(()=>{}); });
-  btnNext?.addEventListener("click", () => { anchorDate = addDays(anchorDate, view === "workweek" ? 6 : 7); load().catch(()=>{}); });
+  btnPrev?.addEventListener("click", () => {
+    const step = view === "day" ? 1 : (view === "5days" ? 5 : 7);
+    anchorDate = addDays(anchorDate, -step);
+    load().catch(()=>{});
+  });
+  btnNext?.addEventListener("click", () => {
+    const step = view === "day" ? 1 : (view === "5days" ? 5 : 7);
+    anchorDate = addDays(anchorDate, step);
+    load().catch(()=>{});
+  });
   btnToday?.addEventListener("click", () => { anchorDate = new Date(); load().catch(()=>{}); });
   document.querySelectorAll("[data-cal-view]").forEach((el) => {
     el.addEventListener("click", () => setView(el.getAttribute("data-cal-view")));
@@ -618,6 +985,8 @@
 
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
+  document.addEventListener("scroll", hideHover, true);
+  window.addEventListener("resize", hideHover);
 
   // Operator selector
   opsBar?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
@@ -688,6 +1057,6 @@
   } catch {}
 
   loadPrefs();
-  setView("week");
+  setView("7days");
 })();
 

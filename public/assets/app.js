@@ -112,6 +112,159 @@ function fmtTime(iso){
 function minutesOfDay(dt){ return dt.getHours()*60 + dt.getMinutes(); }
 function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
 
+// =====================
+// ANAGRAFICA (Lista pazienti)
+// =====================
+function isAnagraficaPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/anagrafica.html") || p.endsWith("/anagrafica.html");
+}
+
+function normStr(x) {
+  return String(x ?? "").trim();
+}
+
+function normalizePhone(raw) {
+  const s = normStr(raw);
+  if (!s) return "";
+  // Mantieni + solo se è all'inizio, poi solo цифre
+  const plus = s.trim().startsWith("+") ? "+" : "";
+  const digits = s.replace(/[^\d]/g, "");
+  return (plus + digits).trim();
+}
+
+function buildTelHref(phoneRaw) {
+  const p = normalizePhone(phoneRaw);
+  return p ? `tel:${p}` : "";
+}
+
+function buildWaHref(phoneRaw) {
+  const p = normalizePhone(phoneRaw);
+  // wa.me vuole solo numeri (senza +)
+  const digits = p.replace(/[^\d]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
+}
+
+function includesChannelPref(raw, filter) {
+  const s = normStr(raw).toLowerCase();
+  if (!filter) return true;
+  return s.includes(filter);
+}
+
+function fmtDob(dob) {
+  const s = normStr(dob);
+  if (!s) return "—";
+  // se Airtable restituisce ISO, proviamo a formattare
+  const dt = new Date(s);
+  if (!isNaN(dt.getTime())) {
+    try {
+      return dt.toLocaleDateString("it-IT", { year: "numeric", month: "2-digit", day: "2-digit" });
+    } catch {
+      return s;
+    }
+  }
+  return s;
+}
+
+function renderPatientsTable(tbody, items, metaEl) {
+  tbody.innerHTML = "";
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="muted">Nessun paziente trovato.</td></tr>`;
+    if (metaEl) metaEl.textContent = "0 risultati";
+    return;
+  }
+
+  for (const p of items) {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.onclick = () => location.href = `paziente.html?id=${encodeURIComponent(p.id)}`;
+
+    const tel = p.Telefono || "";
+    const telHref = buildTelHref(tel);
+    const waHref = buildWaHref(tel);
+    const channels = p["Canali di comunicazione preferiti"] ?? "";
+
+    tr.innerHTML = `
+      <td>${normStr(p.Nome) || "—"}</td>
+      <td>${normStr(p.Cognome) || "—"}</td>
+      <td>${normStr(p["Codice Fiscale"]) || "—"}</td>
+      <td>${normStr(p.Email) || "—"}</td>
+      <td>${normStr(tel) || "—"}</td>
+      <td>${fmtDob(p["Data di nascita"])}</td>
+      <td>${normStr(channels) || "—"}</td>
+      <td>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a class="btn" data-action="call" href="${telHref || "#"}" ${telHref ? "" : 'aria-disabled="true"'} style="padding:8px 10px; font-size:14px;" target="_self" rel="noreferrer">Chiama</a>
+          <a class="btn primary" data-action="wa" href="${waHref || "#"}" ${waHref ? "" : 'aria-disabled="true"'} style="padding:8px 10px; font-size:14px;" target="_blank" rel="noreferrer">WhatsApp</a>
+        </div>
+      </td>
+    `;
+
+    // evita click riga quando clicco bottoni
+    tr.querySelectorAll('a[data-action]').forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (a.getAttribute("href") === "#") e.preventDefault();
+      });
+    });
+
+    tbody.appendChild(tr);
+  }
+
+  if (metaEl) metaEl.textContent = `${items.length} risultati`;
+}
+
+async function initAnagrafica() {
+  if (!isAnagraficaPage()) return;
+
+  const searchInput = document.querySelector("[data-search]");
+  const tbody = document.querySelector("[data-patients-body]");
+  const metaEl = document.querySelector("[data-patients-meta]");
+  const channelSel = document.querySelector("[data-filter-channel]");
+  if (!tbody) return;
+
+  let lastItems = [];
+  let timer = null;
+
+  const load = async () => {
+    const q = normStr(searchInput?.value);
+    const channel = normStr(channelSel?.value).toLowerCase();
+
+    tbody.innerHTML = `<tr><td colspan="8" class="muted">Caricamento…</td></tr>`;
+    try {
+      const data = await api(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(q)}`);
+      const items = (data.items || []).map((x) => ({
+        ...x,
+        // normalizza canali come stringa per filtro
+        "Canali di comunicazione preferiti": Array.isArray(x["Canali di comunicazione preferiti"])
+          ? x["Canali di comunicazione preferiti"].join(", ")
+          : (x["Canali di comunicazione preferiti"] ?? ""),
+      }));
+      lastItems = items;
+      const filtered = items.filter((p) => includesChannelPref(p["Canali di comunicazione preferiti"], channel));
+      renderPatientsTable(tbody, filtered, metaEl);
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="8" class="muted">Errore caricamento lista (controlla Airtable/API).</td></tr>`;
+      if (metaEl) metaEl.textContent = "Errore";
+    }
+  };
+
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(load, 250);
+  };
+
+  if (searchInput) searchInput.addEventListener("input", schedule);
+  if (channelSel) channelSel.addEventListener("change", () => {
+    const channel = normStr(channelSel.value).toLowerCase();
+    const filtered = lastItems.filter((p) => includesChannelPref(p["Canali di comunicazione preferiti"], channel));
+    renderPatientsTable(tbody, filtered, metaEl);
+  });
+
+  await load();
+}
+
 // Hover card
 function buildHoverCard() {
   const el = document.createElement("div");
@@ -456,5 +609,6 @@ async function initAgenda() {
   setUserBadges(user);
   roleGuard(user.role);
   activeNav();
+  await initAnagrafica();
   await initAgenda();
 })();

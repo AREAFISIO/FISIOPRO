@@ -24,6 +24,11 @@ export default async function handler(req, res) {
     const FIELD_NAME = process.env.AIRTABLE_PATIENTS_NAME_FIELD || "Cognome e Nome";
     const FIELD_PHONE = process.env.AIRTABLE_PATIENTS_PHONE_FIELD || "Numero di telefono";
     const FIELD_EMAIL = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD || "E-mail";
+    const FIELD_FIRSTNAME = process.env.AIRTABLE_PATIENTS_FIRSTNAME_FIELD || "Nome";
+    const FIELD_LASTNAME = process.env.AIRTABLE_PATIENTS_LASTNAME_FIELD || "Cognome";
+    const FIELD_FISCAL = process.env.AIRTABLE_PATIENTS_FISCAL_FIELD || "Codice Fiscale";
+    const FIELD_DOB = process.env.AIRTABLE_PATIENTS_DOB_FIELD || "Data di nascita";
+    const FIELD_CHANNELS = process.env.AIRTABLE_PATIENTS_CHANNELS_FIELD || "Canali di comunicazione preferiti";
 
     const table = encodeURIComponent(TABLE_PATIENTS);
 
@@ -89,6 +94,54 @@ export default async function handler(req, res) {
         phone: r.fields?.[FIELD_PHONE] ?? "",
         email: r.fields?.[FIELD_EMAIL] ?? "",
       }));
+
+      return res.status(200).json({ ok: true, items });
+    }
+
+    if (op === "listPatientsFull" || op === "searchPatientsFull") {
+      // Nota: per evitare errori Airtable, la formula di ricerca usa solo campi “sicuri”
+      // (quelli già utilizzati nel progetto / coerenti con il setup). Campi opzionali
+      // (es. Codice Fiscale / Canali) vengono comunque restituiti se presenti.
+      const qRaw = String(req.query?.q || "").trim();
+      const q = escAirtableString(qRaw.toLowerCase());
+
+      const maxRecords = Math.min(Number(req.query?.maxRecords || 200) || 200, 500);
+      const pageSize = Math.min(Number(req.query?.pageSize || 50) || 50, 100);
+
+      const qs = new URLSearchParams({
+        maxRecords: String(maxRecords),
+        pageSize: String(pageSize),
+      });
+
+      if (q) {
+        const formula = `OR(
+          FIND("${q}", LOWER({${FIELD_FIRSTNAME}})),
+          FIND("${q}", LOWER({${FIELD_LASTNAME}})),
+          FIND("${q}", LOWER({${FIELD_PHONE}})),
+          FIND("${q}", LOWER({${FIELD_EMAIL}})),
+          FIND("${q}", LOWER({${FIELD_NAME}}))
+        )`;
+        qs.set("filterByFormula", formula);
+      }
+
+      const data = await airtableFetch(`${table}?${qs.toString()}`);
+      const items = (data.records || []).map((r) => {
+        const f = r.fields || {};
+        return {
+          id: r.id,
+          Nome: f[FIELD_FIRSTNAME] ?? f["Nome"] ?? "",
+          Cognome: f[FIELD_LASTNAME] ?? f["Cognome"] ?? "",
+          "Codice Fiscale": f[FIELD_FISCAL] ?? f["Codice Fiscale"] ?? f["Codice fiscale"] ?? "",
+          Email: f[FIELD_EMAIL] ?? f["Email"] ?? f["E-mail"] ?? "",
+          Telefono: f[FIELD_PHONE] ?? f["Telefono"] ?? f["Numero di telefono"] ?? "",
+          "Data di nascita": f[FIELD_DOB] ?? f["Data di nascita"] ?? "",
+          "Canali di comunicazione preferiti":
+            f[FIELD_CHANNELS] ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
+          // fallback utile se il base ha il campo unico
+          "Cognome e Nome": f[FIELD_NAME] ?? f["Cognome e Nome"] ?? "",
+          _fields: f,
+        };
+      });
 
       return res.status(200).json({ ok: true, items });
     }

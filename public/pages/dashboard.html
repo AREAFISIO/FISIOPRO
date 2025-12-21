@@ -76,7 +76,7 @@
     <nav class="nav">
       <div class="section">Generale</div>
       <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
-      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
       <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
       <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
 
@@ -99,8 +99,9 @@
       <div class="toprow">
         <div class="h1">Dashboard <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
+          <button class="btn primary" onclick="location.href='nuovo-paziente.html'">Nuovo paziente</button>
           <button class="btn" onclick="location.href='agenda.html'">Apri Agenda</button>
-          <button class="btn primary" onclick="location.href='index.html'">Apri Pazienti</button>
+          <button class="btn primary" onclick="location.href='anagrafica.html'">Apri Pazienti</button>
         </div>
       </div>
     </div>
@@ -128,7 +129,7 @@
         <div class="head"><h2>Scorciatoie</h2><span class="chip">Operativo</span></div>
         <div class="body">
           <div class="quickGrid">
-            <div class="quick" onclick="location.href='index.html'">
+            <div class="quick" onclick="location.href='anagrafica.html'">
               <div class="title">Pazienti</div>
               <div class="sub">Ricerca, schede paziente, percorsi.</div>
             </div>
@@ -162,9 +163,11 @@
   <aside class="rightbar">
     <div class="righttitle">Azioni</div>
     <div class="card" style="padding:14px;">
+      <button class="btn primary" style="width:100%;" onclick="location.href='nuovo-paziente.html'">➕ Nuovo paziente</button>
+      <div style="height:10px;"></div>
       <button class="btn primary" style="width:100%;" onclick="location.href='agenda.html'">🗓️ Agenda</button>
       <div style="height:10px;"></div>
-      <button class="btn" style="width:100%;" onclick="location.href='index.html'">👥 Pazienti</button>
+      <button class="btn" style="width:100%;" onclick="location.href='anagrafica.html'">👥 Pazienti</button>
       <div style="height:10px;"></div>
       <button class="btn" style="width:100%; display:none;" data-role="manager" onclick="location.href='impostazioni.html'">⚙️ Configurazione</button>
     </div>
