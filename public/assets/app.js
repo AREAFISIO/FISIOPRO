@@ -76,6 +76,37 @@ function setUserBadges(user) {
 }
 
 // =====================
+// DASHBOARD (Front Office)
+// =====================
+function isDashboardPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/front-office.html") || p.endsWith("/front-office.html");
+}
+function fmtITDate(d) {
+  try { return d.toLocaleDateString("it-IT"); } catch { return ""; }
+}
+function initDashboard() {
+  if (!isDashboardPage()) return;
+
+  const dateEl = document.querySelector("[data-dash-date]");
+  if (dateEl) dateEl.textContent = fmtITDate(new Date());
+
+  const printBtn = document.querySelector("[data-dash-print]");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      toast("Stampa: in arrivo");
+    });
+  }
+
+  const dlBtn = document.querySelector("[data-dash-download]");
+  if (dlBtn) {
+    dlBtn.addEventListener("click", () => {
+      toast("Download: in arrivo");
+    });
+  }
+}
+
+// =====================
 // AGENDA (OsteoEasy-like)
 // =====================
 function isAgendaPage() {
@@ -456,5 +487,6 @@ async function initAgenda() {
   setUserBadges(user);
   roleGuard(user.role);
   activeNav();
+  initDashboard();
   await initAgenda();
 })();

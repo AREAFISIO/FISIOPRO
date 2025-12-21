@@ -591,3 +591,111 @@ h2 { font-size: 22px; }
 label, button, input { font-size: 18px; }
 
 
+/* ===== Dashboard (tema gestionale) ===== */
+/* aggiunto in fondo come richiesto, senza toccare layout/colori base */
+
+.fp-app--no-right{ grid-template-columns: 260px 1fr; }
+
+.fp-dashboard{ gap: 14px; }
+
+.fp-dashTop{
+  display:grid;
+  grid-template-columns: 420px 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1200px){
+  .fp-dashTop{ grid-template-columns: 1fr; }
+}
+
+.fp-dashCtas{ align-self: start; }
+.fp-dashCtasBody{
+  padding-top: 16px;
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+}
+
+.fp-dashCtaBtn{
+  width: 100%;
+  justify-content: center;
+  text-transform: uppercase;
+  letter-spacing: .10em;
+  font-weight: 900;
+  padding: 18px 18px;
+  border-radius: 14px;
+}
+.fp-dashCtaBtn--solid{
+  border-color: rgba(34,230,195,.35);
+  background: linear-gradient(135deg, rgba(34,230,195,.95), rgba(34,230,195,.78));
+  color: rgba(11,18,32,.96);
+  box-shadow: 0 16px 36px rgba(34,230,195,.12);
+}
+.fp-dashCtaBtn--solid:hover{
+  background: linear-gradient(135deg, rgba(34,230,195,1), rgba(34,230,195,.86));
+}
+
+.fp-dashHead{ align-items: flex-start; }
+.fp-dashHead h2{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+
+.fp-label{
+  display:block;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.fp-dashCardActions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top: 12px;
+}
+
+.fp-dashEmpty{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  padding: 14px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.10);
+  color: rgba(255,255,255,.72);
+}
+.fp-dashEmptyIcon{
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display:grid;
+  place-items:center;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  font-weight: 900;
+}
+
+.fp-dashRowActions{
+  display:flex;
+  justify-content:flex-end;
+  gap: 10px;
+  align-items:center;
+}
+.fp-miniBtn{ padding: 8px 12px; border-radius: 999px; }
+.fp-iconBtn{ width: 44px; height: 40px; padding: 0; justify-content: center; }
+
+.fp-ic{
+  width: 20px;
+  height: 20px;
+  display:inline-block;
+  line-height: 0;
+}
+.fp-ic svg{ width: 100%; height: 100%; display:block; }
+.fp-ic--accent{ color: var(--accent); }
+.fp-ic--muted{ color: rgba(255,255,255,.65); }
+.fp-ic--whats{ color: rgba(34,230,195,.95); }
+
+/* ===== Dashboard (tema gestionale) ===== */
