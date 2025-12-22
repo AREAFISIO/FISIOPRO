@@ -141,8 +141,8 @@
     .calGrid{
       position: relative;
       display:grid;
-      grid-template-columns: 64px repeat(7, minmax(160px, 1fr));
-      min-width: 1100px;
+      grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+      min-width: 0;
     }
 
     .calHead{
@@ -197,6 +197,16 @@
     }
     .gridLine.hour{ border-top-color: rgba(255,255,255,.10); }
 
+    .slotHover{
+      position:absolute;
+      left:0; right:0;
+      height: 18px; /* SLOT_PX (sincronizzato in diary.js) */
+      background: rgba(34,230,195,.10);
+      outline: 1px solid rgba(34,230,195,.22);
+      pointer-events:none;
+      display:none;
+    }
+
     .event{
       position:absolute;
       left: 10px;
@@ -235,6 +245,25 @@
     .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed rgba(255,255,255,.10); }
     .fp-kv:last-child{ border-bottom:none; }
     .fp-kv .k{ color: rgba(255,255,255,.55); }
+
+    /* Hover card appuntamento */
+    .fpHover{
+      position: fixed;
+      z-index: 80;
+      width: 320px;
+      max-width: calc(100vw - 24px);
+      background: rgba(15,26,44,.98);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 14px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      padding: 12px 12px 10px;
+      pointer-events: none;
+      display:none;
+    }
+    .fpHover .t{ font-weight: 900; font-size: 16px; color: rgba(255,255,255,.95); }
+    .fpHover .r{ margin-top:6px; color: rgba(255,255,255,.78); font-size: 13px; display:flex; gap:8px; align-items:center; }
+    .fpHover .k{ color: rgba(255,255,255,.55); min-width: 92px; }
+    .fpHover .note{ margin-top:10px; border-top:1px dashed rgba(255,255,255,.12); padding-top:10px; color: rgba(255,255,255,.75); font-size: 12px; }
 
     /* Right slim bar */
     .rightbar.slim{
@@ -341,7 +370,7 @@
     <nav class="nav">
       <div class="section">Generale</div>
       <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
-      <a data-nav href="index.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
       <a data-nav href="agenda.html" class="active" data-role="physio,front,manager">Agenda</a>
       <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
 
@@ -365,7 +394,6 @@
           <button class="btn" data-cal-today>Oggi</button>
           <button class="btn" data-cal-prev>Indietro</button>
           <button class="btn" data-cal-next>Avanti</button>
-          <span class="chip" data-cal-range>—</span>
         </div>
       </div>
     </div>
@@ -373,7 +401,7 @@
     <section class="card">
       <div class="head">
         <h2>Diario</h2>
-        <span class="chip">Settimanale</span>
+        <span class="chip" style="display:none;"></span>
       </div>
       <div class="body">
         <div class="toolbar">
@@ -396,8 +424,9 @@
               </div>
             </div>
             <div class="calChips">
-              <span class="chip btnlike active" data-cal-view="week">Settimana</span>
-              <span class="chip btnlike" data-cal-view="workweek">6 giorni</span>
+              <span class="chip btnlike active" data-cal-view="7days">7 giorni</span>
+              <span class="chip btnlike" data-cal-view="5days">5 giorni</span>
+              <span class="chip btnlike" data-cal-view="day">Giorno</span>
             </div>
           </div>
 

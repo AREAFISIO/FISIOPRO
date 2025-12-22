@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Nuovo paziente</title>
+  <link rel="stylesheet" href="../assets/app.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">FISIOPRO</div>
+        <div class="sub">Nuovo paziente</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
+      <div class="section">Sistema</div>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Nuovo paziente <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" id="btnCancel">Annulla</button>
+          <button class="btn primary" id="btnSave">Salva</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Dati anagrafici</h2><span class="chip">Anagrafica</span></div>
+      <div class="body">
+        <div class="formgrid" style="padding-top:10px;">
+          <div class="field">
+            <label>Nome</label>
+            <input class="input" id="fNome" autocomplete="given-name" />
+          </div>
+          <div class="field">
+            <label>Cognome</label>
+            <input class="input" id="fCognome" autocomplete="family-name" />
+          </div>
+
+          <div class="field">
+            <label>Codice fiscale</label>
+            <input class="input" id="fCF" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Data di nascita</label>
+            <input class="input" id="fDob" type="date" />
+          </div>
+
+          <div class="field">
+            <label>Email</label>
+            <input class="input" id="fEmail" type="email" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label>Cellulare</label>
+            <input class="input" id="fTel" type="tel" autocomplete="tel" />
+          </div>
+
+          <div class="field" style="grid-column:1 / -1;">
+            <label>Canali di comunicazione preferiti</label>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:rgba(0,0,0,.18);">
+              <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0; color:var(--text);">
+                <input type="checkbox" value="WhatsApp" data-channel /> WhatsApp
+              </label>
+              <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0; color:var(--text);">
+                <input type="checkbox" value="SMS" data-channel /> SMS
+              </label>
+              <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0; color:var(--text);">
+                <input type="checkbox" value="Email" data-channel /> Email
+              </label>
+              <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:0; color:var(--text);">
+                <input type="checkbox" value="Telefono" data-channel /> Telefono
+              </label>
+            </div>
+            <small>Se non selezionato, verrà lasciato vuoto.</small>
+          </div>
+        </div>
+        <div class="hr"></div>
+        <div class="mini" style="color:var(--muted);">Salvando, il paziente viene creato su Airtable (tabella ANAGRAFICA).</div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn" style="width:100%;" onclick="location.href='anagrafica.html'">← Torna lista</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
+<script>
+  function getChannels() {
+    return Array.from(document.querySelectorAll("[data-channel]"))
+      .filter((x) => x.checked)
+      .map((x) => x.value);
+  }
+
+  function val(id) {
+    return (document.getElementById(id)?.value || "").trim();
+  }
+
+  document.getElementById("btnCancel").onclick = () => {
+    history.length > 1 ? history.back() : (location.href = "anagrafica.html");
+  };
+
+  async function save() {
+    const payload = {
+      Nome: val("fNome"),
+      Cognome: val("fCognome"),
+      "Codice Fiscale": val("fCF"),
+      Email: val("fEmail"),
+      Telefono: val("fTel"),
+      "Data di nascita": val("fDob"),
+      "Canali di comunicazione preferiti": getChannels(),
+    };
+
+    const btn = document.getElementById("btnSave");
+    btn.disabled = true;
+    try {
+      const created = await api("/api/patient-create", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      toast("Creato");
+      if (created?.id) location.href = `paziente.html?id=${encodeURIComponent(created.id)}`;
+      else location.href = "anagrafica.html";
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "Errore creazione paziente");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById("btnSave").onclick = save;
+  // Enter su un input => salva
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.target?.tagName || "").toLowerCase() === "input") save();
+  });
+</script>
+</body>
+</html>
+
