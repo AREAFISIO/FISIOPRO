@@ -1,4 +1,5 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
+import { memGetOrSet, setPrivateCache } from "./_common.js";
 
 function escAirtableString(s) {
   return String(s ?? "")
@@ -7,6 +8,34 @@ function escAirtableString(s) {
     .replace(/\r/g, " ")
     .replace(/\n/g, " ")
     .trim();
+}
+
+function isUnknownFieldError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return s.includes("unknown field name") || s.includes("unknown field names");
+}
+
+async function probeField(tableEnc, candidate) {
+  const name = String(candidate || "").trim();
+  if (!name) return false;
+  const qs = new URLSearchParams({ pageSize: "1" });
+  qs.append("fields[]", name);
+  try {
+    await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    return true;
+  } catch (e) {
+    if (isUnknownFieldError(e?.message)) return false;
+    throw e;
+  }
+}
+
+async function resolveFieldName(tableEnc, cacheKey, candidates) {
+  return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
+    for (const c of candidates || []) {
+      if (await probeField(tableEnc, c)) return String(c).trim();
+    }
+    return "";
+  });
 }
 
 export default async function handler(req, res) {
@@ -19,19 +48,63 @@ export default async function handler(req, res) {
 
     const op = String(req.query?.op || "").trim();
     const includeFields = String(req.query?.includeFields || "").trim() === "1";
+    setPrivateCache(res, 30);
 
     // === CONFIG (default) ===
     const TABLE_PATIENTS = process.env.AIRTABLE_PATIENTS_TABLE || "ANAGRAFICA";
-    const FIELD_NAME = process.env.AIRTABLE_PATIENTS_NAME_FIELD || "Cognome e Nome";
-    const FIELD_PHONE = process.env.AIRTABLE_PATIENTS_PHONE_FIELD || "Numero di telefono";
-    const FIELD_EMAIL = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD || "E-mail";
-    const FIELD_FIRSTNAME = process.env.AIRTABLE_PATIENTS_FIRSTNAME_FIELD || "Nome";
-    const FIELD_LASTNAME = process.env.AIRTABLE_PATIENTS_LASTNAME_FIELD || "Cognome";
-    const FIELD_FISCAL = process.env.AIRTABLE_PATIENTS_FISCAL_FIELD || "Codice Fiscale";
-    const FIELD_DOB = process.env.AIRTABLE_PATIENTS_DOB_FIELD || "Data di nascita";
-    const FIELD_CHANNELS = process.env.AIRTABLE_PATIENTS_CHANNELS_FIELD || "Canali di comunicazione preferiti";
+    const FIELD_NAME_ENV = process.env.AIRTABLE_PATIENTS_NAME_FIELD;
+    const FIELD_PHONE_ENV = process.env.AIRTABLE_PATIENTS_PHONE_FIELD;
+    const FIELD_EMAIL_ENV = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD;
+    const FIELD_FIRSTNAME_ENV = process.env.AIRTABLE_PATIENTS_FIRSTNAME_FIELD;
+    const FIELD_LASTNAME_ENV = process.env.AIRTABLE_PATIENTS_LASTNAME_FIELD;
+    const FIELD_FISCAL_ENV = process.env.AIRTABLE_PATIENTS_FISCAL_FIELD;
+    const FIELD_DOB_ENV = process.env.AIRTABLE_PATIENTS_DOB_FIELD;
+    const FIELD_CHANNELS_ENV = process.env.AIRTABLE_PATIENTS_CHANNELS_FIELD;
 
     const table = encodeURIComponent(TABLE_PATIENTS);
+
+    // Resolve real field names (to avoid "Unknown field name" errors).
+    // This is cached for warm instances; if fields are correct in env, it's fast.
+    const FIELD_NAME = await resolveFieldName(
+      table,
+      `patients:field:name:${TABLE_PATIENTS}`,
+      [FIELD_NAME_ENV, "Cognome e Nome", "Nome completo", "Full Name", "Name"].filter(Boolean),
+    );
+    const FIELD_PHONE = await resolveFieldName(
+      table,
+      `patients:field:phone:${TABLE_PATIENTS}`,
+      [FIELD_PHONE_ENV, "Telefono", "Numero di telefono", "Cellulare", "Mobile"].filter(Boolean),
+    );
+    const FIELD_EMAIL = await resolveFieldName(
+      table,
+      `patients:field:email:${TABLE_PATIENTS}`,
+      [FIELD_EMAIL_ENV, "Email", "E-mail", "E mail"].filter(Boolean),
+    );
+    const FIELD_FIRSTNAME = await resolveFieldName(
+      table,
+      `patients:field:firstname:${TABLE_PATIENTS}`,
+      [FIELD_FIRSTNAME_ENV, "Nome", "First name", "Firstname"].filter(Boolean),
+    );
+    const FIELD_LASTNAME = await resolveFieldName(
+      table,
+      `patients:field:lastname:${TABLE_PATIENTS}`,
+      [FIELD_LASTNAME_ENV, "Cognome", "Last name", "Lastname"].filter(Boolean),
+    );
+    const FIELD_FISCAL = await resolveFieldName(
+      table,
+      `patients:field:fiscal:${TABLE_PATIENTS}`,
+      [FIELD_FISCAL_ENV, "Codice Fiscale", "Codice fiscale", "CF"].filter(Boolean),
+    );
+    const FIELD_DOB = await resolveFieldName(
+      table,
+      `patients:field:dob:${TABLE_PATIENTS}`,
+      [FIELD_DOB_ENV, "Data di nascita", "Nascita", "DOB", "Birthdate"].filter(Boolean),
+    );
+    const FIELD_CHANNELS = await resolveFieldName(
+      table,
+      `patients:field:channels:${TABLE_PATIENTS}`,
+      [FIELD_CHANNELS_ENV, "Canali di comunicazione preferiti", "Canali preferiti", "Canali"].filter(Boolean),
+    );
 
     if (op === "health") {
       const data = await airtableFetch(`${table}?pageSize=1`);
@@ -54,9 +127,9 @@ export default async function handler(req, res) {
     if (op === "listPatients") {
       const qs = new URLSearchParams({ pageSize: "10" });
       // limit fields for speed
-      qs.append("fields[]", FIELD_NAME);
-      qs.append("fields[]", FIELD_PHONE);
-      qs.append("fields[]", FIELD_EMAIL);
+      if (FIELD_NAME) qs.append("fields[]", FIELD_NAME);
+      if (FIELD_PHONE) qs.append("fields[]", FIELD_PHONE);
+      if (FIELD_EMAIL) qs.append("fields[]", FIELD_EMAIL);
       const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
         id: r.id,
@@ -71,9 +144,9 @@ export default async function handler(req, res) {
       const qRaw = String(req.query?.q || "").trim();
       if (!qRaw) {
         const qs0 = new URLSearchParams({ pageSize: "10" });
-        qs0.append("fields[]", FIELD_NAME);
-        qs0.append("fields[]", FIELD_PHONE);
-        qs0.append("fields[]", FIELD_EMAIL);
+        if (FIELD_NAME) qs0.append("fields[]", FIELD_NAME);
+        if (FIELD_PHONE) qs0.append("fields[]", FIELD_PHONE);
+        if (FIELD_EMAIL) qs0.append("fields[]", FIELD_EMAIL);
         const data = await airtableFetch(`${table}?${qs0.toString()}`);
         const items = (data.records || []).map((r) => ({
           id: r.id,
@@ -85,20 +158,21 @@ export default async function handler(req, res) {
       }
 
       const q = escAirtableString(qRaw.toLowerCase());
-      const formula = `OR(
-        FIND("${q}", LOWER({${FIELD_NAME}})),
-        FIND("${q}", LOWER({${FIELD_PHONE}})),
-        FIND("${q}", LOWER({${FIELD_EMAIL}}))
-      )`;
+      const parts = [];
+      if (FIELD_NAME) parts.push(`FIND("${q}", LOWER({${FIELD_NAME}}))`);
+      if (FIELD_PHONE) parts.push(`FIND("${q}", LOWER({${FIELD_PHONE}}))`);
+      if (FIELD_EMAIL) parts.push(`FIND("${q}", LOWER({${FIELD_EMAIL}}))`);
+      if (!parts.length) return res.status(500).json({ ok: false, error: "patients_schema_mismatch" });
+      const formula = `OR(${parts.join(",")})`;
 
       const qs = new URLSearchParams({
         filterByFormula: formula,
         maxRecords: "20",
         pageSize: "20",
       });
-      qs.append("fields[]", FIELD_NAME);
-      qs.append("fields[]", FIELD_PHONE);
-      qs.append("fields[]", FIELD_EMAIL);
+      if (FIELD_NAME) qs.append("fields[]", FIELD_NAME);
+      if (FIELD_PHONE) qs.append("fields[]", FIELD_PHONE);
+      if (FIELD_EMAIL) qs.append("fields[]", FIELD_EMAIL);
 
       const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
@@ -127,23 +201,24 @@ export default async function handler(req, res) {
       });
 
       // request only the fields we actually render (big performance win)
-      qs.append("fields[]", FIELD_FIRSTNAME);
-      qs.append("fields[]", FIELD_LASTNAME);
-      qs.append("fields[]", FIELD_NAME);
-      qs.append("fields[]", FIELD_FISCAL);
-      qs.append("fields[]", FIELD_EMAIL);
-      qs.append("fields[]", FIELD_PHONE);
-      qs.append("fields[]", FIELD_DOB);
-      qs.append("fields[]", FIELD_CHANNELS);
+      if (FIELD_FIRSTNAME) qs.append("fields[]", FIELD_FIRSTNAME);
+      if (FIELD_LASTNAME) qs.append("fields[]", FIELD_LASTNAME);
+      if (FIELD_NAME) qs.append("fields[]", FIELD_NAME);
+      if (FIELD_FISCAL) qs.append("fields[]", FIELD_FISCAL);
+      if (FIELD_EMAIL) qs.append("fields[]", FIELD_EMAIL);
+      if (FIELD_PHONE) qs.append("fields[]", FIELD_PHONE);
+      if (FIELD_DOB) qs.append("fields[]", FIELD_DOB);
+      if (FIELD_CHANNELS) qs.append("fields[]", FIELD_CHANNELS);
 
       if (q) {
-        const formula = `OR(
-          FIND("${q}", LOWER({${FIELD_FIRSTNAME}})),
-          FIND("${q}", LOWER({${FIELD_LASTNAME}})),
-          FIND("${q}", LOWER({${FIELD_PHONE}})),
-          FIND("${q}", LOWER({${FIELD_EMAIL}})),
-          FIND("${q}", LOWER({${FIELD_NAME}}))
-        )`;
+        const parts = [];
+        if (FIELD_FIRSTNAME) parts.push(`FIND("${q}", LOWER({${FIELD_FIRSTNAME}}))`);
+        if (FIELD_LASTNAME) parts.push(`FIND("${q}", LOWER({${FIELD_LASTNAME}}))`);
+        if (FIELD_PHONE) parts.push(`FIND("${q}", LOWER({${FIELD_PHONE}}))`);
+        if (FIELD_EMAIL) parts.push(`FIND("${q}", LOWER({${FIELD_EMAIL}}))`);
+        if (FIELD_NAME) parts.push(`FIND("${q}", LOWER({${FIELD_NAME}}))`);
+        if (!parts.length) return res.status(500).json({ ok: false, error: "patients_schema_mismatch" });
+        const formula = `OR(${parts.join(",")})`;
         qs.set("filterByFormula", formula);
       }
 
@@ -152,16 +227,16 @@ export default async function handler(req, res) {
         const f = r.fields || {};
         const out = {
           id: r.id,
-          Nome: f[FIELD_FIRSTNAME] ?? f["Nome"] ?? "",
-          Cognome: f[FIELD_LASTNAME] ?? f["Cognome"] ?? "",
-          "Codice Fiscale": f[FIELD_FISCAL] ?? f["Codice Fiscale"] ?? f["Codice fiscale"] ?? "",
-          Email: f[FIELD_EMAIL] ?? f["Email"] ?? f["E-mail"] ?? "",
-          Telefono: f[FIELD_PHONE] ?? f["Telefono"] ?? f["Numero di telefono"] ?? "",
-          "Data di nascita": f[FIELD_DOB] ?? f["Data di nascita"] ?? "",
+          Nome: (FIELD_FIRSTNAME ? f[FIELD_FIRSTNAME] : undefined) ?? f["Nome"] ?? "",
+          Cognome: (FIELD_LASTNAME ? f[FIELD_LASTNAME] : undefined) ?? f["Cognome"] ?? "",
+          "Codice Fiscale": (FIELD_FISCAL ? f[FIELD_FISCAL] : undefined) ?? f["Codice Fiscale"] ?? f["Codice fiscale"] ?? "",
+          Email: (FIELD_EMAIL ? f[FIELD_EMAIL] : undefined) ?? f["Email"] ?? f["E-mail"] ?? "",
+          Telefono: (FIELD_PHONE ? f[FIELD_PHONE] : undefined) ?? f["Telefono"] ?? f["Numero di telefono"] ?? "",
+          "Data di nascita": (FIELD_DOB ? f[FIELD_DOB] : undefined) ?? f["Data di nascita"] ?? "",
           "Canali di comunicazione preferiti":
-            f[FIELD_CHANNELS] ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
+            (FIELD_CHANNELS ? f[FIELD_CHANNELS] : undefined) ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
           // fallback utile se il base ha il campo unico
-          "Cognome e Nome": f[FIELD_NAME] ?? f["Cognome e Nome"] ?? "",
+          "Cognome e Nome": (FIELD_NAME ? f[FIELD_NAME] : undefined) ?? f["Cognome e Nome"] ?? "",
         };
         if (includeFields) out._fields = f;
         return out;
