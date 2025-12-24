@@ -1,4 +1,5 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
+import { memGetOrSet, setPrivateCache } from "./_common.js";
 
 export default async function handler(req, res) {
   ensureRes(res);
@@ -8,6 +9,8 @@ export default async function handler(req, res) {
   try {
     if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
 
+    setPrivateCache(res, 60);
+
     const tableName = process.env.AIRTABLE_SERVICES_TABLE || process.env.AIRTABLE_PRESTAZIONI_TABLE || "PRESTAZIONI";
     const nameField = process.env.AIRTABLE_SERVICES_NAME_FIELD || "Prestazione";
     const table = encodeURIComponent(tableName);
@@ -15,16 +18,19 @@ export default async function handler(req, res) {
     const qs = new URLSearchParams({ pageSize: "100" });
     qs.append("fields[]", nameField);
 
-    const data = await airtableFetch(`${table}?${qs.toString()}`);
-    const items = (data.records || [])
-      .map((r) => {
-        const f = r.fields || {};
-        const name = String(f[nameField] ?? f.Prestazione ?? f.Nome ?? f.Name ?? "").trim();
-        if (!name) return null;
-        return { id: r.id, name };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+    const cacheKey = `services:${tableName}:${nameField}`;
+    const items = await memGetOrSet(cacheKey, 10 * 60_000, async () => {
+      const data = await airtableFetch(`${table}?${qs.toString()}`);
+      return (data.records || [])
+        .map((r) => {
+          const f = r.fields || {};
+          const name = String(f[nameField] ?? f.Prestazione ?? f.Nome ?? f.Name ?? "").trim();
+          if (!name) return null;
+          return { id: r.id, name };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name, "it"));
+    });
 
     return res.status(200).json({ ok: true, items });
   } catch (e) {

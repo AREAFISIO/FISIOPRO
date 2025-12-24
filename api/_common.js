@@ -53,3 +53,53 @@ export function filterByLinkedRecordId({ linkField, recordId }) {
   return `FIND("${rid}", ARRAYJOIN({${field}}))`;
 }
 
+// ---------------------
+// Tiny in-memory cache (best-effort for serverless warm instances)
+// ---------------------
+
+const _memCache = new Map(); // key -> { exp:number, value:any }
+const _memCacheMax = 250;
+
+export function memGet(key) {
+  const k = String(key || "");
+  if (!k) return undefined;
+  const hit = _memCache.get(k);
+  if (!hit) return undefined;
+  if (Date.now() > hit.exp) {
+    _memCache.delete(k);
+    return undefined;
+  }
+  return hit.value;
+}
+
+export function memSet(key, value, ttlMs = 60_000) {
+  const k = String(key || "");
+  if (!k) return;
+  const exp = Date.now() + Math.max(1_000, Number(ttlMs) || 60_000);
+  _memCache.set(k, { exp, value });
+
+  // simple bound
+  if (_memCache.size > _memCacheMax) {
+    // delete oldest-ish by exp
+    const entries = Array.from(_memCache.entries()).sort((a, b) => a[1].exp - b[1].exp);
+    for (let i = 0; i < Math.ceil(_memCacheMax * 0.15); i++) {
+      const kk = entries[i]?.[0];
+      if (kk) _memCache.delete(kk);
+    }
+  }
+}
+
+export async function memGetOrSet(key, ttlMs, fn) {
+  const cached = memGet(key);
+  if (cached !== undefined) return cached;
+  const val = await fn();
+  memSet(key, val, ttlMs);
+  return val;
+}
+
+export function setPrivateCache(res, seconds = 60) {
+  // Avoid caching sensitive patient data in shared caches.
+  const s = Math.max(0, Number(seconds) || 0);
+  res.setHeader("Cache-Control", `private, max-age=${s}, stale-while-revalidate=${Math.max(0, s * 5)}`);
+}
+

@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
 
     const op = String(req.query?.op || "").trim();
+    const includeFields = String(req.query?.includeFields || "").trim() === "1";
 
     // === CONFIG (default) ===
     const TABLE_PATIENTS = process.env.AIRTABLE_PATIENTS_TABLE || "ANAGRAFICA";
@@ -51,7 +52,12 @@ export default async function handler(req, res) {
     }
 
     if (op === "listPatients") {
-      const data = await airtableFetch(`${table}?pageSize=10`);
+      const qs = new URLSearchParams({ pageSize: "10" });
+      // limit fields for speed
+      qs.append("fields[]", FIELD_NAME);
+      qs.append("fields[]", FIELD_PHONE);
+      qs.append("fields[]", FIELD_EMAIL);
+      const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
         id: r.id,
         name: r.fields?.[FIELD_NAME] ?? "",
@@ -64,7 +70,11 @@ export default async function handler(req, res) {
     if (op === "searchPatients") {
       const qRaw = String(req.query?.q || "").trim();
       if (!qRaw) {
-        const data = await airtableFetch(`${table}?pageSize=10`);
+        const qs0 = new URLSearchParams({ pageSize: "10" });
+        qs0.append("fields[]", FIELD_NAME);
+        qs0.append("fields[]", FIELD_PHONE);
+        qs0.append("fields[]", FIELD_EMAIL);
+        const data = await airtableFetch(`${table}?${qs0.toString()}`);
         const items = (data.records || []).map((r) => ({
           id: r.id,
           name: r.fields?.[FIELD_NAME] ?? "",
@@ -86,6 +96,9 @@ export default async function handler(req, res) {
         maxRecords: "20",
         pageSize: "20",
       });
+      qs.append("fields[]", FIELD_NAME);
+      qs.append("fields[]", FIELD_PHONE);
+      qs.append("fields[]", FIELD_EMAIL);
 
       const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => ({
@@ -113,6 +126,16 @@ export default async function handler(req, res) {
         pageSize: String(pageSize),
       });
 
+      // request only the fields we actually render (big performance win)
+      qs.append("fields[]", FIELD_FIRSTNAME);
+      qs.append("fields[]", FIELD_LASTNAME);
+      qs.append("fields[]", FIELD_NAME);
+      qs.append("fields[]", FIELD_FISCAL);
+      qs.append("fields[]", FIELD_EMAIL);
+      qs.append("fields[]", FIELD_PHONE);
+      qs.append("fields[]", FIELD_DOB);
+      qs.append("fields[]", FIELD_CHANNELS);
+
       if (q) {
         const formula = `OR(
           FIND("${q}", LOWER({${FIELD_FIRSTNAME}})),
@@ -127,7 +150,7 @@ export default async function handler(req, res) {
       const data = await airtableFetch(`${table}?${qs.toString()}`);
       const items = (data.records || []).map((r) => {
         const f = r.fields || {};
-        return {
+        const out = {
           id: r.id,
           Nome: f[FIELD_FIRSTNAME] ?? f["Nome"] ?? "",
           Cognome: f[FIELD_LASTNAME] ?? f["Cognome"] ?? "",
@@ -139,8 +162,9 @@ export default async function handler(req, res) {
             f[FIELD_CHANNELS] ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
           // fallback utile se il base ha il campo unico
           "Cognome e Nome": f[FIELD_NAME] ?? f["Cognome e Nome"] ?? "",
-          _fields: f,
         };
+        if (includeFields) out._fields = f;
+        return out;
       });
 
       return res.status(200).json({ ok: true, items });
