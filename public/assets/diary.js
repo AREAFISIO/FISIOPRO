@@ -11,6 +11,7 @@
   const rangeEl = document.querySelector("[data-cal-range]");
   const monthEl = document.querySelector("[data-cal-month]");
   const weekEl = document.querySelector("[data-cal-week]");
+  const loginNameEl = document.querySelector("[data-login-name]");
   const opsBar = document.querySelector("[data-ops-bar]");
   const opsDots = document.querySelector("[data-ops-dots]");
   const opsText = document.querySelector("[data-ops-text]");
@@ -125,6 +126,7 @@
   const prefSlot = document.querySelector("[data-pref-slot]");
   const prefColor = document.querySelector("[data-pref-color]");
   const prefMulti = document.querySelector("[data-pref-multi]");
+  const prefDefaultSection = document.querySelector("[data-pref-default-section]");
   const prefDefaultDots = document.querySelector("[data-pref-default-dots]");
   const prefPick = document.querySelector("[data-pref-pick]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
@@ -270,6 +272,12 @@
     return String(u?.nome || "").trim();
   }
 
+  function syncLoginName() {
+    if (!loginNameEl) return;
+    const name = String(getUserName() || "").trim();
+    loginNameEl.textContent = name || "—";
+  }
+
   function prefsKey() {
     const email = getUserEmail() || "anon";
     return `fp_agenda_prefs_${email}`;
@@ -301,6 +309,7 @@
     if (prefShowService) prefShowService.checked = Boolean(prefs.showService);
     if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
+    if (prefDefaultSection) prefDefaultSection.style.display = prefMulti?.checked ? "" : "none";
     renderDefaultDots();
   }
   function openPrefs() {
@@ -479,6 +488,7 @@
     } catch {
       // fallback to operators found in the week
     }
+    syncLoginName();
 
     const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
@@ -535,6 +545,7 @@
       const d = addDays(start, dIdx);
       const dh = document.createElement("div");
       dh.className = "dayHead";
+      if (dIdx > 0) dh.classList.add("daySepHead");
       const startCol = 2 + dIdx * colsPerDay;
       dh.style.gridColumn = `${startCol} / span ${colsPerDay}`;
       dh.style.gridRow = "1";
@@ -556,6 +567,7 @@
           const name = ops[oIdx] || "";
           const cell = document.createElement("div");
           cell.className = "dayHead";
+          if (dIdx > 0 && oIdx === 0) cell.classList.add("daySepHead");
           cell.style.height = "34px";
           cell.style.padding = "6px 10px";
           cell.style.gridRow = "2";
@@ -596,6 +608,7 @@
       for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
         const col = document.createElement("div");
         col.className = "dayCol";
+        if (dIdx > 0 && oIdx === 0) col.classList.add("daySep");
         col.dataset.dayIndex = String(dIdx);
         col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
         col.style.height = heightPx + "px";
@@ -1024,6 +1037,9 @@
   prefsBack?.addEventListener("click", (e) => { if (e.target === prefsBack) closePrefs(); });
   prefPick?.addEventListener("click", () => { pickMode = "defaults"; openOpsMenu(); });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
+  prefMulti?.addEventListener("change", () => {
+    if (prefDefaultSection) prefDefaultSection.style.display = prefMulti.checked ? "" : "none";
+  });
   prefsSave?.addEventListener("click", () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
@@ -1057,6 +1073,7 @@
   } catch {}
 
   loadPrefs();
+  syncLoginName();
   setView("7days");
 })();
 

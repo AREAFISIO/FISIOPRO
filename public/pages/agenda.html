@@ -11,7 +11,7 @@
   <style>
     /* Agenda shell (keeps your management system look) */
     body { overflow: hidden; }
-    .app { grid-template-columns: 260px 1fr 72px; }
+    .app { grid-template-columns: 230px 1fr 72px; }
 
     .calWrap{
       height: calc(100vh - 120px);
@@ -189,6 +189,16 @@
       border-right: 1px solid var(--border);
       background:
         linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+
+    /* Stronger day separators (between days) */
+    .daySep{
+      border-left: 3px solid rgba(255,255,255,.16);
+      box-shadow: -2px 0 0 rgba(0,0,0,.22);
+    }
+    .daySepHead{
+      border-left: 3px solid rgba(255,255,255,.16) !important;
+      box-shadow: -2px 0 0 rgba(0,0,0,.22);
     }
     .gridLine{
       position:absolute; left:0; right:0;
@@ -389,7 +399,7 @@
   <main class="main">
     <div class="topbar">
       <div class="toprow">
-        <div class="h1">Agenda <span class="pill" data-user-badge>—</span></div>
+        <div class="h1">Agenda <span class="pill" data-login-name>—</span></div>
         <div class="actions">
           <button class="btn" data-cal-today>Oggi</button>
           <button class="btn" data-cal-prev>Indietro</button>
@@ -526,20 +536,20 @@
               </label>
             </div>
           </div>
-        </div>
 
-        <div class="prefsCard">
-          <div class="prefsRow" style="align-items:flex-start;">
+          <div class="prefsRow" data-pref-default-section style="align-items:flex-start;">
             <div style="min-width:0;">
               <div class="prefsLabel">Agende visualizzate di default</div>
-              <div class="prefsSub">Quando attivi la vista multi utente, queste agende vengono mostrate.</div>
+              <div class="prefsSub">Compare solo se attivi la vista multi utente. Queste agende verranno mostrate di default.</div>
             </div>
             <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:8px;">
               <div class="opsDots" data-pref-default-dots></div>
               <button class="btn" data-pref-pick>Seleziona</button>
             </div>
           </div>
+        </div>
 
+        <div class="prefsCard">
           <div class="prefsRow">
             <div>
               <div class="prefsLabel">Visualizza tipologia prestazione in agenda</div>
