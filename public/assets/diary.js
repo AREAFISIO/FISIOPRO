@@ -129,6 +129,10 @@
   const prefDefaultSection = document.querySelector("[data-pref-default-section]");
   const prefDefaultDots = document.querySelector("[data-pref-default-dots]");
   const prefPick = document.querySelector("[data-pref-pick]");
+  const prefDefaultPicker = document.querySelector("[data-pref-default-picker]");
+  const prefDefaultList = document.querySelector("[data-pref-default-list]");
+  const prefDefaultSearch = document.querySelector("[data-pref-default-search]");
+  const prefDefaultClose = document.querySelector("[data-pref-default-close]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
 
@@ -310,6 +314,7 @@
     if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
     if (prefDefaultSection) prefDefaultSection.style.display = prefMulti?.checked ? "" : "none";
+    if (prefDefaultPicker && !prefMulti?.checked) prefDefaultPicker.style.display = "none";
     renderDefaultDots();
   }
   function openPrefs() {
@@ -338,6 +343,49 @@
       t.textContent = "—";
       prefDefaultDots.appendChild(t);
     }
+  }
+
+  function renderDefaultPickerList() {
+    if (!prefDefaultList) return;
+    const q = String(prefDefaultSearch?.value || "").trim().toLowerCase();
+    const names = (knownTherapists || []).slice();
+    const filtered = q ? names.filter((n) => String(n).toLowerCase().includes(q)) : names;
+
+    prefDefaultList.innerHTML = "";
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "prefPickRow";
+      empty.style.cursor = "default";
+      empty.innerHTML = `<div class="prefPickLeft"><div class="prefPickMini">Nessun operatore trovato.</div></div>`;
+      prefDefaultList.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "prefPickRow";
+      const on = (prefs.defaultOperators || []).includes(name);
+      const check = `<div class="prefPickCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      row.innerHTML = `
+        <div class="prefPickLeft">
+          ${check}
+          <div style="min-width:0;">
+            <div class="prefPickName">${name}</div>
+            <div class="prefPickMini">${therapistKey(name) || ""}</div>
+          </div>
+        </div>
+        <div class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name) || ""}</div>
+      `;
+      row.addEventListener("click", () => {
+        const set = new Set(prefs.defaultOperators || []);
+        if (set.has(name)) set.delete(name);
+        else set.add(name);
+        prefs.defaultOperators = Array.from(set);
+        renderDefaultDots();
+        renderDefaultPickerList();
+      });
+      prefDefaultList.appendChild(row);
+    });
   }
 
   function getTherapists(items) {
@@ -489,6 +537,7 @@
       // fallback to operators found in the week
     }
     syncLoginName();
+    if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
 
     const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
@@ -1118,11 +1167,22 @@
   // Preferences modal events
   prefsClose?.addEventListener("click", closePrefs);
   prefsBack?.addEventListener("click", (e) => { if (e.target === prefsBack) closePrefs(); });
-  prefPick?.addEventListener("click", () => { pickMode = "defaults"; openOpsMenu(); });
+  prefPick?.addEventListener("click", () => {
+    if (!prefDefaultPicker) return;
+    if (!prefMulti?.checked) return;
+    const open = prefDefaultPicker.style.display !== "none";
+    prefDefaultPicker.style.display = open ? "none" : "block";
+    if (!open) renderDefaultPickerList();
+  });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
   prefMulti?.addEventListener("change", () => {
     if (prefDefaultSection) prefDefaultSection.style.display = prefMulti.checked ? "" : "none";
+    if (prefDefaultPicker && !prefMulti.checked) prefDefaultPicker.style.display = "none";
   });
+  prefDefaultClose?.addEventListener("click", () => {
+    if (prefDefaultPicker) prefDefaultPicker.style.display = "none";
+  });
+  prefDefaultSearch?.addEventListener("input", () => renderDefaultPickerList());
   prefsSave?.addEventListener("click", () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
