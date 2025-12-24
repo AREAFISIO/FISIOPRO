@@ -13,6 +13,12 @@
     body { overflow: hidden; }
     .app { grid-template-columns: 230px 1fr 72px; }
 
+    :root{
+      --fpDayHeadH: 58px;
+      --fpCancelH: 42px;
+      --fpOpHeadH: 34px;
+    }
+
     .calWrap{
       height: calc(100vh - 120px);
       border:1px solid var(--border);
@@ -156,17 +162,75 @@
       background: rgba(15,26,44,.96);
       border-bottom: 1px solid var(--border);
       border-right: 1px solid var(--border);
-      height: 58px;
+      height: var(--fpDayHeadH);
     }
     .calHead .dayHead{
       position: sticky; top:0;
       z-index: 6;
-      height: 58px;
+      height: var(--fpDayHeadH);
       display:flex; flex-direction:column; justify-content:center;
       gap:4px; padding: 8px 10px;
       background: rgba(15,26,44,.96);
       border-bottom: 1px solid var(--border);
       border-right: 1px solid var(--border);
+    }
+    /* Operator header row needs different sticky top in multi-user */
+    .dayHead.opHead{
+      top: calc(var(--fpDayHeadH) + var(--fpCancelH));
+      height: var(--fpOpHeadH);
+    }
+    /* Cancelled-band row (between date row and operator row) */
+    .cancelHead{
+      position: sticky;
+      top: var(--fpDayHeadH);
+      z-index: 6;
+      height: var(--fpCancelH);
+      padding: 6px 10px;
+      background: rgba(15,26,44,.96);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      border-right: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      overflow:hidden;
+    }
+    .cancelWrap{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      min-width:0;
+    }
+    .cancelChip{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding: 5px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(170,120,255,.20);
+      color: rgba(255,255,255,.92);
+      font-weight: 900;
+      font-size: 12px;
+      max-width: 220px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .cancelChip .k{
+      opacity:.9;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .cancelChip .t{
+      opacity:.85;
+      font-weight: 900;
+    }
+    .cancelChip .p{
+      opacity:.88;
+      font-weight: 900;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
     .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: rgba(255,255,255,.72); }
     .dayHead .d2{ font-weight:900; font-size: 15px; }
@@ -504,12 +568,12 @@
           <div class="prefsRow">
             <div>
               <div class="prefsLabel">Slot agenda</div>
-              <div class="prefsSub">Griglia oraria (consigliato 30 min).</div>
+              <div class="prefsSub">Griglia oraria (consigliato 30 min; puoi usare 60 min).</div>
             </div>
             <div class="prefsRight">
               <select class="selectSmall" data-pref-slot>
-                <option value="15">15 min</option>
                 <option value="30">30 min</option>
+                <option value="60">60 min</option>
               </select>
             </div>
           </div>
