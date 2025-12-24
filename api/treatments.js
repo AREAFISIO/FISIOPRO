@@ -1,46 +1,49 @@
-import { airtableFetch, requireRoles } from "./_auth.js";
+import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
+import { enc } from "./_common.js";
 
-const TREATMENTS_TABLE = process.env.TREATMENTS_TABLE || "EROGATO";
-const PATIENT_LINK_FIELD = process.env.TREATMENTS_PATIENT_FIELD || "Paziente";
-
-function filterByPatientRecordId(patientRecordId) {
-  const rid = String(patientRecordId).replace(/"/g, '\\"');
-  return `FIND("${rid}", ARRAYJOIN({${PATIENT_LINK_FIELD}}))`;
-}
-
+// TRATTAMENTI (catalogo)
 export default async function handler(req, res) {
-  const user = requireRoles(req, res, ["front", "manager"]);
+  ensureRes(res);
+  const user = requireRoles(req, res, ["physio", "manager"]);
   if (!user) return;
 
   try {
-    if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+    if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
 
-    const patientId = req.query?.patientId;
-    if (!patientId) return res.status(400).json({ error: "patientId is required" });
+    const tableName = process.env.AIRTABLE_TRATTAMENTI_TABLE || process.env.TREATMENTS_TABLE || "TRATTAMENTI";
+    const fieldName = process.env.AIRTABLE_TRATTAMENTI_NAME_FIELD || "Nome trattamento";
+    const fieldActive = process.env.AIRTABLE_TRATTAMENTI_ACTIVE_FIELD || "Attivo";
 
-    const table = encodeURIComponent(TREATMENTS_TABLE);
-    const qs = new URLSearchParams({
-      filterByFormula: filterByPatientRecordId(patientId),
-      sort[0][field]: "Data",
-      sort[0][direction]: "desc",
-      pageSize: "50",
-    });
+    const activeOnly = String(req.query?.activeOnly ?? "1") !== "0";
+    const q = String(req.query?.q || "").trim().toLowerCase();
 
-    const data = await airtableFetch(`${table}?${qs.toString()}`);
+    const qs = new URLSearchParams({ pageSize: "100" });
 
-    const items = (data.records || []).map(r => {
-      const f = r.fields || {};
-      return {
-        id: r.id,
-        data: f.Data || f["Data erogazione"] || "",
-        prestazione: f.Prestazione || f["Voce prezzario"] || "",
-        stato: f.Stato || f.Esito || "",
-        note: f.Note || f["Note interne"] || "",
-      };
-    });
+    // optional filter: active + search
+    const filters = [];
+    if (activeOnly) filters.push(`{${fieldActive}}=1`);
+    if (q) {
+      const qEsc = q.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      filters.push(`FIND("${qEsc}", LOWER({${fieldName}}))`);
+    }
+    if (filters.length) qs.set("filterByFormula", `AND(${filters.join(",")})`);
 
-    res.status(200).json({ items });
+    const tableEnc = enc(tableName);
+    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+
+    const items = (data.records || [])
+      .map((r) => {
+        const f = r.fields || {};
+        const name = String(f[fieldName] ?? f["Nome trattamento"] ?? f.Nome ?? f.Name ?? "").trim();
+        if (!name) return null;
+        return { id: r.id, name, active: Boolean(f[fieldActive]), _fields: f };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+
+    return res.status(200).json({ ok: true, items });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    const status = e.status || 500;
+    return res.status(status).json({ ok: false, error: e.message || "server_error" });
   }
 }

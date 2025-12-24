@@ -1,4 +1,5 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
+import { memGet, memSet } from "./_common.js";
 
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -135,12 +136,25 @@ export default async function handler(req, res) {
       "Fisioterapista",
     ].filter(Boolean);
 
-    let FIELD_START = await resolveFieldNameByProbe(tableEnc, startCandidates);
-    let FIELD_OPERATOR = await resolveFieldNameByProbe(tableEnc, operatorCandidates);
+    const schemaCacheKey = `agenda:schema:${APPTS_TABLE_NAME}:${startCandidates.join("|")}:${operatorCandidates.join("|")}`;
+    const cachedSchema = memGet(schemaCacheKey);
+    let FIELD_START = cachedSchema?.FIELD_START || "";
+    let FIELD_OPERATOR = cachedSchema?.FIELD_OPERATOR || "";
+
+    if (!FIELD_START || !FIELD_OPERATOR) {
+      FIELD_START = await resolveFieldNameByProbe(tableEnc, startCandidates);
+      FIELD_OPERATOR = await resolveFieldNameByProbe(tableEnc, operatorCandidates);
+    }
 
     let discovered = [];
     if (!FIELD_START || !FIELD_OPERATOR) {
-      discovered = await discoverFieldNames(tableEnc);
+      const discoveredCacheKey = `agenda:fields:${APPTS_TABLE_NAME}`;
+      discovered = memGet(discoveredCacheKey) || [];
+      if (!discovered.length) {
+        discovered = await discoverFieldNames(tableEnc);
+        // cache discovered fields briefly
+        memSet(discoveredCacheKey, discovered, 10 * 60_000);
+      }
       if (!FIELD_START) {
         FIELD_START =
           resolveFieldNameHeuristic(discovered, ["data e ora inizio", "inizio", "start", "inizio appuntamento"]) ||
@@ -169,6 +183,9 @@ export default async function handler(req, res) {
       });
     }
 
+    // cache schema resolution (warm instance)
+    memSet(schemaCacheKey, { FIELD_START, FIELD_OPERATOR }, 60 * 60_000);
+
     // Debug mode: /api/agenda?op=schema&from=...&to=...
     if (String(req.query?.op || "") === "schema") {
       return res.status(200).json({
@@ -195,10 +212,15 @@ export default async function handler(req, res) {
     if (role === "physio") {
       const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
       const fEmail = `LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}")`;
-      const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
-      const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
-      const rec = userData.records?.[0] || null;
-      const userRecId = rec?.id || "";
+      const emailKey = `collabIdByEmail:${String(email)}`;
+      let userRecId = memGet(emailKey) || "";
+      if (!userRecId) {
+        const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+        const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
+        const rec = userData.records?.[0] || null;
+        userRecId = rec?.id || "";
+        if (userRecId) memSet(emailKey, userRecId, 10 * 60_000);
+      }
 
       if (userRecId) {
         // linked-record field match

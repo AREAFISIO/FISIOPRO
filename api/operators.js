@@ -1,4 +1,5 @@
 import { airtableFetch, ensureRes, requireSession } from "./_auth.js";
+import { memGetOrSet, setPrivateCache } from "./_common.js";
 
 function pickName(fields) {
   const f = fields || {};
@@ -22,6 +23,9 @@ export default async function handler(req, res) {
     if (!session) return res.status(401).json({ ok: false, error: "unauthorized" });
     if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
 
+    // Hot path for agenda: cache operators for a few minutes.
+    setPrivateCache(res, 60);
+
     const tableName = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
     const table = encodeURIComponent(tableName);
 
@@ -32,22 +36,25 @@ export default async function handler(req, res) {
     // Avoid sort-by-field errors if base differs; we sort in JS.
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
 
-    const data = await airtableFetch(`${table}?${qs.toString()}`);
-    const items = (data.records || [])
-      .map((r) => {
-        const f = r.fields || {};
-        const name = String(pickName(f) || "").trim();
-        if (!name) return null;
-        return {
-          id: r.id,
-          name,
-          email: String(f.Email || "").trim().toLowerCase(),
-          role: String(f.Ruolo || "").trim(),
-          active: Boolean(f.Attivo),
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+    const cacheKey = `operators:${tableName}:${formula}`;
+    const items = await memGetOrSet(cacheKey, 5 * 60_000, async () => {
+      const data = await airtableFetch(`${table}?${qs.toString()}`);
+      return (data.records || [])
+        .map((r) => {
+          const f = r.fields || {};
+          const name = String(pickName(f) || "").trim();
+          if (!name) return null;
+          return {
+            id: r.id,
+            name,
+            email: String(f.Email || "").trim().toLowerCase(),
+            role: String(f.Ruolo || "").trim(),
+            active: Boolean(f.Attivo),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name, "it"));
+    });
 
     return res.status(200).json({ ok: true, items });
   } catch (e) {
