@@ -420,7 +420,7 @@ function initSidebars() {
   const leftBtn = document.querySelector("[data-toggle-left]");
   const rightBtn = document.querySelector("[data-toggle-right]");
   if (leftBtn) leftBtn.onclick = () => document.body.classList.toggle("oe-hide-left");
-  if (rightBtn) rightBtn.onclick = () => toggleRightDetail();
+  if (rightBtn) rightBtn.onclick = () => document.body.classList.toggle("fp-right-expanded");
 }
 
 // =====================
@@ -602,7 +602,6 @@ async function runRouteInits() {
   ensureGlobalTopbar();
   removeInnerMenuIcons();
   normalizeRightbar();
-  ensureRightDetailDrawer();
   ensureSettingsModals();
   initSidebars();
   activeNav();
@@ -632,19 +631,7 @@ function removeInnerMenuIcons() {
   });
 }
 
-function ensureRightDetailDrawer() {
-  if (document.querySelector(".fp-rightdetail-back")) return;
-  const back = document.createElement("div");
-  back.className = "fp-rightdetail-back";
-  back.innerHTML = `<div class="fp-rightdetail" role="dialog" aria-modal="true"></div>`;
-  document.body.appendChild(back);
-  back.addEventListener("click", (e) => {
-    if (e.target === back) closeRightDetail();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeRightDetail();
-  });
-}
+// (Right drawer removed) - rightbar itself expands/collapses.
 
 function ensureSettingsModals() {
   // Availability
@@ -963,110 +950,19 @@ function loadAppointmentsSettings() {
   });
 }
 
-function getUserDisplay() {
-  const u = window.FP_USER || window.FP_SESSION || null;
-  const name = String([u?.nome || "", u?.cognome || ""].map((s) => String(s || "").trim()).filter(Boolean).join(" ") || u?.nome || "").trim();
-  const role = String(u?.roleLabel || u?.role || "").trim();
-  const initials =
-    (name || "U")
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => (p[0] ? String(p[0]).toUpperCase() : ""))
-      .join("") || "U";
-  return { name: name || "Utente", role, initials };
-}
-
-function buildRightDetailHtml(view) {
-  const { name, role, initials } = getUserDisplay();
-  const isAgendaPageNow = Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html");
-
-  return `
-    <div class="fp-rightdetail__head">
-      <div class="fp-rightdetail__user">
-        <div class="fp-rightdetail__avatar">${initials}</div>
-        <div style="min-width:0;">
-          <div class="fp-rightdetail__name">${name}</div>
-          <div class="fp-rightdetail__role">${role || ""}</div>
-        </div>
-      </div>
-      <button type="button" class="fp-rightdetail__close" data-rightdetail-close>Chiudi</button>
-    </div>
-    <div class="fp-rightdetail__body">
-      <div class="fp-rsec">
-        <div class="fp-rsec__title" style="cursor:default;">Impostazioni</div>
-        <div class="fp-rsec__items">
-          <a class="fp-ritem" href="#" data-open-agenda-prefs ${isAgendaPageNow ? "" : 'aria-disabled="true"'}><span class="i">⚙️</span><span>Impostazioni Agenda</span></a>
-          <a class="fp-ritem" href="#" data-open-availability><span class="i">🕒</span><span>Impostazioni Disponibilità</span></a>
-          <a class="fp-ritem" href="#" data-open-appointments><span class="i">✅</span><span>Impostazioni Appuntamenti</span></a>
-          ${!isAgendaPageNow ? `<div style="padding:10px 10px 2px; font-size:12px; color: rgba(11,44,61,.62);">Per “Impostazioni Agenda” apri la pagina Agenda.</div>` : ""}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function wireRightDetail(panel) {
-  panel.querySelectorAll("[data-rightdetail-close]").forEach((b) => (b.onclick = () => closeRightDetail()));
-  panel.querySelectorAll("[data-open-agenda-prefs]").forEach((b) => {
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      const btn = document.querySelector("[data-open-prefs]");
-      if (btn) btn.click();
-    });
-  });
-  panel.querySelectorAll("[data-open-availability]").forEach((b) => {
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      closeRightDetail();
-      openAvailabilityModal();
-    });
-  });
-  panel.querySelectorAll("[data-open-appointments]").forEach((b) => {
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      closeRightDetail();
-      openAppointmentsModal();
-    });
-  });
-}
-
-function openRightDetail(view) {
-  ensureRightDetailDrawer();
-  const panel = document.querySelector(".fp-rightdetail-back .fp-rightdetail");
-  if (!panel) return;
-  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
-  window.__FP_RIGHT_DETAIL_VIEW = v;
-  panel.innerHTML = buildRightDetailHtml(v);
-  wireRightDetail(panel);
-  document.body.classList.add("fp-right-open");
-}
-function closeRightDetail() {
-  document.body.classList.remove("fp-right-open");
-}
-function toggleRightDetail(view) {
-  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
-  window.__FP_RIGHT_DETAIL_VIEW = v;
-  if (document.body.classList.contains("fp-right-open")) {
-    // if open, just switch content
-    openRightDetail(v);
-  } else {
-    openRightDetail(v);
-  }
+function isAgendaNow() {
+  return Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html");
 }
 
 function normalizeRightbar() {
   const rb = document.querySelector(".app > .rightbar");
   if (!rb) return;
 
-  // Store original (page-specific) content so we can show it inside the right detail drawer.
-  if (!rb.dataset.fpPageDetail) rb.dataset.fpPageDetail = rb.innerHTML;
+  const isAgenda = isAgendaNow();
 
-  const isAgenda = Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html") || (location.pathname || "").endsWith("/agenda.html");
-
-  rb.className = "rightbar slim";
+  rb.className = "rightbar fp-rbar";
   rb.innerHTML = `
-    <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : 'data-open-right-detail data-right-view="agenda"'} title="Impostazioni Agenda">
+    <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : ""} title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
     </button>
     <button class="rbBtn" data-open-availability title="Impostazioni Disponibilità">
@@ -1075,6 +971,12 @@ function normalizeRightbar() {
     <button class="rbBtn" data-open-appointments title="Impostazioni Appuntamenti">
       <span class="rbIcon">✅</span>
     </button>
+    <div class="fp-rmenu">
+      <div class="section">Impostazioni</div>
+      <a href="#" ${isAgenda ? 'data-open-prefs' : 'aria-disabled="true"'}><span class="i">⚙️</span><span>Impostazioni Agenda</span></a>
+      <a href="#" data-open-availability><span class="i">🕒</span><span>Impostazioni Disponibilità</span></a>
+      <a href="#" data-open-appointments><span class="i">✅</span><span>Impostazioni Appuntamenti</span></a>
+    </div>
   `;
 }
 
@@ -1178,8 +1080,7 @@ function setupSpaRouter() {
       const openRight = e.target?.closest?.("[data-open-right-detail]");
       if (openRight) {
         e.preventDefault();
-        const view = openRight.getAttribute("data-right-view") || "";
-        toggleRightDetail(view);
+        document.body.classList.toggle("fp-right-expanded");
         return;
       }
 

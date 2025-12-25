@@ -20,11 +20,15 @@ small{color:var(--muted)}
 
 .app{
   --leftW: 260px;
-  --rightW: 240px;
+  --rightWCollapsed: 72px;
+  --rightWExpanded: 320px;
+  --rightW: var(--rightWCollapsed);
   height:100vh;
   display:grid;
   grid-template-columns: var(--leftW) 1fr var(--rightW);
 }
+
+body.fp-right-expanded .app{ --rightW: var(--rightWExpanded); }
 
 /* ===== Global top bar (like screenshot) ===== */
 body.fp-has-topbar .app{
@@ -152,17 +156,45 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .rlist a{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;border:1px solid transparent;color:rgba(255,255,255,.78)}
 .rlist a:hover{background:rgba(255,255,255,.05);border-color:var(--border)}
 
-/* Right slim bar (Agenda-like) */
-.rightbar.slim{
+/* Right bar: collapsed (icons) vs expanded (list like left menu) */
+.rightbar.fp-rbar{
   border-left: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+}
+body:not(.fp-right-expanded) .rightbar.fp-rbar{
   padding: 12px 10px;
   display:flex;
   flex-direction:column;
   gap:10px;
   align-items:center;
   justify-content:flex-start;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+  overflow:auto;
 }
+body.fp-right-expanded .rightbar.fp-rbar{
+  padding: 14px 12px;
+  overflow:auto;
+}
+.fp-rmenu{ width:100%; display:none; margin-top: 12px; }
+body.fp-right-expanded .fp-rmenu{ display:block; }
+.fp-rmenu .section{
+  margin: 6px 8px 8px;
+  font-size:12px;
+  color: var(--muted);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.fp-rmenu a{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  color: rgba(255,255,255,.78);
+  border: 1px solid transparent;
+}
+.fp-rmenu a:hover{ background: rgba(255,255,255,.05); border-color: var(--border); }
+.fp-rmenu a .i{ width: 22px; text-align:center; opacity:.85; }
+.fp-rmenu a.active{ background: rgba(34,230,195,.10); border-color: rgba(34,230,195,.28); color: var(--text); }
 .rbBtn{
   width: 44px; height: 44px;
   border-radius: 14px;
@@ -175,83 +207,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .rbBtn:hover{ background: rgba(255,255,255,.06); }
 .rbIcon{ font-size: 18px; }
 
-/* Right detail drawer (OsteoEasy-like) */
-.fp-rightdetail-back{
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  background: rgba(0,0,0,.38);
-  backdrop-filter: blur(2px);
-  display: none;
-}
-.fp-rightdetail{
-  position: absolute;
-  top: 0; right: 0;
-  height: 100%;
-  width: min(420px, 92vw);
-  background: rgba(245,247,250,.98);
-  color: #0b2c3d;
-  border-left: 1px solid rgba(0,0,0,.10);
-  box-shadow: -18px 0 50px rgba(0,0,0,.22);
-  transform: translateX(100%);
-  transition: transform .18s ease;
-  display:flex;
-  flex-direction:column;
-}
-body.fp-right-open .fp-rightdetail-back{ display:block; }
-body.fp-right-open .fp-rightdetail{ transform: translateX(0); }
-
-.fp-rightdetail__head{
-  padding: 14px 14px 10px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 12px;
-}
-.fp-rightdetail__user{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  min-width: 0;
-}
-.fp-rightdetail__avatar{
-  width: 36px; height: 36px;
-  border-radius: 999px;
-  background: rgba(11,44,61,.12);
-  border: 1px solid rgba(0,0,0,.10);
-  display:grid;
-  place-items:center;
-  font-weight: 900;
-}
-.fp-rightdetail__name{
-  font-weight: 900;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fp-rightdetail__role{
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(11,44,61,.62);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fp-rightdetail__close{
-  border: 1px solid rgba(0,0,0,.10);
-  background: rgba(0,0,0,.04);
-  border-radius: 12px;
-  padding: 10px 12px;
-  cursor: pointer;
-  color: #0b2c3d;
-  font-weight: 800;
-}
-.fp-rightdetail__body{
-  padding: 10px 10px 14px;
-  overflow: auto;
-  min-height: 0;
-}
+/* (drawer removed) */
 .fp-rsec{
   margin-top: 10px;
   border: 1px solid rgba(0,0,0,.08);
