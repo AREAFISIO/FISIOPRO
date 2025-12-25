@@ -11,7 +11,7 @@
   <style>
     /* Agenda shell (keeps your management system look) */
     body { overflow: hidden; }
-    .app { --leftW: 230px; --rightW: 72px; grid-template-columns: var(--leftW) 1fr var(--rightW); }
+    .app { --leftW: 230px; --rightWCollapsed: 72px; --rightWExpanded: 320px; --rightW: var(--rightWCollapsed); grid-template-columns: var(--leftW) 1fr var(--rightW); }
 
     :root{
       --fpDayHeadH: 58px;
