@@ -778,9 +778,11 @@ function normalizeRightbar() {
   // Store original (page-specific) content so we can show it inside the right detail drawer.
   if (!rb.dataset.fpPageDetail) rb.dataset.fpPageDetail = rb.innerHTML;
 
+  const isAgenda = Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html") || (location.pathname || "").endsWith("/agenda.html");
+
   rb.className = "rightbar slim";
   rb.innerHTML = `
-    <button class="rbBtn" data-open-right-detail data-right-view="agenda" title="Impostazioni Agenda">
+    <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : 'data-open-right-detail data-right-view="agenda"'} title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
     </button>
     <button class="rbBtn" data-open-right-detail data-right-view="availability" title="Impostazioni Disponibilità">
