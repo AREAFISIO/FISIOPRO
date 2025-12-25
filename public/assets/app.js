@@ -433,87 +433,48 @@ function isSpaShell() {
 }
 
 function ensureGlobalTopbar() {
-  if (window.__FP_GLOBAL_TOPBAR_READY) return;
   if (!document.querySelector(".app")) return;
 
-  // Create once and keep it persistent across SPA swaps.
+  // Create once and keep it persistent across SPA swaps, but refresh the text each route.
   let bar = document.querySelector(".fp-topbar");
   if (!bar) {
     bar = document.createElement("header");
     bar.className = "fp-topbar";
     document.body.insertBefore(bar, document.body.firstChild);
+    bar.innerHTML = `
+      <div class="fp-topbar__left">
+        <button type="button" class="fp-iconbtn" data-toggle-left="1" aria-label="Apri/chiudi menu sinistro">
+          <span class="ic">☰</span>
+        </button>
+        <div class="fp-topbar__brand">
+          <div class="fp-topbar__title" data-fp-top-title></div>
+          <div class="fp-topbar__sub" data-fp-top-sub></div>
+        </div>
+      </div>
+      <div class="fp-topbar__right">
+        <button type="button" class="fp-iconbtn" data-toggle-right="1" aria-label="Apri/chiudi menu destro">
+          <span class="ic">≡</span>
+        </button>
+      </div>
+    `;
   }
 
   // Pull label from left brand if available.
   const brandTitle = String(document.querySelector(".sidebar .brand .title")?.textContent || "").trim();
   const brandSub = String(document.querySelector(".sidebar .brand .sub")?.textContent || "").trim();
 
-  bar.innerHTML = `
-    <div class="fp-topbar__left">
-      <button type="button" class="fp-iconbtn" data-toggle-left="1" aria-label="Apri/chiudi menu sinistro">
-        <span class="ic">☰</span>
-      </button>
-      <div class="fp-topbar__brand">
-        <div class="fp-topbar__title">${brandTitle || "FISIOCLINIK SRL STP"}</div>
-        <div class="fp-topbar__sub">${brandSub || ""}</div>
-      </div>
-    </div>
-    <div class="fp-topbar__right">
-      <button type="button" class="fp-iconbtn" data-toggle-right="1" aria-label="Apri/chiudi menu destro">
-        <span class="ic">≡</span>
-      </button>
-    </div>
-  `;
+  const tEl = bar.querySelector("[data-fp-top-title]");
+  const sEl = bar.querySelector("[data-fp-top-sub]");
+  if (tEl) tEl.textContent = brandTitle || "FISIOCLINIK SRL STP";
+  if (sEl) sEl.textContent = brandSub || "";
 
   document.body.classList.add("fp-has-topbar");
   window.__FP_GLOBAL_TOPBAR_READY = true;
 }
 
 function ensureTopbarToggles() {
-  // Adds top-left / top-right icon buttons if missing.
-  const topRow = document.querySelector(".main .topbar .toprow");
-  if (!topRow) return;
-
-  const h1 = topRow.querySelector(".h1");
-  const actions = topRow.querySelector(".actions");
-
-  // Wrap left side (toggle + title) so we can keep layout consistent.
-  if (h1 && !h1.parentElement?.classList?.contains("fp-toprow-left")) {
-    const wrap = document.createElement("div");
-    wrap.className = "fp-toprow-left";
-    topRow.insertBefore(wrap, h1);
-    wrap.appendChild(h1);
-  }
-
-  const leftWrap = topRow.querySelector(".fp-toprow-left");
-  if (leftWrap && !leftWrap.querySelector("[data-toggle-left]")) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "fp-iconbtn";
-    btn.setAttribute("data-toggle-left", "1");
-    btn.setAttribute("aria-label", "Apri/chiudi menu sinistro");
-    btn.innerHTML = `<span class="ic">☰</span>`;
-    leftWrap.insertBefore(btn, leftWrap.firstChild);
-  }
-
-  if (actions && !actions.querySelector("[data-toggle-right]")) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "fp-iconbtn";
-    btn.setAttribute("data-toggle-right", "1");
-    btn.setAttribute("aria-label", "Apri/chiudi menu destro");
-    btn.innerHTML = `<span class="ic">≡</span>`;
-    actions.insertBefore(btn, actions.firstChild);
-  } else if (!actions && !topRow.querySelector("[data-toggle-right]")) {
-    // fallback: place on the far right
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "fp-iconbtn";
-    btn.setAttribute("data-toggle-right", "1");
-    btn.setAttribute("aria-label", "Apri/chiudi menu destro");
-    btn.innerHTML = `<span class="ic">≡</span>`;
-    topRow.appendChild(btn);
-  }
+  // Kept for backwards compatibility; toggles now live in the global .fp-topbar.
+  // No-op to avoid duplicated buttons inside the page topbar.
 }
 
 function shouldSpaHandleUrl(url) {
