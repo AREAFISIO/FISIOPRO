@@ -1,177 +1,119 @@
 <!doctype html>
 <html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FisioPro – Scheda paziente</title>
-  <link rel="stylesheet" href="/assets/app.css" />
-
-  <script src="/assets/auth-guard.js"></script>
-  <script src="/assets/session-timeout.js"></script>
-
-  <style>
-    /* Solo micro-stili locali se serve */
-    .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
-    .topbar { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom: 16px; }
-    .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); cursor:pointer; }
-    .btn:hover { background: rgba(255,255,255,.10); }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .card { border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px; background: rgba(255,255,255,.04); }
-    .h1 { font-size: 22px; font-weight: 700; }
-    .label { opacity:.8; font-size: 13px; margin-top: 10px; }
-    .value { font-size: 18px; font-weight: 600; }
-    .table { width:100%; border-collapse: collapse; margin-top: 10px; }
-    .table th, .table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.10); text-align:left; font-size: 16px; }
-    .muted { opacity: .75; }
-    .error { padding: 12px; border-radius: 12px; border: 1px solid rgba(255,80,80,.35); background: rgba(255,80,80,.10); }
-  </style>
+  <title>FisioPro • Paziente</title>
+  <link rel="stylesheet" href="../assets/app.css" />
 </head>
-
 <body>
-  <div class="container">
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">FISIOPRO</div><div class="sub">Pazienti</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+      <a data-nav href="casi-clinici.html" data-role="physio,manager">Casi clinici</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+
+      <div class="section">Sistema</div>
+      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main" data-patient-page>
     <div class="topbar">
-      <div class="h1" id="title">Scheda paziente</div>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <button class="btn" id="btnBack">← Agenda</button>
-        <button class="btn" id="btnLogout">Logout</button>
+      <div class="toprow">
+        <div class="h1"><span data-patient-title>Scheda paziente</span> <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" type="button" data-patient-back>Indietro</button>
+        </div>
       </div>
     </div>
 
-    <div id="status" class="muted">Caricamento…</div>
-    <div id="err" class="error" style="display:none;"></div>
+    <div class="mini" data-patient-status style="color:var(--muted);">Caricamento…</div>
+    <div class="status" data-patient-error style="display:none;"></div>
 
-    <div class="grid" style="margin-top:14px;">
-      <div class="card">
-        <div class="h1" style="font-size:18px;">Dati anagrafici</div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:14px;">
+      <section class="card">
+        <div class="head"><h2>Dati anagrafici</h2><span class="chip">Scheda</span></div>
+        <div class="body">
+          <div class="formgrid">
+            <div class="field">
+              <label>Nome</label>
+              <div class="chip" data-patient-nome>—</div>
+            </div>
+            <div class="field">
+              <label>Cognome</label>
+              <div class="chip" data-patient-cognome>—</div>
+            </div>
+            <div class="field">
+              <label>Telefono</label>
+              <div class="chip" data-patient-tel>—</div>
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <div class="chip" data-patient-email>—</div>
+            </div>
+            <div class="field">
+              <label>Data di nascita</label>
+              <div class="chip" data-patient-dob>—</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-        <div class="label">Nome</div>
-        <div class="value" id="pNome">—</div>
-
-        <div class="label">Cognome</div>
-        <div class="value" id="pCognome">—</div>
-
-        <div class="label">Telefono</div>
-        <div class="value" id="pTel">—</div>
-
-        <div class="label">Email</div>
-        <div class="value" id="pEmail">—</div>
-
-        <div class="label">Data di nascita</div>
-        <div class="value" id="pDob">—</div>
-      </div>
-
-      <div class="card">
-        <div class="h1" style="font-size:18px;">Note</div>
-        <div class="muted" id="pNote" style="font-size:16px; line-height:1.35;">—</div>
-      </div>
+      <section class="card">
+        <div class="head"><h2>Note</h2><span class="chip">Cliniche</span></div>
+        <div class="body">
+          <div style="color:var(--muted); line-height:1.6;" data-patient-note>—</div>
+        </div>
+      </section>
     </div>
 
-    <div class="card" style="margin-top:14px;">
-      <div class="h1" style="font-size:18px;">Storico appuntamenti</div>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Inizio</th>
-            <th>Fine</th>
-            <th>Durata</th>
-            <th>Fisio (Email)</th>
-          </tr>
-        </thead>
-        <tbody id="rows">
-          <tr><td colspan="4" class="muted">Caricamento…</td></tr>
-        </tbody>
-      </table>
+    <section class="card" style="margin-top:14px;">
+      <div class="head"><h2>Storico appuntamenti</h2><span class="chip">Log</span></div>
+      <div class="body">
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Inizio</th>
+                <th>Fine</th>
+                <th>Durata</th>
+                <th>Fisio (Email)</th>
+              </tr>
+            </thead>
+            <tbody data-patient-appt-rows>
+              <tr><td colspan="4" class="muted">Caricamento…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn primary" style="width:100%;" onclick="location.href='anagrafica.html'">📋 Lista pazienti</button>
+      <div style="height:10px;"></div>
+      <button class="btn" style="width:100%;" onclick="location.href='agenda.html'">🗓️ Agenda</button>
     </div>
-  </div>
+  </aside>
+</div>
 
-  <script>
-    function qs(name) {
-      return new URLSearchParams(location.search).get(name);
-    }
-
-    function fmtDate(iso) {
-      if (!iso) return "";
-      try {
-        const d = new Date(iso);
-        return d.toLocaleString("it-IT", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
-      } catch { return iso; }
-    }
-
-    async function apiGet(url) {
-      const res = await fetch(url, { credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || ("Errore " + res.status));
-      return data;
-    }
-
-    function setError(msg) {
-      document.getElementById("status").style.display = "none";
-      const box = document.getElementById("err");
-      box.style.display = "block";
-      box.textContent = msg;
-    }
-
-    function setStatus(msg) {
-      const s = document.getElementById("status");
-      s.style.display = "block";
-      s.textContent = msg;
-    }
-
-    async function load() {
-      const id = qs("id");
-      if (!id) return setError("Manca id paziente nell’URL.");
-
-      // prime auth info (no extra network if auth-guard already fetched it)
-      if (typeof window.fpAuthMe === "function") {
-        await window.fpAuthMe();
-      }
-
-      setStatus("Carico dati paziente…");
-      const p = await apiGet("/api/patient?id=" + encodeURIComponent(id));
-
-      document.getElementById("pNome").textContent = p.Nome || "—";
-      document.getElementById("pCognome").textContent = p.Cognome || "—";
-      document.getElementById("pTel").textContent = p["Telefono"] || "—";
-      document.getElementById("pEmail").textContent = p["Email"] || "—";
-      document.getElementById("pDob").textContent = p["Data di nascita"] || "—";
-      document.getElementById("pNote").textContent = (p.Note && String(p.Note).trim()) ? p.Note : "—";
-
-      const fullName = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim();
-      document.getElementById("title").textContent = fullName ? ("Scheda: " + fullName) : "Scheda paziente";
-
-      setStatus("Carico storico appuntamenti…");
-      const a = await apiGet("/api/patient-appointments?id=" + encodeURIComponent(id));
-
-      const tbody = document.getElementById("rows");
-      tbody.innerHTML = "";
-
-      const recs = a.records || [];
-      if (!recs.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun appuntamento trovato.</td></tr>`;
-      } else {
-        for (const r of recs) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>${fmtDate(r["Data e ora INIZIO"])}</td>
-            <td>${fmtDate(r["Data e ora FINE"])}</td>
-            <td>${(r.Durata ?? "")}</td>
-            <td>${(r.Email || "")}</td>
-          `;
-          tbody.appendChild(tr);
-        }
-      }
-
-      setStatus("OK");
-      setTimeout(() => (document.getElementById("status").style.display = "none"), 600);
-    }
-
-    document.getElementById("btnBack").onclick = () => location.href = "/pages/agenda.html";
-    document.getElementById("btnLogout").onclick = async () => {
-      try { await fetch("/api/auth-logout", { method:"POST", credentials:"include" }); } catch {}
-      location.href = "/";
-    };
-
-    load().catch(e => setError(e.message || "Errore"));
-  </script>
+<div class="toast"></div>
+<script src="../assets/app.js"></script>
 </body>
 </html>

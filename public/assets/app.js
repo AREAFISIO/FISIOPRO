@@ -182,7 +182,11 @@ function renderPatientsTable(tbody, items, metaEl) {
   for (const p of items) {
     const tr = document.createElement("tr");
     tr.style.cursor = "pointer";
-    tr.onclick = () => location.href = `paziente.html?id=${encodeURIComponent(p.id)}`;
+    tr.onclick = () => {
+      const href = `paziente.html?id=${encodeURIComponent(p.id)}`;
+      if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+      else location.href = href;
+    };
 
     const tel = p.Telefono || "";
     const telHref = buildTelHref(tel);
@@ -419,6 +423,464 @@ function initSidebars() {
   if (rightBtn) rightBtn.onclick = () => document.body.classList.toggle("oe-hide-right");
 }
 
+// =====================
+// SPA NAV (persist menus, swap center only)
+// =====================
+function isSpaShell() {
+  const app = document.querySelector(".app");
+  if (!app) return false;
+  return Boolean(app.querySelector(":scope > .sidebar") && app.querySelector(":scope > .main") && app.querySelector(":scope > .rightbar"));
+}
+
+function ensureGlobalTopbar() {
+  if (window.__FP_GLOBAL_TOPBAR_READY) return;
+  if (!document.querySelector(".app")) return;
+
+  // Create once and keep it persistent across SPA swaps.
+  let bar = document.querySelector(".fp-topbar");
+  if (!bar) {
+    bar = document.createElement("header");
+    bar.className = "fp-topbar";
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+
+  // Pull label from left brand if available.
+  const brandTitle = String(document.querySelector(".sidebar .brand .title")?.textContent || "").trim();
+  const brandSub = String(document.querySelector(".sidebar .brand .sub")?.textContent || "").trim();
+
+  bar.innerHTML = `
+    <div class="fp-topbar__left">
+      <button type="button" class="fp-iconbtn" data-toggle-left="1" aria-label="Apri/chiudi menu sinistro">
+        <span class="ic">☰</span>
+      </button>
+      <div class="fp-topbar__brand">
+        <div class="fp-topbar__title">${brandTitle || "FISIOCLINIK SRL STP"}</div>
+        <div class="fp-topbar__sub">${brandSub || ""}</div>
+      </div>
+    </div>
+    <div class="fp-topbar__right">
+      <button type="button" class="fp-iconbtn" data-toggle-right="1" aria-label="Apri/chiudi menu destro">
+        <span class="ic">≡</span>
+      </button>
+    </div>
+  `;
+
+  document.body.classList.add("fp-has-topbar");
+  window.__FP_GLOBAL_TOPBAR_READY = true;
+}
+
+function ensureTopbarToggles() {
+  // Adds top-left / top-right icon buttons if missing.
+  const topRow = document.querySelector(".main .topbar .toprow");
+  if (!topRow) return;
+
+  const h1 = topRow.querySelector(".h1");
+  const actions = topRow.querySelector(".actions");
+
+  // Wrap left side (toggle + title) so we can keep layout consistent.
+  if (h1 && !h1.parentElement?.classList?.contains("fp-toprow-left")) {
+    const wrap = document.createElement("div");
+    wrap.className = "fp-toprow-left";
+    topRow.insertBefore(wrap, h1);
+    wrap.appendChild(h1);
+  }
+
+  const leftWrap = topRow.querySelector(".fp-toprow-left");
+  if (leftWrap && !leftWrap.querySelector("[data-toggle-left]")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fp-iconbtn";
+    btn.setAttribute("data-toggle-left", "1");
+    btn.setAttribute("aria-label", "Apri/chiudi menu sinistro");
+    btn.innerHTML = `<span class="ic">☰</span>`;
+    leftWrap.insertBefore(btn, leftWrap.firstChild);
+  }
+
+  if (actions && !actions.querySelector("[data-toggle-right]")) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fp-iconbtn";
+    btn.setAttribute("data-toggle-right", "1");
+    btn.setAttribute("aria-label", "Apri/chiudi menu destro");
+    btn.innerHTML = `<span class="ic">≡</span>`;
+    actions.insertBefore(btn, actions.firstChild);
+  } else if (!actions && !topRow.querySelector("[data-toggle-right]")) {
+    // fallback: place on the far right
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fp-iconbtn";
+    btn.setAttribute("data-toggle-right", "1");
+    btn.setAttribute("aria-label", "Apri/chiudi menu destro");
+    btn.innerHTML = `<span class="ic">≡</span>`;
+    topRow.appendChild(btn);
+  }
+}
+
+function shouldSpaHandleUrl(url) {
+  try {
+    const u = url instanceof URL ? url : new URL(String(url), location.href);
+    if (u.origin !== location.origin) return false;
+    if (!u.pathname.startsWith("/pages/")) return false;
+    if (!u.pathname.endsWith(".html")) return false;
+    // Logout/login should remain a full navigation (session handling).
+    if (u.pathname.endsWith("/pages/login.html")) return false;
+    if (u.pathname.endsWith("/pages/index.html")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function parseOnclickLocationHref(onclickRaw) {
+  const s = String(onclickRaw || "");
+  const m = s.match(/location\.href\s*=\s*["']([^"']+)["']/);
+  return m ? m[1] : "";
+}
+
+async function loadHtml(url) {
+  const u = url instanceof URL ? url : new URL(String(url), location.href);
+  const res = await fetch(u.pathname + u.search, { credentials: "include" });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return text;
+}
+
+function extractPageParts(html) {
+  const doc = new DOMParser().parseFromString(String(html || ""), "text/html");
+  const app = doc.querySelector(".app");
+  const main = app?.querySelector(":scope > .main") || doc.querySelector("main.main") || doc.querySelector("main");
+  const rightbar = app?.querySelector(":scope > .rightbar") || doc.querySelector("aside.rightbar");
+  const title = String(doc.querySelector("title")?.textContent || "").trim();
+  const inlineStyles = Array.from(doc.querySelectorAll("head style"))
+    .map((s) => String(s.textContent || ""))
+    .join("\n");
+  const hasDiary = Boolean(app?.hasAttribute("data-diary"));
+  const hasPatientPage = Boolean(doc.querySelector("main[data-patient-page], .main[data-patient-page]"));
+  const overlays = Array.from(doc.body?.children || [])
+    .filter((el) => el && el.nodeType === 1)
+    .filter((el) => !el.classList.contains("app"))
+    .filter((el) => el.tagName !== "SCRIPT")
+    .filter((el) => !el.classList.contains("toast"))
+    .map((el) => el.outerHTML)
+    .join("\n");
+  return { title, main, rightbar, inlineStyles, hasDiary, hasPatientPage, overlays };
+}
+
+function applyRouteStyles(cssText) {
+  const id = "fp-route-style";
+  const prev = document.getElementById(id);
+  if (prev) prev.remove();
+  const css = String(cssText || "").trim();
+  if (!css) return;
+  const el = document.createElement("style");
+  el.id = id;
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
+function bootstrapRouteStyleControl() {
+  // Move existing inline <style> tags into our managed container.
+  const styles = Array.from(document.querySelectorAll("head style"));
+  if (!styles.length) return;
+  const css = styles.map((s) => String(s.textContent || "")).join("\n");
+  styles.forEach((s) => s.remove());
+  applyRouteStyles(css);
+}
+
+function ensureOverlayHost() {
+  let host = document.getElementById("fp-route-overlays");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "fp-route-overlays";
+  document.body.appendChild(host);
+  return host;
+}
+
+function bootstrapOverlayControl() {
+  const host = ensureOverlayHost();
+  const nodes = Array.from(document.body.children || [])
+    .filter((el) => el && el.nodeType === 1)
+    .filter((el) => el.id !== "fp-route-overlays")
+    .filter((el) => !el.classList.contains("app"))
+    .filter((el) => el.tagName !== "SCRIPT")
+    .filter((el) => !el.classList.contains("toast"));
+
+  if (!nodes.length) return;
+  host.innerHTML = nodes.map((el) => el.outerHTML).join("\n");
+  nodes.forEach((el) => el.remove());
+}
+
+async function ensureDiaryLoaded() {
+  const p = location.pathname || "";
+  if (!p.endsWith("/pages/agenda.html") && !p.endsWith("/agenda.html")) return;
+  if (!document.querySelector("[data-diary]")) return;
+
+  if (typeof window.fpDiaryInit === "function") {
+    window.fpDiaryInit();
+    return;
+  }
+
+  // If the page already includes diary.js via a <script> tag (classic load),
+  // let it execute normally (it auto-inits).
+  if (document.querySelector('script[src*="diary.js"]')) return;
+
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "/assets/diary.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("diary_load_failed"));
+    document.head.appendChild(s);
+  });
+
+  if (typeof window.fpDiaryInit === "function") window.fpDiaryInit();
+}
+
+async function runRouteInits() {
+  // Ensure global bar exists before wiring sidebar toggles.
+  ensureGlobalTopbar();
+  ensureTopbarToggles();
+  initSidebars();
+  activeNav();
+  initLogoutLinks();
+
+  const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  if (role) roleGuard(role);
+
+  await initAnagrafica();
+  await initPatientPage();
+  await ensureDiaryLoaded();
+}
+
+async function swapCenterTo(url, opts = {}) {
+  const replace = Boolean(opts.replace);
+  const u = url instanceof URL ? url : new URL(String(url), location.href);
+
+  // Only swap if we are in the layout shell.
+  if (!isSpaShell()) {
+    if (replace) location.replace(u.toString());
+    else location.href = u.toString();
+    return;
+  }
+
+  // Avoid parallel navigations.
+  if (window.__FP_SPA_INFLIGHT) return;
+  window.__FP_SPA_INFLIGHT = true;
+
+  try {
+    const html = await loadHtml(u);
+    const { title, main, rightbar, inlineStyles, hasDiary, hasPatientPage, overlays } = extractPageParts(html);
+
+    // Apply route-specific styles (from <head><style>…</style>).
+    applyRouteStyles(inlineStyles);
+
+    const curMain = document.querySelector(".app > .main");
+    const curRight = document.querySelector(".app > .rightbar");
+    const curApp = document.querySelector(".app");
+    if (!curMain || !curRight) throw new Error("spa_shell_missing");
+
+    // Sync per-page flags that scripts rely on.
+    if (curApp) {
+      if (hasDiary) curApp.setAttribute("data-diary", "");
+      else curApp.removeAttribute("data-diary");
+    }
+    if (hasPatientPage) curMain.setAttribute("data-patient-page", "");
+    else curMain.removeAttribute("data-patient-page");
+
+    // Swap non-menu overlays (modals, backdrops, etc.)
+    ensureOverlayHost().innerHTML = String(overlays || "");
+
+    if (main) curMain.innerHTML = main.innerHTML;
+    else curMain.innerHTML = `<section class="card"><div class="body">Pagina non supportata.</div></section>`;
+
+    if (rightbar) {
+      curRight.className = rightbar.className;
+      curRight.innerHTML = rightbar.innerHTML;
+    } else {
+      curRight.className = "rightbar";
+      curRight.innerHTML = "";
+    }
+
+    if (title) document.title = title;
+
+    if (replace) history.replaceState({ fpSpa: 1 }, "", u.pathname + u.search);
+    else history.pushState({ fpSpa: 1 }, "", u.pathname + u.search);
+
+    await runRouteInits();
+  } finally {
+    window.__FP_SPA_INFLIGHT = false;
+  }
+}
+
+function setupSpaRouter() {
+  if (window.__FP_SPA_ROUTER_READY) return;
+  window.__FP_SPA_ROUTER_READY = true;
+
+  bootstrapRouteStyleControl();
+  bootstrapOverlayControl();
+
+  // Public helper for code that wants SPA navigation.
+  window.fpNavigate = (href, opts = {}) => {
+    const u = new URL(String(href), location.href);
+    if (!shouldSpaHandleUrl(u)) {
+      location.href = u.toString();
+      return;
+    }
+    swapCenterTo(u, opts).catch(() => (location.href = u.toString()));
+  };
+
+  try { history.replaceState({ fpSpa: 1 }, "", location.pathname + location.search); } catch {}
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const a = e.target?.closest?.("a[href]");
+      if (a) {
+        const href = a.getAttribute("href") || "";
+        if (!href || href.startsWith("#")) return;
+        const u = new URL(href, location.href);
+        if (!shouldSpaHandleUrl(u)) return;
+        e.preventDefault();
+        swapCenterTo(u).catch(() => (location.href = u.toString()));
+        return;
+      }
+
+      const btn = e.target?.closest?.("button[onclick]");
+      if (btn) {
+        const href = parseOnclickLocationHref(btn.getAttribute("onclick"));
+        if (!href) return;
+        const u = new URL(href, location.href);
+        if (!shouldSpaHandleUrl(u)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        swapCenterTo(u).catch(() => (location.href = u.toString()));
+      }
+    },
+    true,
+  );
+
+  window.addEventListener("popstate", () => {
+    if (!shouldSpaHandleUrl(location.href)) return;
+    swapCenterTo(location.href, { replace: true }).catch(() => (location.href = location.href));
+  });
+}
+
+// =====================
+// PAZIENTE (Scheda paziente) - within shell
+// =====================
+function isPatientPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/paziente.html") || p.endsWith("/paziente.html");
+}
+
+function fmtItDateTime(iso) {
+  const s = normStr(iso);
+  if (!s) return "—";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  try {
+    return d.toLocaleString("it-IT", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return s;
+  }
+}
+
+async function initPatientPage() {
+  if (!isPatientPage()) return;
+  const root = document.querySelector("[data-patient-page]");
+  if (!root) return;
+  if (root.dataset.fpInited === "1") return;
+  root.dataset.fpInited = "1";
+
+  const url = new URL(location.href);
+  const id = url.searchParams.get("id");
+
+  const statusEl = document.querySelector("[data-patient-status]");
+  const errEl = document.querySelector("[data-patient-error]");
+  const rowsEl = document.querySelector("[data-patient-appt-rows]");
+
+  const setStatus = (msg) => {
+    if (!statusEl) return;
+    statusEl.style.display = "block";
+    statusEl.textContent = msg;
+  };
+  const setError = (msg) => {
+    if (!errEl) return;
+    errEl.style.display = "block";
+    errEl.textContent = msg;
+  };
+
+  const backBtn = document.querySelector("[data-patient-back]");
+  if (backBtn) {
+    backBtn.onclick = () => {
+      if (history.length > 1) history.back();
+      else if (typeof window.fpNavigate === "function") window.fpNavigate("/pages/anagrafica.html");
+      else location.href = "/pages/anagrafica.html";
+    };
+  }
+
+  if (!id) {
+    setError("Manca id paziente nell’URL.");
+    if (statusEl) statusEl.style.display = "none";
+    return;
+  }
+
+  try {
+    setStatus("Caricamento…");
+
+    const p = await api("/api/patient?id=" + encodeURIComponent(id));
+    const fullName = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim();
+    const titleEl = document.querySelector("[data-patient-title]");
+    if (titleEl) titleEl.textContent = fullName ? ("Scheda: " + fullName) : "Scheda paziente";
+
+    const setText = (sel, val) => {
+      const el = document.querySelector(sel);
+      if (el) el.textContent = normStr(val) || "—";
+    };
+    setText("[data-patient-nome]", p.Nome);
+    setText("[data-patient-cognome]", p.Cognome);
+    setText("[data-patient-tel]", p.Telefono || p["Telefono"]);
+    setText("[data-patient-email]", p.Email || p["Email"]);
+    setText("[data-patient-dob]", p["Data di nascita"]);
+    setText("[data-patient-note]", p.Note);
+
+    setStatus("Carico storico appuntamenti…");
+    const a = await api("/api/patient-appointments?id=" + encodeURIComponent(id));
+    const recs = a.records || [];
+
+    if (rowsEl) {
+      rowsEl.innerHTML = "";
+      if (!recs.length) {
+        rowsEl.innerHTML = `<tr><td colspan="4" class="muted">Nessun appuntamento trovato.</td></tr>`;
+      } else {
+        for (const r of recs) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${fmtItDateTime(r["Data e ora INIZIO"])}</td>
+            <td>${fmtItDateTime(r["Data e ora FINE"])}</td>
+            <td>${normStr(r.Durata) || "—"}</td>
+            <td>${normStr(r.Email) || "—"}</td>
+          `;
+          rowsEl.appendChild(tr);
+        }
+      }
+    }
+
+    if (statusEl) {
+      statusEl.textContent = "OK";
+      setTimeout(() => { if (statusEl) statusEl.style.display = "none"; }, 600);
+    }
+  } catch (e) {
+    console.error(e);
+    if (statusEl) statusEl.style.display = "none";
+    setError(e.message || "Errore");
+  }
+}
+
 function buildTimeUI(timeCol, linesEl, startMin, endMin, slotMin, slotPx) {
   timeCol.innerHTML = "";
   linesEl.innerHTML = "";
@@ -570,17 +1032,20 @@ async function initAgenda() {
   if (btnToday) btnToday.onclick = () => {
     const u = new URL(location.href);
     u.searchParams.set("date", toISODate(new Date()));
-    location.href = u.toString();
+    if (typeof window.fpNavigate === "function") window.fpNavigate(u.toString(), { replace: true });
+    else location.href = u.toString();
   };
   if (btnPrev) btnPrev.onclick = () => {
     const u = new URL(location.href);
     u.searchParams.set("date", toISODate(addDays(weekStart, -7)));
-    location.href = u.toString();
+    if (typeof window.fpNavigate === "function") window.fpNavigate(u.toString(), { replace: true });
+    else location.href = u.toString();
   };
   if (btnNext) btnNext.onclick = () => {
     const u = new URL(location.href);
     u.searchParams.set("date", toISODate(addDays(weekStart, 7)));
-    location.href = u.toString();
+    if (typeof window.fpNavigate === "function") window.fpNavigate(u.toString(), { replace: true });
+    else location.href = u.toString();
   };
 
   const hoverCard = buildHoverCard();
@@ -610,10 +1075,12 @@ async function initAgenda() {
   const user = await ensureAuth();
   if (!user) return;
 
+  // SPA router: keep left/right menus mounted, swap only center content.
+  setupSpaRouter();
+
   initLogoutLinks();
   setUserBadges(user);
   roleGuard(user.role);
   activeNav();
-  await initAnagrafica();
-  await initAgenda();
+  await runRouteInits();
 })();
