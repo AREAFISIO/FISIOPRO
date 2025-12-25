@@ -603,6 +603,7 @@ async function runRouteInits() {
   removeInnerMenuIcons();
   normalizeRightbar();
   ensureRightDetailDrawer();
+  ensureSettingsModals();
   initSidebars();
   activeNav();
   initLogoutLinks();
@@ -645,6 +646,323 @@ function ensureRightDetailDrawer() {
   });
 }
 
+function ensureSettingsModals() {
+  // Availability
+  if (!document.querySelector("[data-fp-av-back]")) {
+    const back = document.createElement("div");
+    back.className = "fp-set-back";
+    back.setAttribute("data-fp-av-back", "1");
+    back.innerHTML = `
+      <div class="fp-set-panel" role="dialog" aria-modal="true">
+        <div class="fp-set-head">
+          <div class="fp-set-title"><span style="font-size:18px;">🕒</span> Configura la disponibilità</div>
+          <button class="btn" type="button" data-fp-av-close>Chiudi</button>
+        </div>
+        <div class="fp-set-body">
+          <div class="fp-av-top">
+            <div style="font-weight:900;">Puoi selezionare più slot cliccando e trascinando la selezione</div>
+          </div>
+          <div class="fp-av-wrap" style="margin-top:12px;">
+            <div class="fp-av-grid" data-fp-av-grid></div>
+          </div>
+        </div>
+        <div class="fp-set-foot">
+          <button class="btn" type="button" data-fp-av-reset>Reset</button>
+          <button class="btn primary" type="button" data-fp-av-save>Salva</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+  }
+
+  // Appointments
+  if (!document.querySelector("[data-fp-appt-back]")) {
+    const back = document.createElement("div");
+    back.className = "fp-set-back";
+    back.setAttribute("data-fp-appt-back", "1");
+    back.innerHTML = `
+      <div class="fp-set-panel" role="dialog" aria-modal="true">
+        <div class="fp-set-head">
+          <div class="fp-set-title"><span style="font-size:18px;">✅</span> Impostazioni Appuntamenti</div>
+          <button class="btn" type="button" data-fp-appt-close>Chiudi</button>
+        </div>
+        <div class="fp-set-body">
+          <div class="card" style="padding:14px;">
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Proponi primo appuntamento a partire da</div>
+                <div class="sub">Numero di giorni da oggi (default per proposta appuntamento).</div>
+              </div>
+              <div class="right">
+                <input class="input" style="width:120px;" type="number" min="0" max="365" data-fp-appt-days />
+                <div style="color:var(--muted);">giorni</div>
+              </div>
+            </div>
+
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Sposta appuntamenti annullati in alto</div>
+                <div class="sub">Mostra gli annullati come banda in alto.</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="checkbox" data-fp-appt-cancelband /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Abilita modifica appuntamenti con trascinamento</div>
+                <div class="sub">Consente drag&drop su agenda.</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="checkbox" data-fp-appt-drag /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Considera gli appuntamenti associati da fatturare</div>
+                <div class="sub">Flag utile per flussi amministrativi.</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="checkbox" data-fp-appt-billing /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Mostra nome utente in fattura</div>
+                <div class="sub">Usa il nome sotto come riferimento.</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="checkbox" data-fp-appt-showname /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="fp-set-row" style="align-items:flex-start;">
+              <div style="min-width:0;">
+                <div class="lbl">Nome utente visualizzato</div>
+                <div class="sub">Testo mostrato (max 150).</div>
+              </div>
+              <div class="right" style="flex-direction:column; align-items:flex-end;">
+                <input class="input" style="width:min(520px, 78vw);" maxlength="150" data-fp-appt-name />
+                <div style="font-size:12px; color:var(--muted);" data-fp-appt-name-count>0 / 150</div>
+              </div>
+            </div>
+
+            <div class="fp-set-row" style="align-items:flex-start;">
+              <div style="min-width:0;">
+                <div class="lbl">Informazioni utente</div>
+                <div class="sub">Note operative (opzionale).</div>
+              </div>
+              <div class="right" style="flex-direction:column; align-items:flex-end;">
+                <textarea class="textarea" style="width:min(520px, 78vw); min-height: 90px;" maxlength="150" data-fp-appt-info></textarea>
+                <div style="font-size:12px; color:var(--muted);" data-fp-appt-info-count>0 / 150</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fp-set-foot">
+          <button class="btn" type="button" data-fp-appt-reset>Reset</button>
+          <button class="btn primary" type="button" data-fp-appt-save>Salva</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+  }
+}
+
+function fpSettingsKey(suffix) {
+  const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+  return `fp_settings_${suffix}_${email}`;
+}
+
+function openAvailabilityModal() {
+  ensureSettingsModals();
+  const back = document.querySelector("[data-fp-av-back]");
+  if (!back) return;
+  buildAvailabilityUI();
+  back.style.display = "block";
+}
+function closeAvailabilityModal() {
+  const back = document.querySelector("[data-fp-av-back]");
+  if (back) back.style.display = "none";
+}
+
+function openAppointmentsModal() {
+  ensureSettingsModals();
+  const back = document.querySelector("[data-fp-appt-back]");
+  if (!back) return;
+  loadAppointmentsSettings();
+  back.style.display = "block";
+}
+function closeAppointmentsModal() {
+  const back = document.querySelector("[data-fp-appt-back]");
+  if (back) back.style.display = "none";
+}
+
+function buildAvailabilityUI() {
+  const grid = document.querySelector("[data-fp-av-grid]");
+  if (!grid) return;
+
+  const days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
+  const startDefault = ["07:00","07:00","07:00","07:00","07:00","07:00","07:00"];
+  const endDefault = ["21:00","21:00","21:00","21:00","21:00","20:00","20:00"];
+
+  // 30-min slots 07:00-21:00
+  const startMin = 7 * 60;
+  const endMin = 21 * 60;
+  const step = 30;
+  const times = [];
+  for (let m = startMin; m <= endMin; m += 60) {
+    const hh = String(Math.floor(m/60)).padStart(2,"0");
+    times.push(`${hh}:00`);
+  }
+
+  const stateKey = fpSettingsKey("availability");
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(stateKey) || "null"); } catch {}
+  const ranges = saved?.ranges || days.map((_,i)=>({ start: startDefault[i], end: endDefault[i] }));
+  const onMap = new Set((saved?.on || []).map(String));
+
+  // header row
+  const headCells = days
+    .map((d, idx) => `
+      <div class="fp-av-dayhead">
+        <div class="d">${d}</div>
+        <div class="row"><span style="opacity:.85;">Inizio</span><input data-av-start="${idx}" value="${ranges[idx]?.start || startDefault[idx]}" /></div>
+        <div class="row"><span style="opacity:.85;">Fine</span><input data-av-end="${idx}" value="${ranges[idx]?.end || endDefault[idx]}" /></div>
+      </div>
+    `)
+    .join("");
+
+  grid.innerHTML = `
+    <div class="fp-av-dayhead" style="background:rgba(0,0,0,.10); border-right:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08);"></div>
+    ${headCells}
+    <div class="fp-av-timecol">
+      ${times.map((t)=>`<div class="fp-av-time">${t}</div>`).join("")}
+    </div>
+    ${days
+      .map((_, dIdx) => {
+        return `
+          <div style="display:grid; grid-template-rows: repeat(${times.length}, 34px);">
+            ${times.map((t, rIdx) => {
+              const key = `${dIdx}:${rIdx}`;
+              const on = onMap.has(key) ? "on" : "";
+              return `<div class="fp-av-cell ${on}" data-av-cell="${key}"></div>`;
+            }).join("")}
+          </div>
+        `;
+      })
+      .join("")}
+  `;
+
+  // drag selection
+  let dragging = false;
+  let dragSetOn = true;
+  const setCell = (el, on) => {
+    if (!el) return;
+    el.classList.toggle("on", on);
+  };
+  grid.querySelectorAll("[data-av-cell]").forEach((c) => {
+    c.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      dragging = true;
+      dragSetOn = !c.classList.contains("on");
+      setCell(c, dragSetOn);
+    });
+    c.addEventListener("mouseenter", () => {
+      if (!dragging) return;
+      setCell(c, dragSetOn);
+    });
+  });
+  window.addEventListener("mouseup", () => { dragging = false; }, { once: true });
+
+  // wire buttons
+  const back = document.querySelector("[data-fp-av-back]");
+  const close = back?.querySelector("[data-fp-av-close]");
+  const reset = back?.querySelector("[data-fp-av-reset]");
+  const save = back?.querySelector("[data-fp-av-save]");
+  close && (close.onclick = closeAvailabilityModal);
+  back && (back.onclick = (e) => { if (e.target === back) closeAvailabilityModal(); });
+  reset && (reset.onclick = () => {
+    localStorage.removeItem(stateKey);
+    buildAvailabilityUI();
+  });
+  save && (save.onclick = () => {
+    const nextRanges = days.map((_, i) => ({
+      start: String(grid.querySelector(`[data-av-start="${i}"]`)?.value || startDefault[i]).trim(),
+      end: String(grid.querySelector(`[data-av-end="${i}"]`)?.value || endDefault[i]).trim(),
+    }));
+    const nextOn = Array.from(grid.querySelectorAll(".fp-av-cell.on")).map((el) => String(el.getAttribute("data-av-cell") || ""));
+    try { localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, on: nextOn })); } catch {}
+    closeAvailabilityModal();
+    toast("Salvato");
+  });
+}
+
+function loadAppointmentsSettings() {
+  const key = fpSettingsKey("appointments");
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(key) || "null"); } catch {}
+  const obj = s && typeof s === "object" ? s : {};
+
+  const back = document.querySelector("[data-fp-appt-back]");
+  if (!back) return;
+  const panel = back.querySelector(".fp-set-panel");
+  if (!panel) return;
+
+  const days = panel.querySelector("[data-fp-appt-days]");
+  const cancelband = panel.querySelector("[data-fp-appt-cancelband]");
+  const drag = panel.querySelector("[data-fp-appt-drag]");
+  const billing = panel.querySelector("[data-fp-appt-billing]");
+  const showname = panel.querySelector("[data-fp-appt-showname]");
+  const name = panel.querySelector("[data-fp-appt-name]");
+  const info = panel.querySelector("[data-fp-appt-info]");
+  const nameCount = panel.querySelector("[data-fp-appt-name-count]");
+  const infoCount = panel.querySelector("[data-fp-appt-info-count]");
+
+  if (days) days.value = String(obj.days ?? 7);
+  if (cancelband) cancelband.checked = Boolean(obj.cancelband ?? true);
+  if (drag) drag.checked = Boolean(obj.drag ?? true);
+  if (billing) billing.checked = Boolean(obj.billing ?? true);
+  if (showname) showname.checked = Boolean(obj.showname ?? false);
+  if (name) name.value = String(obj.name ?? "");
+  if (info) info.value = String(obj.info ?? "");
+
+  const syncCounts = () => {
+    if (nameCount) nameCount.textContent = `${String(name?.value || "").length} / 150`;
+    if (infoCount) infoCount.textContent = `${String(info?.value || "").length} / 150`;
+  };
+  name?.addEventListener("input", syncCounts);
+  info?.addEventListener("input", syncCounts);
+  syncCounts();
+
+  const close = panel.querySelector("[data-fp-appt-close]");
+  const reset = panel.querySelector("[data-fp-appt-reset]");
+  const save = panel.querySelector("[data-fp-appt-save]");
+  close && (close.onclick = closeAppointmentsModal);
+  back.onclick = (e) => { if (e.target === back) closeAppointmentsModal(); };
+  reset && (reset.onclick = () => {
+    localStorage.removeItem(key);
+    loadAppointmentsSettings();
+  });
+  save && (save.onclick = () => {
+    const next = {
+      days: Number(days?.value || 0),
+      cancelband: Boolean(cancelband?.checked),
+      drag: Boolean(drag?.checked),
+      billing: Boolean(billing?.checked),
+      showname: Boolean(showname?.checked),
+      name: String(name?.value || "").trim(),
+      info: String(info?.value || "").trim(),
+    };
+    try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+    closeAppointmentsModal();
+    toast("Salvato");
+  });
+}
+
 function getUserDisplay() {
   const u = window.FP_USER || window.FP_SESSION || null;
   const name = String([u?.nome || "", u?.cognome || ""].map((s) => String(s || "").trim()).filter(Boolean).join(" ") || u?.nome || "").trim();
@@ -661,40 +979,7 @@ function getUserDisplay() {
 
 function buildRightDetailHtml(view) {
   const { name, role, initials } = getUserDisplay();
-  const pageRight = document.querySelector(".app > .rightbar");
-  const pageDetail = String(pageRight?.dataset?.fpPageDetail || "").trim();
-
-  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
-  const isAgendaPageNow = (location.pathname || "").endsWith("/pages/agenda.html") || (location.pathname || "").endsWith("/agenda.html");
-
-  const agendaHtml = `
-    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
-      Impostazioni visualizzazione agenda (slot, multi-operatore, colore, ecc.).
-      ${isAgendaPageNow ? `<div style="margin-top:10px;"><button class="fp-rightdetail__close" type="button" data-open-agenda-prefs>Apri impostazioni Agenda</button></div>` : ""}
-      ${!isAgendaPageNow ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">Apri la pagina Agenda per modificare le preferenze specifiche.</div>` : ""}
-    </div>
-  `;
-  const availabilityHtml = `
-    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
-      Impostazioni disponibilità (come griglia “Configura la disponibilità”).
-      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (slot settimanali + drag).</div>
-    </div>
-  `;
-  const appointmentsHtml = `
-    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
-      Impostazioni appuntamenti (default, drag&drop, fatturazione, ecc.).
-      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (come schermata “Appuntamenti”).</div>
-    </div>
-  `;
-
-  const pageSection = pageDetail
-    ? `
-      <div class="fp-rsec" data-rsec="page">
-        <div class="fp-rsec__title" data-rsec-toggle="page">Dettaglio pagina <span style="opacity:.6;">▾</span></div>
-        <div class="fp-rsec__items">${pageDetail}</div>
-      </div>
-    `
-    : "";
+  const isAgendaPageNow = Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html");
 
   return `
     <div class="fp-rightdetail__head">
@@ -708,41 +993,40 @@ function buildRightDetailHtml(view) {
       <button type="button" class="fp-rightdetail__close" data-rightdetail-close>Chiudi</button>
     </div>
     <div class="fp-rightdetail__body">
-      <div class="fp-rsec" data-rsec="agenda">
-        <div class="fp-rsec__title" data-rsec-toggle="agenda">Impostazioni Agenda <span style="opacity:.6;">▾</span></div>
-        <div class="fp-rsec__items" style="${v === "agenda" ? "" : "display:none;"}">${agendaHtml}</div>
+      <div class="fp-rsec">
+        <div class="fp-rsec__title" style="cursor:default;">Impostazioni</div>
+        <div class="fp-rsec__items">
+          <a class="fp-ritem" href="#" data-open-agenda-prefs ${isAgendaPageNow ? "" : 'aria-disabled="true"'}><span class="i">⚙️</span><span>Impostazioni Agenda</span></a>
+          <a class="fp-ritem" href="#" data-open-availability><span class="i">🕒</span><span>Impostazioni Disponibilità</span></a>
+          <a class="fp-ritem" href="#" data-open-appointments><span class="i">✅</span><span>Impostazioni Appuntamenti</span></a>
+          ${!isAgendaPageNow ? `<div style="padding:10px 10px 2px; font-size:12px; color: rgba(11,44,61,.62);">Per “Impostazioni Agenda” apri la pagina Agenda.</div>` : ""}
+        </div>
       </div>
-      <div class="fp-rsec" data-rsec="availability">
-        <div class="fp-rsec__title" data-rsec-toggle="availability">Impostazioni Disponibilità <span style="opacity:.6;">▾</span></div>
-        <div class="fp-rsec__items" style="${v === "availability" ? "" : "display:none;"}">${availabilityHtml}</div>
-      </div>
-      <div class="fp-rsec" data-rsec="appointments">
-        <div class="fp-rsec__title" data-rsec-toggle="appointments">Impostazioni Appuntamenti <span style="opacity:.6;">▾</span></div>
-        <div class="fp-rsec__items" style="${v === "appointments" ? "" : "display:none;"}">${appointmentsHtml}</div>
-      </div>
-      ${pageSection}
     </div>
   `;
 }
 
 function wireRightDetail(panel) {
   panel.querySelectorAll("[data-rightdetail-close]").forEach((b) => (b.onclick = () => closeRightDetail()));
-  panel.querySelectorAll("[data-rsec-toggle]").forEach((t) => {
-    t.addEventListener("click", () => {
-      const key = t.getAttribute("data-rsec-toggle");
-      const sec = panel.querySelector(`[data-rsec="${key}"]`);
-      const items = sec?.querySelector(".fp-rsec__items");
-      if (!items) return;
-      const isHidden = items.style.display === "none";
-      items.style.display = isHidden ? "" : "none";
-    });
-  });
-
-  // Deep link to Agenda prefs modal if available
   panel.querySelectorAll("[data-open-agenda-prefs]").forEach((b) => {
-    b.addEventListener("click", () => {
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
       const btn = document.querySelector("[data-open-prefs]");
       if (btn) btn.click();
+    });
+  });
+  panel.querySelectorAll("[data-open-availability]").forEach((b) => {
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeRightDetail();
+      openAvailabilityModal();
+    });
+  });
+  panel.querySelectorAll("[data-open-appointments]").forEach((b) => {
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeRightDetail();
+      openAppointmentsModal();
     });
   });
 }
@@ -785,10 +1069,10 @@ function normalizeRightbar() {
     <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : 'data-open-right-detail data-right-view="agenda"'} title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
     </button>
-    <button class="rbBtn" data-open-right-detail data-right-view="availability" title="Impostazioni Disponibilità">
+    <button class="rbBtn" data-open-availability title="Impostazioni Disponibilità">
       <span class="rbIcon">🕒</span>
     </button>
-    <button class="rbBtn" data-open-right-detail data-right-view="appointments" title="Impostazioni Appuntamenti">
+    <button class="rbBtn" data-open-appointments title="Impostazioni Appuntamenti">
       <span class="rbIcon">✅</span>
     </button>
   `;
@@ -896,6 +1180,20 @@ function setupSpaRouter() {
         e.preventDefault();
         const view = openRight.getAttribute("data-right-view") || "";
         toggleRightDetail(view);
+        return;
+      }
+
+      const openAvail = e.target?.closest?.("[data-open-availability]");
+      if (openAvail) {
+        e.preventDefault();
+        openAvailabilityModal();
+        return;
+      }
+
+      const openAppt = e.target?.closest?.("[data-open-appointments]");
+      if (openAppt) {
+        e.preventDefault();
+        openAppointmentsModal();
         return;
       }
 
