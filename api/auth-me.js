@@ -10,6 +10,7 @@ export default async function handler(req, res) {
     role: normalizeRole(session.role),
     roleLabel: session.roleLabel || session.role || "",
     nome: session.nome || "",
+    cognome: session.cognome || "",
   };
 
   return setJson(res, 200, { ok: true, session: { ...session, role: user.role, email: user.email }, user });

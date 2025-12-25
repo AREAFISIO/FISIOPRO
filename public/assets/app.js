@@ -71,8 +71,11 @@ function initLogoutLinks() {
 }
 
 function setUserBadges(user) {
+  const fullName = user
+    ? [user.nome || "", user.cognome || ""].map(s => String(s || "").trim()).filter(Boolean).join(" ")
+    : "";
   const label = user
-    ? [user.nome || "", user.roleLabel || user.role || ""].filter(Boolean).join(" • ")
+    ? [fullName || user.nome || "", user.roleLabel || user.role || ""].filter(Boolean).join(" • ")
     : "—";
   document.querySelectorAll("[data-user-badge]").forEach((el) => (el.textContent = label));
 }
