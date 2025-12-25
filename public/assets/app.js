@@ -420,7 +420,7 @@ function initSidebars() {
   const leftBtn = document.querySelector("[data-toggle-left]");
   const rightBtn = document.querySelector("[data-toggle-right]");
   if (leftBtn) leftBtn.onclick = () => document.body.classList.toggle("oe-hide-left");
-  if (rightBtn) rightBtn.onclick = () => document.body.classList.toggle("oe-hide-right");
+  if (rightBtn) rightBtn.onclick = () => toggleRightDetail();
 }
 
 // =====================
@@ -601,6 +601,8 @@ async function runRouteInits() {
   // Ensure global bar exists before wiring sidebar toggles.
   ensureGlobalTopbar();
   removeInnerMenuIcons();
+  normalizeRightbar();
+  ensureRightDetailDrawer();
   initSidebars();
   activeNav();
   initLogoutLinks();
@@ -627,6 +629,167 @@ function removeInnerMenuIcons() {
       wrap.remove();
     }
   });
+}
+
+function ensureRightDetailDrawer() {
+  if (document.querySelector(".fp-rightdetail-back")) return;
+  const back = document.createElement("div");
+  back.className = "fp-rightdetail-back";
+  back.innerHTML = `<div class="fp-rightdetail" role="dialog" aria-modal="true"></div>`;
+  document.body.appendChild(back);
+  back.addEventListener("click", (e) => {
+    if (e.target === back) closeRightDetail();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeRightDetail();
+  });
+}
+
+function getUserDisplay() {
+  const u = window.FP_USER || window.FP_SESSION || null;
+  const name = String([u?.nome || "", u?.cognome || ""].map((s) => String(s || "").trim()).filter(Boolean).join(" ") || u?.nome || "").trim();
+  const role = String(u?.roleLabel || u?.role || "").trim();
+  const initials =
+    (name || "U")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => (p[0] ? String(p[0]).toUpperCase() : ""))
+      .join("") || "U";
+  return { name: name || "Utente", role, initials };
+}
+
+function buildRightDetailHtml(view) {
+  const { name, role, initials } = getUserDisplay();
+  const pageRight = document.querySelector(".app > .rightbar");
+  const pageDetail = String(pageRight?.dataset?.fpPageDetail || "").trim();
+
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  const isAgendaPageNow = (location.pathname || "").endsWith("/pages/agenda.html") || (location.pathname || "").endsWith("/agenda.html");
+
+  const agendaHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni visualizzazione agenda (slot, multi-operatore, colore, ecc.).
+      ${isAgendaPageNow ? `<div style="margin-top:10px;"><button class="fp-rightdetail__close" type="button" data-open-agenda-prefs>Apri impostazioni Agenda</button></div>` : ""}
+      ${!isAgendaPageNow ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">Apri la pagina Agenda per modificare le preferenze specifiche.</div>` : ""}
+    </div>
+  `;
+  const availabilityHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni disponibilità (come griglia “Configura la disponibilità”).
+      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (slot settimanali + drag).</div>
+    </div>
+  `;
+  const appointmentsHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni appuntamenti (default, drag&drop, fatturazione, ecc.).
+      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (come schermata “Appuntamenti”).</div>
+    </div>
+  `;
+
+  const pageSection = pageDetail
+    ? `
+      <div class="fp-rsec" data-rsec="page">
+        <div class="fp-rsec__title" data-rsec-toggle="page">Dettaglio pagina <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items">${pageDetail}</div>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="fp-rightdetail__head">
+      <div class="fp-rightdetail__user">
+        <div class="fp-rightdetail__avatar">${initials}</div>
+        <div style="min-width:0;">
+          <div class="fp-rightdetail__name">${name}</div>
+          <div class="fp-rightdetail__role">${role || ""}</div>
+        </div>
+      </div>
+      <button type="button" class="fp-rightdetail__close" data-rightdetail-close>Chiudi</button>
+    </div>
+    <div class="fp-rightdetail__body">
+      <div class="fp-rsec" data-rsec="agenda">
+        <div class="fp-rsec__title" data-rsec-toggle="agenda">Impostazioni Agenda <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "agenda" ? "" : "display:none;"}">${agendaHtml}</div>
+      </div>
+      <div class="fp-rsec" data-rsec="availability">
+        <div class="fp-rsec__title" data-rsec-toggle="availability">Impostazioni Disponibilità <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "availability" ? "" : "display:none;"}">${availabilityHtml}</div>
+      </div>
+      <div class="fp-rsec" data-rsec="appointments">
+        <div class="fp-rsec__title" data-rsec-toggle="appointments">Impostazioni Appuntamenti <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "appointments" ? "" : "display:none;"}">${appointmentsHtml}</div>
+      </div>
+      ${pageSection}
+    </div>
+  `;
+}
+
+function wireRightDetail(panel) {
+  panel.querySelectorAll("[data-rightdetail-close]").forEach((b) => (b.onclick = () => closeRightDetail()));
+  panel.querySelectorAll("[data-rsec-toggle]").forEach((t) => {
+    t.addEventListener("click", () => {
+      const key = t.getAttribute("data-rsec-toggle");
+      const sec = panel.querySelector(`[data-rsec="${key}"]`);
+      const items = sec?.querySelector(".fp-rsec__items");
+      if (!items) return;
+      const isHidden = items.style.display === "none";
+      items.style.display = isHidden ? "" : "none";
+    });
+  });
+
+  // Deep link to Agenda prefs modal if available
+  panel.querySelectorAll("[data-open-agenda-prefs]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const btn = document.querySelector("[data-open-prefs]");
+      if (btn) btn.click();
+    });
+  });
+}
+
+function openRightDetail(view) {
+  ensureRightDetailDrawer();
+  const panel = document.querySelector(".fp-rightdetail-back .fp-rightdetail");
+  if (!panel) return;
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  window.__FP_RIGHT_DETAIL_VIEW = v;
+  panel.innerHTML = buildRightDetailHtml(v);
+  wireRightDetail(panel);
+  document.body.classList.add("fp-right-open");
+}
+function closeRightDetail() {
+  document.body.classList.remove("fp-right-open");
+}
+function toggleRightDetail(view) {
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  window.__FP_RIGHT_DETAIL_VIEW = v;
+  if (document.body.classList.contains("fp-right-open")) {
+    // if open, just switch content
+    openRightDetail(v);
+  } else {
+    openRightDetail(v);
+  }
+}
+
+function normalizeRightbar() {
+  const rb = document.querySelector(".app > .rightbar");
+  if (!rb) return;
+
+  // Store original (page-specific) content so we can show it inside the right detail drawer.
+  if (!rb.dataset.fpPageDetail) rb.dataset.fpPageDetail = rb.innerHTML;
+
+  rb.className = "rightbar slim";
+  rb.innerHTML = `
+    <button class="rbBtn" data-open-right-detail data-right-view="agenda" title="Impostazioni Agenda">
+      <span class="rbIcon">⚙️</span>
+    </button>
+    <button class="rbBtn" data-open-right-detail data-right-view="availability" title="Impostazioni Disponibilità">
+      <span class="rbIcon">🕒</span>
+    </button>
+    <button class="rbBtn" data-open-right-detail data-right-view="appointments" title="Impostazioni Appuntamenti">
+      <span class="rbIcon">✅</span>
+    </button>
+  `;
 }
 
 async function swapCenterTo(url, opts = {}) {
@@ -723,6 +886,14 @@ function setupSpaRouter() {
         if (!shouldSpaHandleUrl(u)) return;
         e.preventDefault();
         swapCenterTo(u).catch(() => (location.href = u.toString()));
+        return;
+      }
+
+      const openRight = e.target?.closest?.("[data-open-right-detail]");
+      if (openRight) {
+        e.preventDefault();
+        const view = openRight.getAttribute("data-right-view") || "";
+        toggleRightDetail(view);
         return;
       }
 
