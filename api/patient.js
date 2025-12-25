@@ -95,6 +95,27 @@ async function resolveCollaboratorRecordIdByEmail(emailRaw) {
   return recId;
 }
 
+async function resolveCollaboratorByEmail(emailRaw) {
+  const email = String(emailRaw || "").trim().toLowerCase();
+  if (!email) return { id: "", name: "" };
+
+  const cacheKey = `collabByEmail:${email}`;
+  const cached = memGet(cacheKey);
+  if (cached) return cached;
+
+  const collabTable = enc(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+  const formula = `LOWER({Email}) = LOWER("${escAirtableString(email)}")`;
+  const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
+  const data = await airtableFetch(`${collabTable}?${qs.toString()}`);
+  const rec = data.records?.[0] || null;
+  const out = {
+    id: rec?.id || "",
+    name: String(rec?.fields?.["Nome completo"] || rec?.fields?.["Cognome e Nome"] || rec?.fields?.Name || "").trim(),
+  };
+  memSet(cacheKey, out, 10 * 60_000);
+  return out;
+}
+
 async function physioCanAccessPatient({ patientId, email }) {
   // Must have at least one appointment linked to that patient AND assigned to that physio.
   // Preferred assignment is via linked-record operator field (Collaboratore/Operatore).
@@ -172,16 +193,25 @@ async function physioCanAccessPatient({ patientId, email }) {
 
   if (!FIELD_PATIENT) return false;
 
-  const baseFilter = `FIND("${pid}", ARRAYJOIN({${FIELD_PATIENT}}))`;
+  // Robust: support both linked-record arrays and plain text fields.
+  const patientExpr = `IFERROR(ARRAYJOIN({${FIELD_PATIENT}}), {${FIELD_PATIENT}} & "")`;
+  const baseFilter = `FIND("${pid}", ${patientExpr})`;
 
   // Prefer linked-record RBAC if we can resolve collaborator record id
-  const collabRecId = await resolveCollaboratorRecordIdByEmail(emailNorm);
-  let roleFilter = "FALSE()";
-  if (collabRecId && FIELD_OPERATOR) {
-    roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${FIELD_OPERATOR}}))`;
-  } else if (FIELD_EMAIL) {
-    roleFilter = `LOWER({${FIELD_EMAIL}}) = LOWER("${em}")`;
+  const collab = await resolveCollaboratorByEmail(emailNorm);
+  const roleFilters = [];
+
+  if (FIELD_OPERATOR) {
+    const operatorExpr = `IFERROR(ARRAYJOIN({${FIELD_OPERATOR}}), {${FIELD_OPERATOR}} & "")`;
+    if (collab?.id) roleFilters.push(`FIND("${escAirtableString(collab.id)}", ${operatorExpr})`);
+    if (collab?.name) roleFilters.push(`FIND("${escAirtableString(collab.name)}", ${operatorExpr})`);
   }
+  if (FIELD_EMAIL) {
+    const emailExpr = `LOWER(IFERROR(ARRAYJOIN({${FIELD_EMAIL}}), {${FIELD_EMAIL}} & ""))`;
+    roleFilters.push(`${emailExpr} = LOWER("${em}")`);
+  }
+
+  const roleFilter = roleFilters.length ? `OR(${roleFilters.join(",")})` : "FALSE()";
 
   const formula = `AND(${baseFilter}, ${roleFilter})`;
   const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
