@@ -420,7 +420,7 @@ function initSidebars() {
   const leftBtn = document.querySelector("[data-toggle-left]");
   const rightBtn = document.querySelector("[data-toggle-right]");
   if (leftBtn) leftBtn.onclick = () => document.body.classList.toggle("oe-hide-left");
-  if (rightBtn) rightBtn.onclick = () => document.body.classList.toggle("oe-hide-right");
+  if (rightBtn) rightBtn.onclick = () => toggleRightDetail();
 }
 
 // =====================
@@ -601,6 +601,8 @@ async function runRouteInits() {
   // Ensure global bar exists before wiring sidebar toggles.
   ensureGlobalTopbar();
   removeInnerMenuIcons();
+  normalizeRightbar();
+  ensureRightDetailDrawer();
   initSidebars();
   activeNav();
   initLogoutLinks();
@@ -627,6 +629,136 @@ function removeInnerMenuIcons() {
       wrap.remove();
     }
   });
+}
+
+function ensureRightDetailDrawer() {
+  if (document.querySelector(".fp-rightdetail-back")) return;
+  const back = document.createElement("div");
+  back.className = "fp-rightdetail-back";
+  back.innerHTML = `<div class="fp-rightdetail" role="dialog" aria-modal="true"></div>`;
+  document.body.appendChild(back);
+  back.addEventListener("click", (e) => {
+    if (e.target === back) closeRightDetail();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeRightDetail();
+  });
+}
+
+function getUserDisplay() {
+  const u = window.FP_USER || window.FP_SESSION || null;
+  const name = String([u?.nome || "", u?.cognome || ""].map((s) => String(s || "").trim()).filter(Boolean).join(" ") || u?.nome || "").trim();
+  const role = String(u?.roleLabel || u?.role || "").trim();
+  const initials =
+    (name || "U")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => (p[0] ? String(p[0]).toUpperCase() : ""))
+      .join("") || "U";
+  return { name: name || "Utente", role, initials };
+}
+
+function buildRightDetailHtml() {
+  const { name, role, initials } = getUserDisplay();
+  const pageRight = document.querySelector(".app > .rightbar");
+  const pageDetail = String(pageRight?.dataset?.fpPageDetail || "").trim();
+
+  const configItems = [
+    { icon: "🧾", label: "Info abbonamento", href: "/pages/impostazioni.html" },
+    { icon: "👁️", label: "Abilitazione moduli", href: "/pages/impostazioni.html" },
+    { icon: "👤", label: "Impostazioni utente", href: "/pages/impostazioni.html" },
+    { icon: "⚙️", label: "Impostazioni azienda", href: "/pages/impostazioni.html" },
+    { icon: "💬", label: "Template notifiche", href: "/pages/impostazioni.html" },
+    { icon: "👥", label: "Utenti e dispositivi", href: "/pages/impostazioni.html" },
+    { icon: "€", label: "Prezziario", href: "/pages/impostazioni.html" },
+    { icon: "📄", label: "Modulistica", href: "/pages/impostazioni.html" },
+  ];
+
+  const itemsHtml = configItems
+    .map((x) => {
+      const disabled = !x.href;
+      const href = x.href || "#";
+      return `<a class="fp-ritem" href="${href}" ${disabled ? 'aria-disabled="true"' : ""}><span class="i">${x.icon}</span><span>${x.label}</span></a>`;
+    })
+    .join("");
+
+  const pageSection = pageDetail
+    ? `
+      <div class="fp-rsec" data-rsec="page">
+        <div class="fp-rsec__title" data-rsec-toggle="page">Dettaglio pagina <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items">${pageDetail}</div>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="fp-rightdetail__head">
+      <div class="fp-rightdetail__user">
+        <div class="fp-rightdetail__avatar">${initials}</div>
+        <div style="min-width:0;">
+          <div class="fp-rightdetail__name">${name}</div>
+          <div class="fp-rightdetail__role">${role || ""}</div>
+        </div>
+      </div>
+      <button type="button" class="fp-rightdetail__close" data-rightdetail-close>Chiudi</button>
+    </div>
+    <div class="fp-rightdetail__body">
+      <div class="fp-rsec" data-rsec="config">
+        <div class="fp-rsec__title" data-rsec-toggle="config">Configurazione <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items">${itemsHtml}</div>
+      </div>
+      ${pageSection}
+    </div>
+  `;
+}
+
+function wireRightDetail(panel) {
+  panel.querySelectorAll("[data-rightdetail-close]").forEach((b) => (b.onclick = () => closeRightDetail()));
+  panel.querySelectorAll("[data-rsec-toggle]").forEach((t) => {
+    t.addEventListener("click", () => {
+      const key = t.getAttribute("data-rsec-toggle");
+      const sec = panel.querySelector(`[data-rsec="${key}"]`);
+      const items = sec?.querySelector(".fp-rsec__items");
+      if (!items) return;
+      const isHidden = items.style.display === "none";
+      items.style.display = isHidden ? "" : "none";
+    });
+  });
+}
+
+function openRightDetail() {
+  ensureRightDetailDrawer();
+  const panel = document.querySelector(".fp-rightdetail-back .fp-rightdetail");
+  if (!panel) return;
+  panel.innerHTML = buildRightDetailHtml();
+  wireRightDetail(panel);
+  document.body.classList.add("fp-right-open");
+}
+function closeRightDetail() {
+  document.body.classList.remove("fp-right-open");
+}
+function toggleRightDetail() {
+  if (document.body.classList.contains("fp-right-open")) closeRightDetail();
+  else openRightDetail();
+}
+
+function normalizeRightbar() {
+  const rb = document.querySelector(".app > .rightbar");
+  if (!rb) return;
+
+  // Store original (page-specific) content so we can show it inside the right detail drawer.
+  if (!rb.dataset.fpPageDetail) rb.dataset.fpPageDetail = rb.innerHTML;
+
+  rb.className = "rightbar slim";
+  rb.innerHTML = `
+    <button class="rbBtn" data-open-right-detail title="Apri pannello">
+      <span class="rbIcon">≡</span>
+    </button>
+    <button class="rbBtn" data-open-right-detail title="Impostazioni">
+      <span class="rbIcon">⚙️</span>
+    </button>
+  `;
 }
 
 async function swapCenterTo(url, opts = {}) {
@@ -723,6 +855,13 @@ function setupSpaRouter() {
         if (!shouldSpaHandleUrl(u)) return;
         e.preventDefault();
         swapCenterTo(u).catch(() => (location.href = u.toString()));
+        return;
+      }
+
+      const openRight = e.target?.closest?.("[data-open-right-detail]");
+      if (openRight) {
+        e.preventDefault();
+        toggleRightDetail();
         return;
       }
 
