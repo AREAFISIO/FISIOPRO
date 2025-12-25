@@ -432,6 +432,43 @@ function isSpaShell() {
   return Boolean(app.querySelector(":scope > .sidebar") && app.querySelector(":scope > .main") && app.querySelector(":scope > .rightbar"));
 }
 
+function ensureGlobalTopbar() {
+  if (window.__FP_GLOBAL_TOPBAR_READY) return;
+  if (!document.querySelector(".app")) return;
+
+  // Create once and keep it persistent across SPA swaps.
+  let bar = document.querySelector(".fp-topbar");
+  if (!bar) {
+    bar = document.createElement("header");
+    bar.className = "fp-topbar";
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+
+  // Pull label from left brand if available.
+  const brandTitle = String(document.querySelector(".sidebar .brand .title")?.textContent || "").trim();
+  const brandSub = String(document.querySelector(".sidebar .brand .sub")?.textContent || "").trim();
+
+  bar.innerHTML = `
+    <div class="fp-topbar__left">
+      <button type="button" class="fp-iconbtn" data-toggle-left="1" aria-label="Apri/chiudi menu sinistro">
+        <span class="ic">☰</span>
+      </button>
+      <div class="fp-topbar__brand">
+        <div class="fp-topbar__title">${brandTitle || "FISIOCLINIK SRL STP"}</div>
+        <div class="fp-topbar__sub">${brandSub || ""}</div>
+      </div>
+    </div>
+    <div class="fp-topbar__right">
+      <button type="button" class="fp-iconbtn" data-toggle-right="1" aria-label="Apri/chiudi menu destro">
+        <span class="ic">≡</span>
+      </button>
+    </div>
+  `;
+
+  document.body.classList.add("fp-has-topbar");
+  window.__FP_GLOBAL_TOPBAR_READY = true;
+}
+
 function ensureTopbarToggles() {
   // Adds top-left / top-right icon buttons if missing.
   const topRow = document.querySelector(".main .topbar .toprow");
@@ -600,6 +637,8 @@ async function ensureDiaryLoaded() {
 }
 
 async function runRouteInits() {
+  // Ensure global bar exists before wiring sidebar toggles.
+  ensureGlobalTopbar();
   ensureTopbarToggles();
   initSidebars();
   activeNav();
