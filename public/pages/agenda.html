@@ -11,7 +11,13 @@
   <style>
     /* Agenda shell (keeps your management system look) */
     body { overflow: hidden; }
-    .app { grid-template-columns: 260px 1fr 72px; }
+    .app { grid-template-columns: 230px 1fr 72px; }
+
+    :root{
+      --fpDayHeadH: 58px;
+      --fpCancelH: 42px;
+      --fpOpHeadH: 34px;
+    }
 
     .calWrap{
       height: calc(100vh - 120px);
@@ -156,17 +162,75 @@
       background: rgba(15,26,44,.96);
       border-bottom: 1px solid var(--border);
       border-right: 1px solid var(--border);
-      height: 58px;
+      height: var(--fpDayHeadH);
     }
     .calHead .dayHead{
       position: sticky; top:0;
       z-index: 6;
-      height: 58px;
+      height: var(--fpDayHeadH);
       display:flex; flex-direction:column; justify-content:center;
       gap:4px; padding: 8px 10px;
       background: rgba(15,26,44,.96);
       border-bottom: 1px solid var(--border);
       border-right: 1px solid var(--border);
+    }
+    /* Operator header row needs different sticky top in multi-user */
+    .dayHead.opHead{
+      top: calc(var(--fpDayHeadH) + var(--fpCancelH));
+      height: var(--fpOpHeadH);
+    }
+    /* Cancelled-band row (between date row and operator row) */
+    .cancelHead{
+      position: sticky;
+      top: var(--fpDayHeadH);
+      z-index: 6;
+      height: var(--fpCancelH);
+      padding: 6px 10px;
+      background: rgba(15,26,44,.96);
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      border-right: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      overflow:hidden;
+    }
+    .cancelWrap{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      min-width:0;
+    }
+    .cancelChip{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding: 5px 8px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(170,120,255,.20);
+      color: rgba(255,255,255,.92);
+      font-weight: 900;
+      font-size: 12px;
+      max-width: 220px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .cancelChip .k{
+      opacity:.9;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .cancelChip .t{
+      opacity:.85;
+      font-weight: 900;
+    }
+    .cancelChip .p{
+      opacity:.88;
+      font-weight: 900;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
     .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: rgba(255,255,255,.72); }
     .dayHead .d2{ font-weight:900; font-size: 15px; }
@@ -189,6 +253,16 @@
       border-right: 1px solid var(--border);
       background:
         linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+
+    /* Stronger day separators (between days) */
+    .daySep{
+      border-left: 3px solid rgba(255,255,255,.16);
+      box-shadow: -2px 0 0 rgba(0,0,0,.22);
+    }
+    .daySepHead{
+      border-left: 3px solid rgba(255,255,255,.16) !important;
+      box-shadow: -2px 0 0 rgba(0,0,0,.22);
     }
     .gridLine{
       position:absolute; left:0; right:0;
@@ -361,6 +435,76 @@
       border-top: 1px solid var(--border);
       display:flex; justify-content:flex-end; gap:10px;
     }
+
+    /* Inline picker for default agendas */
+    .prefPicker{
+      margin-top: 10px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,.03);
+      overflow:hidden;
+      display:none;
+    }
+    .prefPickerTop{
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .prefPickerTop .mini{
+      color: rgba(255,255,255,.60);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .prefPickerSearch{
+      flex:1;
+      min-width: 0;
+      height: 34px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.18);
+      color: rgba(255,255,255,.90);
+      padding: 0 10px;
+    }
+    .prefPickerBody{
+      max-height: 260px;
+      overflow:auto;
+    }
+    .prefPickRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      cursor:pointer;
+      background: rgba(255,255,255,.02);
+    }
+    .prefPickRow:hover{ background: rgba(255,255,255,.04); }
+    .prefPickRow:last-child{ border-bottom:none; }
+    .prefPickLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .prefPickCheck{
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.15);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+      color: rgba(255,255,255,.95);
+      font-weight: 900;
+    }
+    .prefPickCheck.on{ background: rgba(34,230,195,.20); border-color: rgba(34,230,195,.35); }
+    .prefPickName{
+      font-weight: 900;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .prefPickMini{ color: rgba(255,255,255,.55); font-size: 12px; }
   </style>
 </head>
 <body>
@@ -389,7 +533,7 @@
   <main class="main">
     <div class="topbar">
       <div class="toprow">
-        <div class="h1">Agenda <span class="pill" data-user-badge>—</span></div>
+        <div class="h1">Agenda <span class="pill" data-login-name>—</span></div>
         <div class="actions">
           <button class="btn" data-cal-today>Oggi</button>
           <button class="btn" data-cal-prev>Indietro</button>
@@ -494,12 +638,12 @@
           <div class="prefsRow">
             <div>
               <div class="prefsLabel">Slot agenda</div>
-              <div class="prefsSub">Griglia oraria (consigliato 30 min).</div>
+              <div class="prefsSub">Griglia oraria (consigliato 30 min; puoi usare 60 min).</div>
             </div>
             <div class="prefsRight">
               <select class="selectSmall" data-pref-slot>
-                <option value="15">15 min</option>
                 <option value="30">30 min</option>
+                <option value="60">60 min</option>
               </select>
             </div>
           </div>
@@ -526,20 +670,29 @@
               </label>
             </div>
           </div>
-        </div>
 
-        <div class="prefsCard">
-          <div class="prefsRow" style="align-items:flex-start;">
+          <div class="prefsRow" data-pref-default-section style="align-items:flex-start;">
             <div style="min-width:0;">
               <div class="prefsLabel">Agende visualizzate di default</div>
-              <div class="prefsSub">Quando attivi la vista multi utente, queste agende vengono mostrate.</div>
+              <div class="prefsSub">Compare solo se attivi la vista multi utente. Queste agende verranno mostrate di default.</div>
             </div>
             <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:8px;">
               <div class="opsDots" data-pref-default-dots></div>
-              <button class="btn" data-pref-pick>Seleziona</button>
+              <button class="btn" data-pref-pick type="button">Seleziona</button>
             </div>
           </div>
 
+          <div class="prefPicker" data-pref-default-picker>
+            <div class="prefPickerTop">
+              <div class="mini">Agende</div>
+              <input class="prefPickerSearch" data-pref-default-search placeholder="Cerca operatore..." />
+              <button class="btn" data-pref-default-close type="button">Chiudi</button>
+            </div>
+            <div class="prefPickerBody" data-pref-default-list></div>
+          </div>
+        </div>
+
+        <div class="prefsCard">
           <div class="prefsRow">
             <div>
               <div class="prefsLabel">Visualizza tipologia prestazione in agenda</div>

@@ -11,6 +11,7 @@
   const rangeEl = document.querySelector("[data-cal-range]");
   const monthEl = document.querySelector("[data-cal-month]");
   const weekEl = document.querySelector("[data-cal-week]");
+  const loginNameEl = document.querySelector("[data-login-name]");
   const opsBar = document.querySelector("[data-ops-bar]");
   const opsDots = document.querySelector("[data-ops-dots]");
   const opsText = document.querySelector("[data-ops-text]");
@@ -125,8 +126,13 @@
   const prefSlot = document.querySelector("[data-pref-slot]");
   const prefColor = document.querySelector("[data-pref-color]");
   const prefMulti = document.querySelector("[data-pref-multi]");
+  const prefDefaultSection = document.querySelector("[data-pref-default-section]");
   const prefDefaultDots = document.querySelector("[data-pref-default-dots]");
   const prefPick = document.querySelector("[data-pref-pick]");
+  const prefDefaultPicker = document.querySelector("[data-pref-default-picker]");
+  const prefDefaultList = document.querySelector("[data-pref-default-list]");
+  const prefDefaultSearch = document.querySelector("[data-pref-default-search]");
+  const prefDefaultClose = document.querySelector("[data-pref-default-close]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
 
@@ -270,6 +276,12 @@
     return String(u?.nome || "").trim();
   }
 
+  function syncLoginName() {
+    if (!loginNameEl) return;
+    const name = String(getUserName() || "").trim();
+    loginNameEl.textContent = name || "—";
+  }
+
   function prefsKey() {
     const email = getUserEmail() || "anon";
     return `fp_agenda_prefs_${email}`;
@@ -282,7 +294,7 @@
       if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
     } catch {}
     SLOT_MIN = Number(prefs.slotMin || 30);
-    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
   }
   function savePrefs() {
@@ -301,6 +313,8 @@
     if (prefShowService) prefShowService.checked = Boolean(prefs.showService);
     if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
+    if (prefDefaultSection) prefDefaultSection.style.display = prefMulti?.checked ? "" : "none";
+    if (prefDefaultPicker && !prefMulti?.checked) prefDefaultPicker.style.display = "none";
     renderDefaultDots();
   }
   function openPrefs() {
@@ -329,6 +343,49 @@
       t.textContent = "—";
       prefDefaultDots.appendChild(t);
     }
+  }
+
+  function renderDefaultPickerList() {
+    if (!prefDefaultList) return;
+    const q = String(prefDefaultSearch?.value || "").trim().toLowerCase();
+    const names = (knownTherapists || []).slice();
+    const filtered = q ? names.filter((n) => String(n).toLowerCase().includes(q)) : names;
+
+    prefDefaultList.innerHTML = "";
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "prefPickRow";
+      empty.style.cursor = "default";
+      empty.innerHTML = `<div class="prefPickLeft"><div class="prefPickMini">Nessun operatore trovato.</div></div>`;
+      prefDefaultList.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "prefPickRow";
+      const on = (prefs.defaultOperators || []).includes(name);
+      const check = `<div class="prefPickCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      row.innerHTML = `
+        <div class="prefPickLeft">
+          ${check}
+          <div style="min-width:0;">
+            <div class="prefPickName">${name}</div>
+            <div class="prefPickMini">${therapistKey(name) || ""}</div>
+          </div>
+        </div>
+        <div class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name) || ""}</div>
+      `;
+      row.addEventListener("click", () => {
+        const set = new Set(prefs.defaultOperators || []);
+        if (set.has(name)) set.delete(name);
+        else set.add(name);
+        prefs.defaultOperators = Array.from(set);
+        renderDefaultDots();
+        renderDefaultPickerList();
+      });
+      prefDefaultList.appendChild(row);
+    });
   }
 
   function getTherapists(items) {
@@ -479,6 +536,8 @@
     } catch {
       // fallback to operators found in the week
     }
+    syncLoginName();
+    if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
 
     const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
@@ -520,7 +579,7 @@
 
     // Colonne sempre visibili: si stringono (no orizzontale) quando aggiungo operatori
     gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(0, 1fr))`;
-    if (multiUser) gridEl.style.gridTemplateRows = `58px 34px ${heightPx}px`;
+    if (multiUser) gridEl.style.gridTemplateRows = `58px 42px 34px ${heightPx}px`;
     else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
 
     // Corner (day header)
@@ -535,6 +594,7 @@
       const d = addDays(start, dIdx);
       const dh = document.createElement("div");
       dh.className = "dayHead";
+      if (dIdx > 0) dh.classList.add("daySepHead");
       const startCol = 2 + dIdx * colsPerDay;
       dh.style.gridColumn = `${startCol} / span ${colsPerDay}`;
       dh.style.gridRow = "1";
@@ -542,23 +602,45 @@
       gridEl.appendChild(dh);
     }
 
-    // Operator headers (only in multi-user)
+    // Cancelled-band row (only in multi-user): between day header and operator header
     if (multiUser) {
       const blank = document.createElement("div");
       blank.className = "corner";
-      blank.style.height = "34px";
+      blank.style.height = "42px";
       blank.style.gridColumn = "1";
       blank.style.gridRow = "2";
       gridEl.appendChild(blank);
+
+      for (let dIdx = 0; dIdx < days; dIdx++) {
+        const cell = document.createElement("div");
+        cell.className = "cancelHead";
+        if (dIdx > 0) cell.classList.add("daySepHead");
+        const startCol = 2 + dIdx * colsPerDay;
+        cell.style.gridColumn = `${startCol} / span ${colsPerDay}`;
+        cell.style.gridRow = "2";
+        cell.dataset.cancelDay = String(dIdx);
+        cell.innerHTML = `<div class="cancelWrap" data-cancel-wrap="${dIdx}"></div>`;
+        gridEl.appendChild(cell);
+      }
+
+      // Operator headers
+      const blank2 = document.createElement("div");
+      blank2.className = "corner";
+      blank2.style.height = "34px";
+      blank2.style.gridColumn = "1";
+      blank2.style.gridRow = "3";
+      gridEl.appendChild(blank2);
 
       for (let dIdx = 0; dIdx < days; dIdx++) {
         for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
           const name = ops[oIdx] || "";
           const cell = document.createElement("div");
           cell.className = "dayHead";
+          cell.classList.add("opHead");
+          if (dIdx > 0 && oIdx === 0) cell.classList.add("daySepHead");
           cell.style.height = "34px";
           cell.style.padding = "6px 10px";
-          cell.style.gridRow = "2";
+          cell.style.gridRow = "3";
           cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
           cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
             <span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
@@ -574,7 +656,7 @@
     timeCol.className = "timeCol";
     timeCol.style.height = heightPx + "px";
     timeCol.style.gridColumn = "1";
-    timeCol.style.gridRow = multiUser ? "3" : "2";
+    timeCol.style.gridRow = multiUser ? "4" : "2";
     timeCol.style.position = "sticky";
     timeCol.style.left = "0";
     timeCol.style.zIndex = "4";
@@ -596,11 +678,12 @@
       for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
         const col = document.createElement("div");
         col.className = "dayCol";
+        if (dIdx > 0 && oIdx === 0) col.classList.add("daySep");
         col.dataset.dayIndex = String(dIdx);
         col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-        col.style.gridRow = multiUser ? "3" : "2";
+        col.style.gridRow = multiUser ? "4" : "2";
 
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
@@ -910,6 +993,68 @@
 
     buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1));
 
+    // Render cancelled appointments into the band (multi-user only).
+    if (multiUser) {
+      const cancelWraps = Array.from(document.querySelectorAll("[data-cancel-wrap]"));
+      cancelWraps.forEach((w) => (w.innerHTML = ""));
+
+      // cancelled/disdetta keywords
+      const isCancelled = (s) => {
+        const x = String(s || "").toLowerCase();
+        return x.includes("annull") || x.includes("disdett") || x.includes("cancell");
+      };
+
+      // build list for visible range + selected therapists (ignore free-text search)
+      const day0 = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+      const cancelled = (rawItems || [])
+        .filter((x) => x?.startAt && isCancelled(x.status))
+        .filter((x) => {
+          const dt0 = new Date(x.startAt.getFullYear(), x.startAt.getMonth(), x.startAt.getDate()).getTime();
+          const idx = Math.round((dt0 - day0) / 86400000);
+          if (idx < 0 || idx >= days) return false;
+          if (selectedTherapists.size && !selectedTherapists.has(x.therapist)) return false;
+          return true;
+        })
+        .map((x) => {
+          const dt0 = new Date(x.startAt.getFullYear(), x.startAt.getMonth(), x.startAt.getDate()).getTime();
+          const idx = Math.round((dt0 - day0) / 86400000);
+          return { ...x, _dayIndex: idx };
+        })
+        .sort((a, b) => a.startAt - b.startAt);
+
+      const maxPerDay = 6;
+      for (let dIdx = 0; dIdx < days; dIdx++) {
+        const wrap = document.querySelector(`[data-cancel-wrap="${dIdx}"]`);
+        if (!wrap) continue;
+        const list = cancelled.filter((x) => x._dayIndex === dIdx);
+        if (!list.length) continue;
+
+        const shown = list.slice(0, maxPerDay);
+        shown.forEach((it) => {
+          const hh = pad2(it.startAt.getHours());
+          const mm = pad2(it.startAt.getMinutes());
+          const key = therapistKey(it.therapist) || "";
+          const label = (it.patient || "Paziente").trim();
+          const chip = document.createElement("div");
+          chip.className = "cancelChip";
+          chip.style.background = `color-mix(in srgb, ${solidForTherapist(it.therapist)} 22%, rgba(255,255,255,.06))`;
+          chip.title = `${label} • ${hh}:${mm} • ${it.therapist || ""} • ${it.status || "Annullato"}`;
+          chip.innerHTML = `<span class="k">DIS</span><span class="t">${hh}:${mm}</span><span class="k">${key}</span><span class="p">${label}</span>`;
+          wrap.appendChild(chip);
+        });
+
+        if (list.length > shown.length) {
+          const more = document.createElement("div");
+          more.className = "cancelChip";
+          more.style.background = "rgba(255,255,255,.08)";
+          more.style.borderColor = "rgba(255,255,255,.14)";
+          more.innerHTML = `<span class="k">+${list.length - shown.length}</span>`;
+          more.title = `${list.length - shown.length} annullati in più`;
+          wrap.appendChild(more);
+        }
+      }
+    }
+
     const cols = Array.from(document.querySelectorAll(".dayCol"));
     const startMin = START_HOUR * 60;
     const endMin = END_HOUR * 60;
@@ -1022,8 +1167,22 @@
   // Preferences modal events
   prefsClose?.addEventListener("click", closePrefs);
   prefsBack?.addEventListener("click", (e) => { if (e.target === prefsBack) closePrefs(); });
-  prefPick?.addEventListener("click", () => { pickMode = "defaults"; openOpsMenu(); });
+  prefPick?.addEventListener("click", () => {
+    if (!prefDefaultPicker) return;
+    if (!prefMulti?.checked) return;
+    const open = prefDefaultPicker.style.display !== "none";
+    prefDefaultPicker.style.display = open ? "none" : "block";
+    if (!open) renderDefaultPickerList();
+  });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
+  prefMulti?.addEventListener("change", () => {
+    if (prefDefaultSection) prefDefaultSection.style.display = prefMulti.checked ? "" : "none";
+    if (prefDefaultPicker && !prefMulti.checked) prefDefaultPicker.style.display = "none";
+  });
+  prefDefaultClose?.addEventListener("click", () => {
+    if (prefDefaultPicker) prefDefaultPicker.style.display = "none";
+  });
+  prefDefaultSearch?.addEventListener("input", () => renderDefaultPickerList());
   prefsSave?.addEventListener("click", () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
@@ -1033,7 +1192,7 @@
     savePrefs();
 
     SLOT_MIN = Number(prefs.slotMin || 30);
-    if (![15, 30].includes(SLOT_MIN)) SLOT_MIN = 30;
+    if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
 
     // enforce default selection logic
@@ -1057,6 +1216,7 @@
   } catch {}
 
   loadPrefs();
+  syncLoginName();
   setView("7days");
 })();
 
