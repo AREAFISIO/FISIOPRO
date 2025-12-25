@@ -316,10 +316,20 @@
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
       overflow:hidden;
+      max-height: calc(100vh - 32px);
+      display:flex;
+      flex-direction:column;
     }
     .fp-modalHead{ padding: 14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
     .fp-modalTitle{ font-weight:900; font-size: 19px; }
-    .fp-modalBody{ padding: 16px; color: rgba(255,255,255,.84); font-size: 16px; line-height:1.55; }
+    .fp-modalBody{
+      padding: 16px;
+      color: rgba(255,255,255,.84);
+      font-size: 16px;
+      line-height:1.55;
+      overflow:auto;
+      min-height:0; /* allow flex child to scroll */
+    }
     .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed rgba(255,255,255,.10); }
     .fp-kv:last-child{ border-bottom:none; }
     .fp-kv .k{ color: rgba(255,255,255,.55); }
