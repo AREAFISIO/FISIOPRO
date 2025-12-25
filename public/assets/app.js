@@ -600,7 +600,7 @@ async function ensureDiaryLoaded() {
 async function runRouteInits() {
   // Ensure global bar exists before wiring sidebar toggles.
   ensureGlobalTopbar();
-  ensureTopbarToggles();
+  removeInnerMenuIcons();
   initSidebars();
   activeNav();
   initLogoutLinks();
@@ -611,6 +611,22 @@ async function runRouteInits() {
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();
+}
+
+function removeInnerMenuIcons() {
+  // Remove any previously injected toggle icons inside the page topbar (Agenda/Dashboard etc).
+  const scope = document.querySelector(".main .topbar") || document;
+  scope.querySelectorAll(".fp-iconbtn[data-toggle-left], .fp-iconbtn[data-toggle-right]").forEach((el) => el.remove());
+  // Remove empty wrapper if it was created
+  scope.querySelectorAll(".fp-toprow-left").forEach((wrap) => {
+    if (!wrap.querySelector(".h1") && !wrap.textContent.trim()) wrap.remove();
+    // If wrapper only contains .h1, unwrap it
+    const h1 = wrap.querySelector(":scope > .h1");
+    if (h1 && wrap.children.length === 1) {
+      wrap.parentElement?.insertBefore(h1, wrap);
+      wrap.remove();
+    }
+  });
 }
 
 async function swapCenterTo(url, opts = {}) {

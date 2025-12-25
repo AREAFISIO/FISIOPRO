@@ -99,7 +99,8 @@ body.fp-has-topbar .app{
 .main{overflow:auto;padding:18px 18px 28px}
 
 .topbar{
-  position:sticky;top:0;z-index:5;padding:10px 10px 14px;
+  /* non deve rimanere fissa */
+  position:relative;top:auto;z-index:1;padding:10px 10px 14px;
   background:linear-gradient(180deg, rgba(11,18,32,.90), rgba(11,18,32,.62), transparent);
   backdrop-filter: blur(10px);
 }
