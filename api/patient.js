@@ -228,11 +228,9 @@ export default async function handler(req, res) {
     const patientId = req.query?.id;
     if (!patientId) return res.status(400).json({ error: "Missing id" });
 
-    const role = normalizeRole(session.role);
-    if (role === "physio") {
-      const ok = await physioCanAccessPatient({ patientId, email: session.email });
-      if (!ok) return res.status(403).json({ error: "Forbidden" });
-    }
+    // NOTE: requirement: the patient card must be viewable even if the patient has no appointments yet.
+    // So we do not gate access on appointment history.
+    // (Authentication is still required above.)
 
     const table = enc("ANAGRAFICA");
     const record = await airtableFetch(`${table}/${enc(patientId)}`);
