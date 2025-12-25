@@ -49,6 +49,7 @@
   let locationsCache = null; // [{id,name}]
   let servicesCache = null; // [{id,name}]
   let insuranceCache = new Map(); // patientId -> string
+  let patientSearchCache = new Map(); // qLower -> [{id,label,phone,email}]
   let selectedTherapists = new Set();
   let draftSelected = new Set();
   let pickMode = "view"; // view | defaults
@@ -531,13 +532,18 @@
   async function searchPatients(q) {
     const qq = String(q || "").trim();
     if (!qq) return [];
-    const data = await apiGet(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(qq)}`);
+    const key = qq.toLowerCase();
+    if (patientSearchCache.has(key)) return patientSearchCache.get(key) || [];
+    const data = await apiGet(
+      `/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(qq)}&maxRecords=60&pageSize=30`,
+    );
     const items = (data.items || []).map((x) => {
       const nome = String(x.Nome || "").trim();
       const cognome = String(x.Cognome || "").trim();
       const full = [nome, cognome].filter(Boolean).join(" ").trim() || String(x["Cognome e Nome"] || "").trim();
       return { id: x.id, label: full || "Paziente", phone: x.Telefono || "", email: x.Email || "" };
     });
+    patientSearchCache.set(key, items);
     return items;
   }
 
