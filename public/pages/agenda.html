@@ -338,8 +338,26 @@
       padding: 12px 14px;
       border-radius: 14px;
       font-size: 16px;
+      background: rgba(0,0,0,.30);
+      border-color: rgba(255,255,255,.22);
+      color: rgba(255,255,255,.95);
     }
     .fp-modalBody .btn{ padding: 12px 16px; border-radius: 14px; font-size: 16px; }
+    .fp-modalBody .input::placeholder,
+    .fp-modalBody .textarea::placeholder{ color: rgba(255,255,255,.62); }
+    .fp-modalBody .input:focus,
+    .fp-modalBody .select:focus,
+    .fp-modalBody .textarea:focus{
+      outline: none;
+      border-color: rgba(34,230,195,.55);
+      box-shadow: 0 0 0 3px rgba(34,230,195,.18);
+      background: rgba(0,0,0,.34);
+    }
+    /* Keep dropdown options readable on dark UI */
+    .fp-modalBody select.select option{
+      background: rgba(15,26,44,.98);
+      color: rgba(255,255,255,.92);
+    }
 
     /* Hover card appuntamento */
     .fpHover{
