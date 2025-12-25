@@ -16,7 +16,9 @@ async function api(path, opts = {}) {
 async function ensureAuth() {
   try {
     const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
-    const data = await api("/api/auth-me");
+    const data = (typeof window.fpAuthMe === "function")
+      ? await window.fpAuthMe()
+      : await api("/api/auth-me");
     if (!data?.ok) {
       if (!isLoginPage) location.href = "/";
       return null;
