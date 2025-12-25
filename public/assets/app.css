@@ -17,7 +17,13 @@ body{
 a{color:inherit;text-decoration:none}
 small{color:var(--muted)}
 
-.app{height:100vh;display:grid;grid-template-columns:260px 1fr 240px}
+.app{
+  --leftW: 260px;
+  --rightW: 240px;
+  height:100vh;
+  display:grid;
+  grid-template-columns: var(--leftW) 1fr var(--rightW);
+}
 
 .sidebar{
   background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
@@ -211,8 +217,15 @@ tr:hover td{background:rgba(255,255,255,.03)}
 /* accessibilità mini: link disabilitati */
 a[aria-disabled="true"]{ opacity:.45; pointer-events:none; }
 
-@media (max-width:1200px){.app{grid-template-columns:240px 1fr}.rightbar{display:none}}
-@media (max-width:860px){.app{grid-template-columns:1fr}.sidebar{display:none}.formgrid{grid-template-columns:1fr}}
+@media (max-width:1200px){
+  .app{ --leftW: 240px; --rightW: 0px; grid-template-columns: var(--leftW) 1fr; }
+  .rightbar{ display:none; }
+}
+@media (max-width:860px){
+  .app{ --leftW: 0px; --rightW: 0px; grid-template-columns: 1fr; }
+  .sidebar{ display:none; }
+  .formgrid{ grid-template-columns:1fr; }
+}
 /* ===== Typography upgrade (no emoji UI, bigger text) ===== */
 :root{
   --fs-base: 16px;
@@ -635,11 +648,40 @@ td{ font-size: var(--fs-base); }
 }
 
 /* Collassa sidebar sinistra/destra: più spazio al centro */
+/* Nota: serve anche cambiare le colonne della grid, altrimenti resta "vuoto". */
+body.oe-hide-left .app{ grid-template-columns: 0 1fr var(--rightW) !important; }
+body.oe-hide-right .app{ grid-template-columns: var(--leftW) 1fr 0 !important; }
+body.oe-hide-left.oe-hide-right .app{ grid-template-columns: 0 1fr 0 !important; }
+
 body.oe-hide-left .sidebar{ width: 0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; }
 body.oe-hide-left .sidebar *{ display:none !important; }
 
 body.oe-hide-right .rightbar{ width: 0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; }
 body.oe-hide-right .rightbar *{ display:none !important; }
+
+/* Icon buttons (toggle menu left/right) */
+.fp-iconbtn{
+  display:inline-grid;
+  place-items:center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  cursor: pointer;
+  user-select:none;
+}
+.fp-iconbtn:hover{ background: rgba(255,255,255,.09); transform: translateY(-1px); }
+.fp-iconbtn:active{ transform: translateY(0); }
+.fp-iconbtn .ic{ font-size: 18px; line-height: 1; opacity: .92; }
+
+.fp-toprow-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width: 0;
+}
 html { font-size: 18px; }
 body { font-size: 18px; }
 h1 { font-size: 28px; }

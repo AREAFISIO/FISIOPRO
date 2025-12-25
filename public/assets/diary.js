@@ -1,10 +1,19 @@
 // Diary (agenda) renderer: week grid similar to OsteoEasy,
 // but styled using the existing app.css tokens.
 (function () {
-  // build marker (helps verify cache busting)
-  console.log("FISIOPRO diary build", "7e72bca");
-  const root = document.querySelector("[data-diary]");
-  if (!root) return;
+  if (typeof window.fpDiaryInit === "function") return;
+
+  window.fpDiaryInit = function fpDiaryInit() {
+    // Cleanup previous init (SPA navigation back/forth)
+    try {
+      if (typeof window.__FP_DIARY_CLEANUP === "function") window.__FP_DIARY_CLEANUP();
+    } catch {}
+    window.__FP_DIARY_CLEANUP = null;
+
+    // build marker (helps verify cache busting)
+    console.log("FISIOPRO diary build", "7e72bca");
+    const root = document.querySelector("[data-diary]");
+    if (!root) return;
 
   const gridEl = document.querySelector("[data-cal-grid]");
   const qEl = document.querySelector("[data-cal-q]");
@@ -1181,8 +1190,10 @@
 
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
-  document.addEventListener("scroll", hideHover, true);
-  window.addEventListener("resize", hideHover);
+  const onDocScroll = () => hideHover();
+  const onResize = () => hideHover();
+  document.addEventListener("scroll", onDocScroll, true);
+  window.addEventListener("resize", onResize);
 
   // Operator selector
   opsBar?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
@@ -1269,5 +1280,15 @@
   loadPrefs();
   syncLoginName();
   setView("7days");
+  // Cleanup (remove global listeners + ephemeral DOM)
+  window.__FP_DIARY_CLEANUP = () => {
+    try { document.removeEventListener("scroll", onDocScroll, true); } catch {}
+    try { window.removeEventListener("resize", onResize); } catch {}
+    try { hoverCard?.remove?.(); } catch {}
+  };
+};
+
+  // Auto-init on classic page load
+  window.fpDiaryInit();
 })();
 
