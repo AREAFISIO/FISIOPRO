@@ -10,8 +10,12 @@
   <script>
     (async function () {
       try {
-        const r = await fetch("/api/auth-me", { credentials: "include" });
-        const data = await r.json().catch(() => ({}));
+        const data = (typeof window.fpAuthMe === "function")
+          ? await window.fpAuthMe()
+          : await (async () => {
+              const r = await fetch("/api/auth-me", { credentials: "include" });
+              return await r.json().catch(() => ({}));
+            })();
         const role = (data?.user?.role || data?.session?.role || "").toString();
         if (role === "physio") location.replace("/agenda.html");
         else location.replace("/pages/front-office.html");
