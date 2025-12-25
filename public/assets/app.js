@@ -571,6 +571,16 @@ function bootstrapOverlayControl() {
   nodes.forEach((el) => el.remove());
 }
 
+function removeLegacyRightDrawer() {
+  // Hard cleanup for older "white drawer" implementation.
+  try { document.body.classList.remove("fp-right-open"); } catch {}
+  try { document.body.classList.remove("fp-right-expanded"); } catch {}
+
+  document.querySelectorAll(".fp-rightdetail-back, .fp-rightdetail").forEach((el) => el.remove());
+  // It may have been captured inside the overlay host too.
+  document.querySelectorAll("#fp-route-overlays .fp-rightdetail-back, #fp-route-overlays .fp-rightdetail").forEach((el) => el.remove());
+}
+
 async function ensureDiaryLoaded() {
   const p = location.pathname || "";
   if (!p.endsWith("/pages/agenda.html") && !p.endsWith("/agenda.html")) return;
@@ -601,6 +611,7 @@ async function runRouteInits() {
   // Ensure global bar exists before wiring sidebar toggles.
   ensureGlobalTopbar();
   removeInnerMenuIcons();
+  removeLegacyRightDrawer();
   normalizeRightbar();
   ensureSettingsModals();
   initSidebars();
