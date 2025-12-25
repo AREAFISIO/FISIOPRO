@@ -45,6 +45,7 @@
   let knownByEmail = new Map(); // email -> name
   let knownOperators = []; // [{id,name,email,...}] from /api/operators
   let operatorNameToId = new Map(); // name -> recId
+  let operatorNameToRole = new Map(); // name -> role label
   let locationsCache = null; // [{id,name}]
   let servicesCache = null; // [{id,name}]
   let insuranceCache = new Map(); // patientId -> string
@@ -67,6 +68,7 @@
 
     const sede = pickField(item.fields || {}, ["Sede", "Sedi", "Sede appuntamento", "Location", "Luogo", "Sede Bologna"]);
     const note = pickField(item.fields || {}, ["Note interne", "Note", "Nota", "Note interne (preview)", "Note paziente"]);
+    const opRole = roleForOperatorName(item.therapist);
 
     const roleRaw = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).toLowerCase();
     const canSeeInsurance = roleRaw.includes("front") || roleRaw.includes("manager") || roleRaw.includes("admin") || roleRaw.includes("amministr");
@@ -78,7 +80,7 @@
       <div class="r"><span class="k">Orario</span><span>${when || "—"}</span></div>
       <div class="r"><span class="k">Stato</span><span>${item.status || "—"}</span></div>
       ${canSeeInsurance ? `<div class="r"><span class="k">Assicurazione</span><span>${insurance || "—"}</span></div>` : ""}
-      <div class="r"><span class="k">Operatore</span><span>${item.therapist || "—"}</span></div>
+      <div class="r"><span class="k">Operatore</span><span>${item.therapist || "—"}${opRole ? " • " + opRole : ""}</span></div>
       <div class="r"><span class="k">Sede</span><span>${sede ? String(sede) : "—"}</span></div>
       <div class="note">${note ? String(note) : ""}</div>
     `;
@@ -276,10 +278,30 @@
     return String(u?.nome || "").trim();
   }
 
+  function normalizeRoleLabel(roleRaw) {
+    const r = String(roleRaw || "").trim();
+    if (!r) return "";
+    const x = r.toLowerCase();
+    if (x === "physio" || x === "fisioterapista") return "Fisioterapista";
+    if (x.includes("front")) return "Front office";
+    if (x.includes("manager") || x.includes("admin") || x.includes("amministr")) return "Manager";
+    return r;
+  }
+  function getUserRoleLabel() {
+    const u = window.FP_USER || window.FP_SESSION || null;
+    return normalizeRoleLabel(u?.roleLabel || u?.role || "");
+  }
+  function roleForOperatorName(name) {
+    const n = String(name || "").trim();
+    if (!n) return "";
+    return normalizeRoleLabel(operatorNameToRole.get(n) || "");
+  }
+
   function syncLoginName() {
     if (!loginNameEl) return;
     const name = String(getUserName() || "").trim();
-    loginNameEl.textContent = name || "—";
+    const roleLabel = getUserRoleLabel();
+    loginNameEl.textContent = name ? (name + (roleLabel ? " • " + roleLabel : "")) : "—";
   }
 
   function prefsKey() {
@@ -366,11 +388,15 @@
       row.className = "prefPickRow";
       const on = (prefs.defaultOperators || []).includes(name);
       const check = `<div class="prefPickCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      const role = roleForOperatorName(name);
       row.innerHTML = `
         <div class="prefPickLeft">
           ${check}
           <div style="min-width:0;">
-            <div class="prefPickName">${name}</div>
+            <div class="prefPickName" style="display:flex; align-items:center; gap:10px; min-width:0;">
+              <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+              ${role ? `<span class="opsRole">${role}</span>` : ""}
+            </div>
             <div class="prefPickMini">${therapistKey(name) || ""}</div>
           </div>
         </div>
@@ -447,11 +473,15 @@
       row.className = "opsRow";
       const on = draftSelected.has(name);
       const check = `<div class="opsCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      const role = roleForOperatorName(name);
       row.innerHTML = `
         <div class="opsRowLeft">
           ${check}
           <div style="min-width:0;">
-            <div class="opsName">${name}</div>
+            <div class="opsName" style="display:flex; align-items:center; gap:10px; min-width:0;">
+              <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+              ${role ? `<span class="opsRole">${role}</span>` : ""}
+            </div>
             <div class="opsMini">${therapistKey(name) || ""}</div>
           </div>
         </div>
@@ -533,6 +563,7 @@
       if (names.length) knownTherapists = names;
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
+      operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
     } catch {
       // fallback to operators found in the week
     }
@@ -642,9 +673,9 @@
           cell.style.padding = "6px 10px";
           cell.style.gridRow = "3";
           cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
+          // Requested: keep the colored dot, but remove name/surname next to it (still keep tooltip).
           cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <span class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9;">${name}</span>
+            <span class="opsDot" title="${name}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
           </div>`;
           gridEl.appendChild(cell);
         }
@@ -739,7 +770,10 @@
     const st = item.startAt ? item.startAt.toLocaleString("it-IT", { weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
     const en = item.endAt ? item.endAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
     lines.push(["Quando", st + (en ? " → " + en : "")]);
-    if (item.therapist) lines.push(["Operatore", item.therapist]);
+    if (item.therapist) {
+      const role = roleForOperatorName(item.therapist);
+      lines.push(["Operatore", item.therapist + (role ? " • " + role : "")]);
+    }
     if (item.service) lines.push(["Prestazione", item.service]);
     if (item.status) lines.push(["Stato", item.status]);
 
@@ -787,7 +821,7 @@
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         <label class="field" style="gap:6px;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Tipologia</span>
+          <span class="fpFormLabel">Tipologia</span>
           <select class="select" data-f-type>
             <option value="Appuntamento paziente">Appuntamento paziente</option>
             <option value="Indisponibilità">Indisponibilità</option>
@@ -799,14 +833,14 @@
         </label>
 
         <label class="field" style="gap:6px;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Durata</span>
+          <span class="fpFormLabel">Durata</span>
           <select class="select" data-f-duration>
             ${durOptions.map((m) => `<option value="${m}">${m === 30 ? "30 min" : (m % 60 === 0 ? (m/60) + " h" : (Math.floor(m/60) + " h " + (m%60) + " min"))}</option>`).join("")}
           </select>
         </label>
 
         <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Paziente</span>
+          <span class="fpFormLabel">Paziente</span>
           <div style="display:flex; gap:10px; align-items:center;">
             <input class="input" data-f-patient-q placeholder="Cerca paziente..." />
             <button class="btn" data-f-patient-clear type="button">Svuota</button>
@@ -816,22 +850,22 @@
         </label>
 
         <label class="field" style="gap:6px;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Sede</span>
+          <span class="fpFormLabel">Sede</span>
           <select class="select" data-f-location><option value="">Carico…</option></select>
         </label>
 
         <label class="field" style="gap:6px;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Prestazione</span>
+          <span class="fpFormLabel">Prestazione</span>
           <select class="select" data-f-service><option value="">Carico…</option></select>
         </label>
 
         <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Operatore</span>
+          <span class="fpFormLabel">Operatore</span>
           <select class="select" data-f-operator></select>
         </label>
 
         <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span style="color:rgba(255,255,255,.55); font-size:12px; letter-spacing:.08em; text-transform:uppercase;">Note interne</span>
+          <span class="fpFormLabel">Note interne</span>
           <textarea class="textarea" data-f-internal placeholder="Note interne..."></textarea>
         </label>
       </div>
@@ -851,7 +885,14 @@
 
     // operator select
     const ops = (knownOperators || []).slice();
-    elOp.innerHTML = ops.map((o) => `<option value="${String(o.id || "")}">${String(o.name || "").trim()}</option>`).join("");
+    elOp.innerHTML = ops
+      .map((o) => {
+        const name = String(o.name || "").trim();
+        const role = normalizeRoleLabel(o.role || "");
+        const label = name + (role ? " • " + role : "");
+        return `<option value="${String(o.id || "")}">${label}</option>`;
+      })
+      .join("");
     const defaultOpId = therapistName ? (operatorNameToId.get(therapistName) || "") : "";
     if (defaultOpId) elOp.value = defaultOpId;
 
