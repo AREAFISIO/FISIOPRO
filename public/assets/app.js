@@ -659,29 +659,33 @@ function getUserDisplay() {
   return { name: name || "Utente", role, initials };
 }
 
-function buildRightDetailHtml() {
+function buildRightDetailHtml(view) {
   const { name, role, initials } = getUserDisplay();
   const pageRight = document.querySelector(".app > .rightbar");
   const pageDetail = String(pageRight?.dataset?.fpPageDetail || "").trim();
 
-  const configItems = [
-    { icon: "🧾", label: "Info abbonamento", href: "/pages/impostazioni.html" },
-    { icon: "👁️", label: "Abilitazione moduli", href: "/pages/impostazioni.html" },
-    { icon: "👤", label: "Impostazioni utente", href: "/pages/impostazioni.html" },
-    { icon: "⚙️", label: "Impostazioni azienda", href: "/pages/impostazioni.html" },
-    { icon: "💬", label: "Template notifiche", href: "/pages/impostazioni.html" },
-    { icon: "👥", label: "Utenti e dispositivi", href: "/pages/impostazioni.html" },
-    { icon: "€", label: "Prezziario", href: "/pages/impostazioni.html" },
-    { icon: "📄", label: "Modulistica", href: "/pages/impostazioni.html" },
-  ];
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  const isAgendaPageNow = (location.pathname || "").endsWith("/pages/agenda.html") || (location.pathname || "").endsWith("/agenda.html");
 
-  const itemsHtml = configItems
-    .map((x) => {
-      const disabled = !x.href;
-      const href = x.href || "#";
-      return `<a class="fp-ritem" href="${href}" ${disabled ? 'aria-disabled="true"' : ""}><span class="i">${x.icon}</span><span>${x.label}</span></a>`;
-    })
-    .join("");
+  const agendaHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni visualizzazione agenda (slot, multi-operatore, colore, ecc.).
+      ${isAgendaPageNow ? `<div style="margin-top:10px;"><button class="fp-rightdetail__close" type="button" data-open-agenda-prefs>Apri impostazioni Agenda</button></div>` : ""}
+      ${!isAgendaPageNow ? `<div style="margin-top:8px; font-size:12px; opacity:.8;">Apri la pagina Agenda per modificare le preferenze specifiche.</div>` : ""}
+    </div>
+  `;
+  const availabilityHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni disponibilità (come griglia “Configura la disponibilità”).
+      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (slot settimanali + drag).</div>
+    </div>
+  `;
+  const appointmentsHtml = `
+    <div style="padding:6px 6px 10px; color: rgba(11,44,61,.70); line-height:1.6;">
+      Impostazioni appuntamenti (default, drag&drop, fatturazione, ecc.).
+      <div style="margin-top:8px; font-size:12px; opacity:.8;">UI completa da collegare (come schermata “Appuntamenti”).</div>
+    </div>
+  `;
 
   const pageSection = pageDetail
     ? `
@@ -704,9 +708,17 @@ function buildRightDetailHtml() {
       <button type="button" class="fp-rightdetail__close" data-rightdetail-close>Chiudi</button>
     </div>
     <div class="fp-rightdetail__body">
-      <div class="fp-rsec" data-rsec="config">
-        <div class="fp-rsec__title" data-rsec-toggle="config">Configurazione <span style="opacity:.6;">▾</span></div>
-        <div class="fp-rsec__items">${itemsHtml}</div>
+      <div class="fp-rsec" data-rsec="agenda">
+        <div class="fp-rsec__title" data-rsec-toggle="agenda">Impostazioni Agenda <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "agenda" ? "" : "display:none;"}">${agendaHtml}</div>
+      </div>
+      <div class="fp-rsec" data-rsec="availability">
+        <div class="fp-rsec__title" data-rsec-toggle="availability">Impostazioni Disponibilità <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "availability" ? "" : "display:none;"}">${availabilityHtml}</div>
+      </div>
+      <div class="fp-rsec" data-rsec="appointments">
+        <div class="fp-rsec__title" data-rsec-toggle="appointments">Impostazioni Appuntamenti <span style="opacity:.6;">▾</span></div>
+        <div class="fp-rsec__items" style="${v === "appointments" ? "" : "display:none;"}">${appointmentsHtml}</div>
       </div>
       ${pageSection}
     </div>
@@ -725,22 +737,38 @@ function wireRightDetail(panel) {
       items.style.display = isHidden ? "" : "none";
     });
   });
+
+  // Deep link to Agenda prefs modal if available
+  panel.querySelectorAll("[data-open-agenda-prefs]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const btn = document.querySelector("[data-open-prefs]");
+      if (btn) btn.click();
+    });
+  });
 }
 
-function openRightDetail() {
+function openRightDetail(view) {
   ensureRightDetailDrawer();
   const panel = document.querySelector(".fp-rightdetail-back .fp-rightdetail");
   if (!panel) return;
-  panel.innerHTML = buildRightDetailHtml();
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  window.__FP_RIGHT_DETAIL_VIEW = v;
+  panel.innerHTML = buildRightDetailHtml(v);
   wireRightDetail(panel);
   document.body.classList.add("fp-right-open");
 }
 function closeRightDetail() {
   document.body.classList.remove("fp-right-open");
 }
-function toggleRightDetail() {
-  if (document.body.classList.contains("fp-right-open")) closeRightDetail();
-  else openRightDetail();
+function toggleRightDetail(view) {
+  const v = String(view || window.__FP_RIGHT_DETAIL_VIEW || "agenda");
+  window.__FP_RIGHT_DETAIL_VIEW = v;
+  if (document.body.classList.contains("fp-right-open")) {
+    // if open, just switch content
+    openRightDetail(v);
+  } else {
+    openRightDetail(v);
+  }
 }
 
 function normalizeRightbar() {
@@ -752,11 +780,14 @@ function normalizeRightbar() {
 
   rb.className = "rightbar slim";
   rb.innerHTML = `
-    <button class="rbBtn" data-open-right-detail title="Apri pannello">
-      <span class="rbIcon">≡</span>
-    </button>
-    <button class="rbBtn" data-open-right-detail title="Impostazioni">
+    <button class="rbBtn" data-open-right-detail data-right-view="agenda" title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
+    </button>
+    <button class="rbBtn" data-open-right-detail data-right-view="availability" title="Impostazioni Disponibilità">
+      <span class="rbIcon">🕒</span>
+    </button>
+    <button class="rbBtn" data-open-right-detail data-right-view="appointments" title="Impostazioni Appuntamenti">
+      <span class="rbIcon">✅</span>
     </button>
   `;
 }
@@ -861,7 +892,8 @@ function setupSpaRouter() {
       const openRight = e.target?.closest?.("[data-open-right-detail]");
       if (openRight) {
         e.preventDefault();
-        toggleRightDetail();
+        const view = openRight.getAttribute("data-right-view") || "";
+        toggleRightDetail(view);
         return;
       }
 
