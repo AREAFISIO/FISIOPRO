@@ -38,6 +38,7 @@ export default async function handler(req, res) {
     const ruolo = String(f.Ruolo || "").trim();
     const codiceDb = String(f["Codice accesso"] || "").trim();
     const nome = String(f.Nome || "").trim();
+    const cognome = String(f.Cognome || "").trim();
 
     const ruoloValido = ruolo === "Fisioterapista" || ruolo === "Front office" || ruolo === "Manager";
     if (!attivo || !ruoloValido || !codiceDb || codiceDb !== codice) {
@@ -53,12 +54,13 @@ export default async function handler(req, res) {
       role,
       roleLabel: ruolo,
       nome,
+      cognome,
       exp,
     });
 
     const cookie = makeSessionCookie(token, maxAgeSeconds);
 
-    const user = { email: email.toLowerCase(), role, roleLabel: ruolo, nome };
+    const user = { email: email.toLowerCase(), role, roleLabel: ruolo, nome, cognome };
     return setJson(res, 200, { ok: true, user }, cookie);
   } catch (e) {
     return setJson(res, 500, { ok: false, error: "server_error" });
