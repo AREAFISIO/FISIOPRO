@@ -62,6 +62,7 @@
   let selectedTherapists = new Set();
   let draftSelected = new Set();
   let pickMode = "view"; // view | defaults
+  let didApplyDefaultSelectionOnce = false;
 
   // Hover card (info rapida)
   const hoverCard = document.createElement("div");
@@ -589,20 +590,16 @@
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
 
-    // Default behavior:
+    // Default behavior (per login):
     // - show the logged-in user's agenda only
-    // - if multi-user is enabled (preference), use defaultOperators list
-    if (selectedTherapists.size === 0 && knownTherapists.length) {
+    // - if multi-user is enabled, apply defaultOperators ONCE (first load after access)
+    if (!didApplyDefaultSelectionOnce && knownTherapists.length) {
       const me = getUserName();
-      if (!multiUser && me) {
-        selectedTherapists = new Set([me]);
-      } else if (multiUser && (prefs.defaultOperators || []).length) {
-        selectedTherapists = new Set(prefs.defaultOperators);
-      } else if (me) {
-        selectedTherapists = new Set([me]);
-      } else {
-        selectedTherapists = new Set([knownTherapists[0]]);
-      }
+      if (multiUser && (prefs.defaultOperators || []).length) selectedTherapists = new Set(prefs.defaultOperators);
+      else if (!multiUser && me) selectedTherapists = new Set([me]);
+      else if (me) selectedTherapists = new Set([me]);
+      else selectedTherapists = new Set([knownTherapists[0]]);
+      didApplyDefaultSelectionOnce = true;
     }
 
     // keep selection valid
@@ -1229,12 +1226,15 @@
   // Preferences modal events
   prefsClose?.addEventListener("click", closePrefs);
   prefsBack?.addEventListener("click", (e) => { if (e.target === prefsBack) closePrefs(); });
+  // "Agende visualizzate di default" -> apre selezione operatori (salva su prefs.defaultOperators per utente)
   prefPick?.addEventListener("click", () => {
-    if (!prefDefaultPicker) return;
-    if (!prefMulti?.checked) return;
-    const open = prefDefaultPicker.style.display !== "none";
-    prefDefaultPicker.style.display = open ? "none" : "block";
-    if (!open) renderDefaultPickerList();
+    // Se l'utente non ha ancora attivato la vista multi utente, la attiviamo (come in OsteoEasy).
+    if (prefMulti && !prefMulti.checked) {
+      prefMulti.checked = true;
+      if (prefDefaultSection) prefDefaultSection.style.display = "";
+    }
+    pickMode = "defaults";
+    openOpsMenu();
   });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
   prefMulti?.addEventListener("change", () => {
