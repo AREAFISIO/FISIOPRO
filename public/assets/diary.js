@@ -609,8 +609,10 @@
     const totalDayCols = days * colsPerDay;
 
     // Colonne sempre visibili: si stringono (no orizzontale) quando aggiungo operatori
+    const showCancelBand = true; // requested: show "disdette" band even in single-operator view
     gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(0, 1fr))`;
     if (multiUser) gridEl.style.gridTemplateRows = `58px 42px 34px ${heightPx}px`;
+    else if (showCancelBand) gridEl.style.gridTemplateRows = `58px 42px ${heightPx}px`;
     else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
 
     // Corner (day header)
@@ -633,8 +635,8 @@
       gridEl.appendChild(dh);
     }
 
-    // Cancelled-band row (only in multi-user): between day header and operator header
-    if (multiUser) {
+    // Cancelled-band row: between day header and operator header (or before grid in single-user)
+    if (multiUser || showCancelBand) {
       const blank = document.createElement("div");
       blank.className = "corner";
       blank.style.height = "42px";
@@ -655,29 +657,31 @@
       }
 
       // Operator headers
-      const blank2 = document.createElement("div");
-      blank2.className = "corner";
-      blank2.style.height = "34px";
-      blank2.style.gridColumn = "1";
-      blank2.style.gridRow = "3";
-      gridEl.appendChild(blank2);
+      if (multiUser) {
+        const blank2 = document.createElement("div");
+        blank2.className = "corner";
+        blank2.style.height = "34px";
+        blank2.style.gridColumn = "1";
+        blank2.style.gridRow = "3";
+        gridEl.appendChild(blank2);
 
-      for (let dIdx = 0; dIdx < days; dIdx++) {
-        for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
-          const name = ops[oIdx] || "";
-          const cell = document.createElement("div");
-          cell.className = "dayHead";
-          cell.classList.add("opHead");
-          if (dIdx > 0 && oIdx === 0) cell.classList.add("daySepHead");
-          cell.style.height = "34px";
-          cell.style.padding = "6px 10px";
-          cell.style.gridRow = "3";
-          cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-          // Requested: keep the colored dot, but remove name/surname next to it (still keep tooltip).
-          cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <span class="opsDot" title="${name}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
-          </div>`;
-          gridEl.appendChild(cell);
+        for (let dIdx = 0; dIdx < days; dIdx++) {
+          for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
+            const name = ops[oIdx] || "";
+            const cell = document.createElement("div");
+            cell.className = "dayHead";
+            cell.classList.add("opHead");
+            if (dIdx > 0 && oIdx === 0) cell.classList.add("daySepHead");
+            cell.style.height = "34px";
+            cell.style.padding = "6px 10px";
+            cell.style.gridRow = "3";
+            cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
+            // Requested: keep the colored dot, but remove name/surname next to it (still keep tooltip).
+            cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
+              <span class="opsDot" title="${name}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
+            </div>`;
+            gridEl.appendChild(cell);
+          }
         }
       }
     }
@@ -687,7 +691,7 @@
     timeCol.className = "timeCol";
     timeCol.style.height = heightPx + "px";
     timeCol.style.gridColumn = "1";
-    timeCol.style.gridRow = multiUser ? "4" : "2";
+    timeCol.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
     timeCol.style.position = "sticky";
     timeCol.style.left = "0";
     timeCol.style.zIndex = "4";
@@ -714,7 +718,7 @@
         col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-        col.style.gridRow = multiUser ? "4" : "2";
+        col.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
 
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
@@ -1034,8 +1038,8 @@
 
     buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1));
 
-    // Render cancelled appointments into the band (multi-user only).
-    if (multiUser) {
+    // Render cancelled appointments into the band (also when single-operator view).
+    {
       const cancelWraps = Array.from(document.querySelectorAll("[data-cancel-wrap]"));
       cancelWraps.forEach((w) => (w.innerHTML = ""));
 
