@@ -569,6 +569,14 @@ td{ font-size: var(--fs-base); }
 }
 .oe-dot--warn{ background: rgba(255,140,0,.9); }
 
+.fpSlotHoverCard{
+  width: 240px;
+  max-width: calc(100vw - 24px);
+}
+.fpSlotHoverCard .oe-hovercard__row{
+  font-size: 14px;
+}
+
 .oe-modal__backdrop{
   position: fixed;
   inset: 0;

@@ -73,9 +73,49 @@
   hoverCard.className = "fpHover";
   document.body.appendChild(hoverCard);
   function hideHover() { hoverCard.style.display = "none"; }
+
+  // Hover card per SLOT (preview quando passi sulla griglia vuota)
+  // Stile "OsteoEasy-like" (card chiara) usando le classi già presenti in app.css.
+  const slotHoverCard = document.createElement("div");
+  slotHoverCard.className = "oe-hovercard fpSlotHoverCard";
+  slotHoverCard.style.display = "none";
+  slotHoverCard.setAttribute("aria-hidden", "true");
+  slotHoverCard.innerHTML = `
+    <div class="oe-hovercard__row"><span class="oe-ic">🕒</span><span data-slot-time></span></div>
+    <div class="oe-hovercard__row"><span class="oe-ic">👤</span><span data-slot-ther></span></div>
+    <div class="oe-hovercard__row"><span class="oe-ic">📍</span><span data-slot-loc></span></div>
+  `;
+  document.body.appendChild(slotHoverCard);
+
+  function hideSlotHover() {
+    slotHoverCard.style.display = "none";
+    slotHoverCard.setAttribute("aria-hidden", "true");
+  }
+
+  function showSlotHover(ctx, x, y) {
+    if (!ctx) return;
+    if (modalBack && modalBack.style.display !== "none") return;
+
+    const time = String(ctx.time || "").trim() || "—";
+    const ther = String(ctx.therapist || "").trim() || "—";
+    const loc = String(ctx.location || "").trim() || "—";
+
+    slotHoverCard.querySelector("[data-slot-time]").textContent = time;
+    slotHoverCard.querySelector("[data-slot-ther]").textContent = ther;
+    slotHoverCard.querySelector("[data-slot-loc]").textContent = loc;
+
+    const left = Math.min(window.innerWidth - 280, x + 12);
+    const top = Math.min(window.innerHeight - 140, y + 12);
+    slotHoverCard.style.left = Math.max(12, left) + "px";
+    slotHoverCard.style.top = Math.max(12, top) + "px";
+    slotHoverCard.style.display = "block";
+    slotHoverCard.setAttribute("aria-hidden", "false");
+  }
   function showHover(item, x, y) {
     if (!item) return;
     if (modalBack && modalBack.style.display !== "none") return;
+    // se stai hoverando un evento, nascondi il tooltip slot per non sovrapporre
+    hideSlotHover();
 
     const startStr = item.startAt ? item.startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
     const endStr = item.endAt ? item.endAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
@@ -206,6 +246,79 @@
       if (fields && fields[k] != null && String(fields[k]).trim() !== "") return fields[k];
     }
     return "";
+  }
+
+  // --- Sede / Location inference (per tooltip sugli slot) ---
+  // Non abbiamo (ancora) una select Sede nel modal di creazione; perciò, per lo slot
+  // stimiamo la sede più probabile guardando gli appuntamenti nel range corrente.
+  const LOCATION_KEYS = ["Sede", "Sedi", "Sede appuntamento", "Location", "Luogo", "Sede Bologna"];
+  function pickLocation(fields) {
+    const v = pickField(fields || {}, LOCATION_KEYS);
+    return String(v || "").trim();
+  }
+
+  function incCount(map, key, loc) {
+    if (!key || !loc) return;
+    let inner = map.get(key);
+    if (!inner) { inner = new Map(); map.set(key, inner); }
+    inner.set(loc, (inner.get(loc) || 0) + 1);
+  }
+
+  function pickMostFrequent(inner) {
+    if (!inner || !(inner instanceof Map)) return "";
+    let best = "";
+    let bestN = 0;
+    for (const [k, n] of inner.entries()) {
+      if (n > bestN) { bestN = n; best = k; }
+    }
+    return best;
+  }
+
+  // Cache: key = "YYYY-MM-DD|Therapist Name" -> "SEDE ..."
+  let slotLocationByDayTher = new Map();
+  // Cache: key = "Therapist Name" -> "SEDE ..."
+  let slotLocationByTher = new Map();
+
+  function rebuildSlotLocationIndex() {
+    const dayCounts = new Map(); // key -> Map(loc->count)
+    const therCounts = new Map(); // therapist -> Map(loc->count)
+
+    for (const it of rawItems || []) {
+      if (!it?.startAt) continue;
+      const ymd = toYmd(it.startAt);
+      const ther = String(it.therapist || "").trim() || "__ALL__";
+      const loc = pickLocation(it.fields || {});
+      if (!loc) continue;
+
+      incCount(dayCounts, `${ymd}|${ther}`, loc);
+      incCount(dayCounts, `${ymd}|__ALL__`, loc);
+      incCount(therCounts, ther, loc);
+      incCount(therCounts, "__ALL__", loc);
+    }
+
+    slotLocationByDayTher = new Map();
+    for (const [k, inner] of dayCounts.entries()) {
+      const best = pickMostFrequent(inner);
+      if (best) slotLocationByDayTher.set(k, best);
+    }
+
+    slotLocationByTher = new Map();
+    for (const [k, inner] of therCounts.entries()) {
+      const best = pickMostFrequent(inner);
+      if (best) slotLocationByTher.set(k, best);
+    }
+  }
+
+  function inferSlotLocation(ymd, therapistName) {
+    const ther = String(therapistName || "").trim() || "__ALL__";
+    const day = String(ymd || "").trim();
+    return (
+      slotLocationByDayTher.get(`${day}|${ther}`) ||
+      slotLocationByDayTher.get(`${day}|__ALL__`) ||
+      slotLocationByTher.get(ther) ||
+      slotLocationByTher.get("__ALL__") ||
+      ""
+    );
   }
 
   function normalizeItem(x) {
@@ -586,6 +699,7 @@
 
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
+    rebuildSlotLocationIndex();
 
     // Default behavior (per login):
     // - show the logged-in user's agenda only
@@ -753,13 +867,42 @@
           hover.style.top = (GRID_PAD_TOP + (idx * SLOT_PX)) + "px";
           hover.style.display = "";
           col.dataset._slotIndex = String(idx);
+
+          // Tooltip slot (ora + sede + operatore)
+          const slotStartMin = START_HOUR * 60 + idx * SLOT_MIN;
+          const day = addDays(start, dIdx);
+          const dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+          dt.setMinutes(slotStartMin);
+          const timeStr = dt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+
+          const therapistName = multiUser
+            ? String(col.dataset.therapist || "").trim()
+            : (Array.from(selectedTherapists)[0] || "");
+          const role = roleForOperatorName(therapistName);
+          const therLabel = therapistName ? (therapistName + (role ? " • " + role : "")) : "—";
+
+          const loc = inferSlotLocation(toYmd(day), therapistName) || "—";
+          showSlotHover({ time: timeStr, therapist: therLabel, location: loc }, lastMouseX, lastMouseY);
         };
 
-        col.addEventListener("mousemove", (e) => updateHover(e.clientY));
-        col.addEventListener("mouseleave", () => { hover.style.display = "none"; });
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        col.addEventListener("mousemove", (e) => {
+          lastMouseX = e.clientX;
+          lastMouseY = e.clientY;
+          // Se stai sopra un evento, non mostrare highlight/tooltip slot.
+          if (e.target && e.target.closest && e.target.closest(".event")) {
+            hover.style.display = "none";
+            hideSlotHover();
+            return;
+          }
+          updateHover(e.clientY);
+        });
+        col.addEventListener("mouseleave", () => { hover.style.display = "none"; hideSlotHover(); });
 
         col.addEventListener("click", (e) => {
           if (e.target && e.target.closest && e.target.closest(".event")) return;
+          hideSlotHover();
           const idx = Number(col.dataset._slotIndex || "0");
           const slotStartMin = START_HOUR * 60 + idx * SLOT_MIN;
 
@@ -1272,8 +1415,8 @@
 
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
-  const onDocScroll = () => hideHover();
-  const onResize = () => hideHover();
+  const onDocScroll = () => { hideHover(); hideSlotHover(); };
+  const onResize = () => { hideHover(); hideSlotHover(); };
   document.addEventListener("scroll", onDocScroll, true);
   window.addEventListener("resize", onResize);
 
@@ -1370,6 +1513,7 @@
     try { document.removeEventListener("scroll", onDocScroll, true); } catch {}
     try { window.removeEventListener("resize", onResize); } catch {}
     try { hoverCard?.remove?.(); } catch {}
+    try { slotHoverCard?.remove?.(); } catch {}
   };
 };
 
