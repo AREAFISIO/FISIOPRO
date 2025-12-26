@@ -115,8 +115,13 @@ export default async function handler(req, res) {
       }
       if (!chosen) return setJson(res, 401, { ok: false, error: "invalid" });
     } else {
-      // default: least privileged first (physio -> front -> manager)
-      chosen = valid.find((x) => x.role === "physio") || valid.find((x) => x.role === "front") || valid.find((x) => x.role === "manager") || null;
+      // default: MOST privileged first (manager/CEO -> front -> physio)
+      // This matches "login as CEO and see everything" when a CEO/Manager record exists for the same email.
+      chosen =
+        valid.find((x) => x.role === "manager") ||
+        valid.find((x) => x.role === "front") ||
+        valid.find((x) => x.role === "physio") ||
+        null;
       if (!chosen) return setJson(res, 401, { ok: false, error: "invalid" });
     }
 
