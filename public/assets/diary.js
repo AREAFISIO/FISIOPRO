@@ -569,10 +569,13 @@
     if (monthEl) monthEl.textContent = String(fmtMonth(start) || "").toUpperCase();
     if (weekEl) weekEl.textContent = fmtWeekRange(start, days);
 
-    // Load known operators from COLLABORATORI (preferred),
-    // then load appointments for the selected week.
-    try {
-      const ops = await apiGet("/api/operators");
+    // Fetch operators + agenda in parallel (reduces initial load latency).
+    const opsPromise = apiGet("/api/operators").catch(() => null);
+    const agendaPromise = apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+
+    const [ops, data] = await Promise.all([opsPromise, agendaPromise]);
+
+    if (ops?.items) {
       const items = (ops.items || []);
       knownOperators = items;
       const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
@@ -580,13 +583,11 @@
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
-    } catch {
-      // fallback to operators found in the week
     }
+
     syncLoginName();
     if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
 
-    const data = await apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
 
