@@ -154,33 +154,62 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: "missing_operator" });
     }
 
-    const baseFields = {};
-    if (!Number.isNaN(durationMin) && durationMin > 0) baseFields[FIELD_DURATION] = durationMin;
-    if (type) baseFields[FIELD_TYPE] = type;
-    if (internalNote) baseFields[FIELD_INTERNAL] = internalNote;
+    // Some bases have "Durata" as a computed field (formula/rollup). If so, writing it fails.
+    // We detect this once and cache "duration not writable" for warm instances.
+    const durationWritableKey = `apptCreate:durationWritable:${tableName}:${FIELD_DURATION}`;
+    const cachedDurationWritable = memGet(durationWritableKey);
+    const canWriteDuration = cachedDurationWritable === undefined ? true : Boolean(cachedDurationWritable);
 
-    // linked records (best effort)
-    const opArr = asLinkArray(therapistId);
-    if (opArr) baseFields[FIELD_OPERATOR] = opArr;
-    const patArr = asLinkArray(patientId);
-    if (patArr) baseFields[FIELD_PATIENT] = patArr;
-    const servArr = asLinkArray(serviceId);
-    if (servArr) baseFields[FIELD_SERVICE] = servArr;
-    const locArr = asLinkArray(locationId);
-    if (locArr) baseFields[FIELD_LOCATION] = locArr;
+    const buildBaseFields = (includeDuration) => {
+      const baseFields = {};
+      if (includeDuration && !Number.isNaN(durationMin) && durationMin > 0) baseFields[FIELD_DURATION] = durationMin;
+      if (type) baseFields[FIELD_TYPE] = type;
+      if (internalNote) baseFields[FIELD_INTERNAL] = internalNote;
+
+      // linked records (best effort)
+      const opArr = asLinkArray(therapistId);
+      if (opArr) baseFields[FIELD_OPERATOR] = opArr;
+      const patArr = asLinkArray(patientId);
+      if (patArr) baseFields[FIELD_PATIENT] = patArr;
+      const servArr = asLinkArray(serviceId);
+      if (servArr) baseFields[FIELD_SERVICE] = servArr;
+      const locArr = asLinkArray(locationId);
+      if (locArr) baseFields[FIELD_LOCATION] = locArr;
+
+      return baseFields;
+    };
 
     const schemaKey = `apptCreate:schema:${tableName}`;
     const cached = memGet(schemaKey);
 
+    const createWithRetryForDuration = async (fields, includedDuration) => {
+      try {
+        return await tryCreate({ tableName, fields });
+      } catch (e) {
+        const msg = String(e?.message || "");
+        const fieldName = parseAirtableFieldNameFromError(msg);
+        if (includedDuration && fieldName === FIELD_DURATION && isComputedFieldError(msg)) {
+          // Mark duration as not writable and retry once without it.
+          memSet(durationWritableKey, false, 60 * 60_000);
+          const next = { ...fields };
+          delete next[FIELD_DURATION];
+          return await tryCreate({ tableName, fields: next });
+        }
+        throw e;
+      }
+    };
+
     const attemptDatetime = async (FIELD_START, FIELD_END) => {
-      const fields = { ...baseFields };
+      const includeDuration = canWriteDuration;
+      const fields = buildBaseFields(includeDuration);
       fields[FIELD_START] = startAt;
       fields[FIELD_END] = endAt;
-      return await tryCreate({ tableName, fields });
+      return await createWithRetryForDuration(fields, includeDuration);
     };
 
     const attemptSplit = async ({ FIELD_SD, FIELD_ST, FIELD_ED, FIELD_ET }) => {
-      const fields = { ...baseFields };
+      const includeDuration = canWriteDuration;
+      const fields = buildBaseFields(includeDuration);
       const sd = ymdFromIso(startAt);
       const st = hmFromIso(startAt);
       const ed = ymdFromIso(endAt);
@@ -189,7 +218,7 @@ export default async function handler(req, res) {
       if (FIELD_ST) fields[FIELD_ST] = st;
       if (FIELD_ED) fields[FIELD_ED] = ed;
       if (FIELD_ET) fields[FIELD_ET] = et;
-      return await tryCreate({ tableName, fields });
+      return await createWithRetryForDuration(fields, includeDuration);
     };
 
     // 1) Use cached schema if available
