@@ -975,19 +975,16 @@ function normalizeRightbar() {
   rb.innerHTML = `
     <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : ""} title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
+      <span class="rbLabel">Impostazioni Agenda</span>
     </button>
     <button class="rbBtn" data-open-availability title="Impostazioni Disponibilità">
       <span class="rbIcon">🕒</span>
+      <span class="rbLabel">Impostazioni Disponibilità</span>
     </button>
     <button class="rbBtn" data-open-appointments title="Impostazioni Appuntamenti">
       <span class="rbIcon">✅</span>
+      <span class="rbLabel">Impostazioni Appuntamenti</span>
     </button>
-    <div class="fp-rmenu">
-      <div class="section">Impostazioni</div>
-      <a href="#" ${isAgenda ? 'data-open-prefs' : 'aria-disabled="true"'}><span class="i">⚙️</span><span>Impostazioni Agenda</span></a>
-      <a href="#" data-open-availability><span class="i">🕒</span><span>Impostazioni Disponibilità</span></a>
-      <a href="#" data-open-appointments><span class="i">✅</span><span>Impostazioni Appuntamenti</span></a>
-    </div>
   `;
 }
 
