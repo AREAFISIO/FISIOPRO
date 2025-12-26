@@ -1,5 +1,5 @@
-import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
-import { escAirtableString, memGet, memSet } from "./_common.js";
+import { airtableFetch, ensureRes, requireSession } from "./_auth.js";
+import { memGet, memSet } from "./_common.js";
 
 function enc(x) {
   return encodeURIComponent(String(x));
@@ -116,109 +116,6 @@ async function resolveCollaboratorByEmail(emailRaw) {
   return out;
 }
 
-async function physioCanAccessPatient({ patientId, email }) {
-  // Must have at least one appointment linked to that patient AND assigned to that physio.
-  // Preferred assignment is via linked-record operator field (Collaboratore/Operatore).
-  // Some bases store assignment via a plain Email field instead. We support both,
-  // resolving field names dynamically to avoid "Unknown field name" failures.
-
-  const pid = escAirtableString(patientId);
-  const emailNorm = String(email || "").trim().toLowerCase();
-  const em = escAirtableString(emailNorm);
-  if (!pid || !em) return false;
-
-  const APPTS_TABLE = process.env.AGENDA_TABLE || "APPUNTAMENTI";
-  const apptsEnc = enc(APPTS_TABLE);
-
-  const patientCandidates = [
-    process.env.AGENDA_PATIENT_FIELD,
-    "Paziente",
-    "Pazienti",
-    "Patient",
-    "Patients",
-  ].filter(Boolean);
-
-  const operatorCandidates = [
-    process.env.AGENDA_OPERATOR_FIELD,
-    "Collaboratore",
-    "Collaboratori",
-    "Collaborator",
-    "Operatore",
-    "Operator",
-    "Fisioterapista",
-  ].filter(Boolean);
-
-  const emailCandidates = [
-    process.env.AGENDA_EMAIL_FIELD,
-    "Email",
-    "E-mail",
-    "E mail",
-    "email",
-  ].filter(Boolean);
-
-  const schemaKey = `patientRBAC:schema:${APPTS_TABLE}:${patientCandidates.join("|")}:${operatorCandidates.join("|")}:${emailCandidates.join("|")}`;
-  const cachedSchema = memGet(schemaKey) || null;
-
-  let FIELD_PATIENT = cachedSchema?.FIELD_PATIENT || "";
-  let FIELD_OPERATOR = cachedSchema?.FIELD_OPERATOR || "";
-  let FIELD_EMAIL = cachedSchema?.FIELD_EMAIL || "";
-
-  if (!FIELD_PATIENT || (!FIELD_OPERATOR && !FIELD_EMAIL)) {
-    FIELD_PATIENT = FIELD_PATIENT || (await resolveFieldNameByProbe(apptsEnc, patientCandidates));
-    FIELD_OPERATOR = FIELD_OPERATOR || (await resolveFieldNameByProbe(apptsEnc, operatorCandidates));
-    FIELD_EMAIL = FIELD_EMAIL || (await resolveFieldNameByProbe(apptsEnc, emailCandidates));
-  }
-
-  if (!FIELD_PATIENT || (!FIELD_OPERATOR && !FIELD_EMAIL)) {
-    const discoveredKey = `patientRBAC:fields:${APPTS_TABLE}`;
-    let discovered = memGet(discoveredKey) || [];
-    if (!discovered.length) {
-      discovered = await discoverFieldNames(apptsEnc);
-      memSet(discoveredKey, discovered, 10 * 60_000);
-    }
-    if (!FIELD_PATIENT) {
-      FIELD_PATIENT =
-        resolveFieldNameHeuristic(discovered, ["paziente", "pazienti", "patient", "patients"]) || "";
-    }
-    if (!FIELD_OPERATOR) {
-      FIELD_OPERATOR =
-        resolveFieldNameHeuristic(discovered, ["collaboratore", "collaboratori", "operatore", "operator", "fisioterapista"]) ||
-        "";
-    }
-    if (!FIELD_EMAIL) FIELD_EMAIL = resolveFieldNameHeuristic(discovered, ["email", "e-mail"]) || "";
-  }
-
-  // Cache schema resolution for warm instances
-  memSet(schemaKey, { FIELD_PATIENT, FIELD_OPERATOR, FIELD_EMAIL }, 60 * 60_000);
-
-  if (!FIELD_PATIENT) return false;
-
-  // Robust: support both linked-record arrays and plain text fields.
-  const patientExpr = `IFERROR(ARRAYJOIN({${FIELD_PATIENT}}), {${FIELD_PATIENT}} & "")`;
-  const baseFilter = `FIND("${pid}", ${patientExpr})`;
-
-  // Prefer linked-record RBAC if we can resolve collaborator record id
-  const collab = await resolveCollaboratorByEmail(emailNorm);
-  const roleFilters = [];
-
-  if (FIELD_OPERATOR) {
-    const operatorExpr = `IFERROR(ARRAYJOIN({${FIELD_OPERATOR}}), {${FIELD_OPERATOR}} & "")`;
-    if (collab?.id) roleFilters.push(`FIND("${escAirtableString(collab.id)}", ${operatorExpr})`);
-    if (collab?.name) roleFilters.push(`FIND("${escAirtableString(collab.name)}", ${operatorExpr})`);
-  }
-  if (FIELD_EMAIL) {
-    const emailExpr = `LOWER(IFERROR(ARRAYJOIN({${FIELD_EMAIL}}), {${FIELD_EMAIL}} & ""))`;
-    roleFilters.push(`${emailExpr} = LOWER("${em}")`);
-  }
-
-  const roleFilter = roleFilters.length ? `OR(${roleFilters.join(",")})` : "FALSE()";
-
-  const formula = `AND(${baseFilter}, ${roleFilter})`;
-  const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
-  const data = await airtableFetch(`${apptsEnc}?${qs.toString()}`);
-  return Boolean(data?.records?.length);
-}
-
 export default async function handler(req, res) {
   ensureRes(res);
   try {
@@ -232,18 +129,27 @@ export default async function handler(req, res) {
     // So we do not gate access on appointment history.
     // (Authentication is still required above.)
 
-    const table = enc("ANAGRAFICA");
-    const record = await airtableFetch(`${table}/${enc(patientId)}`);
+    const TABLE_PATIENTS = process.env.AIRTABLE_PATIENTS_TABLE || "ANAGRAFICA";
+    const table = enc(TABLE_PATIENTS);
 
+    const record = await airtableFetch(`${table}/${enc(patientId)}`);
     const f = record.fields || {};
+
+    const FIELD_FIRSTNAME = process.env.AIRTABLE_PATIENTS_FIRSTNAME_FIELD || "Nome";
+    const FIELD_LASTNAME = process.env.AIRTABLE_PATIENTS_LASTNAME_FIELD || "Cognome";
+    const FIELD_PHONE = process.env.AIRTABLE_PATIENTS_PHONE_FIELD || "Telefono";
+    const FIELD_EMAIL = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD || "Email";
+    const FIELD_DOB = process.env.AIRTABLE_PATIENTS_DOB_FIELD || "Data di nascita";
+    const FIELD_NOTES = process.env.AIRTABLE_PATIENTS_NOTES_FIELD || "Note";
+
     return res.status(200).json({
       id: record.id,
-      Nome: f["Nome"] || "",
-      Cognome: f["Cognome"] || "",
-      Telefono: f["Telefono"] || "",
-      Email: f["Email"] || "",
-      "Data di nascita": f["Data di nascita"] || "",
-      Note: f["Note"] || "",
+      Nome: f[FIELD_FIRSTNAME] || f["Nome"] || "",
+      Cognome: f[FIELD_LASTNAME] || f["Cognome"] || "",
+      Telefono: f[FIELD_PHONE] || f["Telefono"] || "",
+      Email: f[FIELD_EMAIL] || f["Email"] || "",
+      "Data di nascita": f[FIELD_DOB] || f["Data di nascita"] || "",
+      Note: f[FIELD_NOTES] || f["Note"] || "",
     });
   } catch (e) {
     const status = e.status || 500;
