@@ -33,6 +33,8 @@ export function normalizeRole(roleRaw) {
   const r = String(roleRaw || "").trim().toLowerCase();
   if (r === "fisioterapista" || r === "physio") return "physio";
   if (r === "front office" || r === "front-office" || r === "front") return "front";
+  // "CEO" is treated as manager-level access in the app.
+  if (r === "ceo") return "manager";
   if (r === "manager" || r === "admin" || r === "amministratore") return "manager";
   return "";
 }
