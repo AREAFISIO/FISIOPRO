@@ -1,5 +1,5 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
-import { memGet, memSet } from "./_common.js";
+import { memGet, memGetOrSet, memSet, setPrivateCache } from "./_common.js";
 
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -99,6 +99,8 @@ export default async function handler(req, res) {
     if (!session) return res.status(401).json({ ok: false, error: "unauthorized" });
 
     if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
+    // Browser-side cache for rapid back/forward / refresh.
+    setPrivateCache(res, 30);
 
     const from = String(req.query?.from || "").trim();
     const to = String(req.query?.to || "").trim();
@@ -231,14 +233,16 @@ export default async function handler(req, res) {
       }
     }
 
-    const qs = new URLSearchParams({
-      filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
-      pageSize: "100",
-      "sort[0][field]": FIELD_START,
-      "sort[0][direction]": "asc",
+    const listCacheKey = `agenda:list:${APPTS_TABLE_NAME}:${FIELD_START}:${FIELD_OPERATOR}:${role}:${email}:${from}:${to}`;
+    const data = await memGetOrSet(listCacheKey, 15_000, async () => {
+      const qs = new URLSearchParams({
+        filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
+        pageSize: "100",
+        "sort[0][field]": FIELD_START,
+        "sort[0][direction]": "asc",
+      });
+      return await airtableFetch(`${tableEnc}?${qs.toString()}`);
     });
-
-    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
 
     // If Collaboratore/Operatore is a linked-record field, Airtable returns record IDs.
     // Resolve to names via COLLABORATORI table so the UI can show proper operator names.
