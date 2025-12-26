@@ -882,14 +882,10 @@
           <div data-f-patient-results style="margin-top:8px; display:none; border:1px solid rgba(255,255,255,.10); border-radius:12px; overflow:hidden;"></div>
         </label>
 
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Sede</span>
-          <select class="select" data-f-location><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
           <span class="fpFormLabel">Prestazione</span>
-          <select class="select" data-f-service><option value="">Carico…</option></select>
+          <input class="input" data-f-service-q placeholder="Cerca prestazione..." />
+          <select class="select" data-f-service style="margin-top:8px;"><option value="">Carico…</option></select>
         </label>
 
         <label class="field" style="gap:6px; grid-column:1 / -1;">
@@ -911,7 +907,7 @@
 
     const elType = modalBody.querySelector("[data-f-type]");
     const elDur = modalBody.querySelector("[data-f-duration]");
-    const elLoc = modalBody.querySelector("[data-f-location]");
+    const elServQ = modalBody.querySelector("[data-f-service-q]");
     const elServ = modalBody.querySelector("[data-f-service]");
     const elOp = modalBody.querySelector("[data-f-operator]");
     const elInternal = modalBody.querySelector("[data-f-internal]");
@@ -929,7 +925,7 @@
     const defaultOpId = therapistName ? (operatorNameToId.get(therapistName) || "") : "";
     if (defaultOpId) elOp.value = defaultOpId;
 
-    // locations + services
+    // services (with searchable select)
     const renderSelectError = (selEl, label, err) => {
       if (!selEl) return;
       const msg = String(err?.message || err || "Errore caricamento");
@@ -956,7 +952,7 @@
         const btn = hint.querySelector("[data-fp-debugbtn]");
         btn.onclick = async () => {
           try {
-            const dbgUrl = label === "SEDI" ? "/api/locations?debug=1" : "/api/services?debug=1";
+            const dbgUrl = "/api/services?debug=1";
             const dbg = await apiGet(dbgUrl);
             alert(JSON.stringify(dbg?.debug || dbg, null, 2));
           } catch (e) {
@@ -966,24 +962,33 @@
       }
     };
 
-    loadLocations()
-      .then((arr) => {
-        elLoc.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-        if (!arr.length) {
-          // If empty, offer debug info quickly.
-          renderSelectError(elLoc, "SEDI", "Nessuna sede trovata (tabella vuota o campo nome senza valori). Premi Debug.");
-        }
-      })
-      .catch((e) => renderSelectError(elLoc, "SEDI", e));
+    let allServices = [];
+    function renderServicesFiltered() {
+      const q = String(elServQ?.value || "").trim().toLowerCase();
+      const selected = String(elServ?.value || "");
+      const filtered = q
+        ? allServices.filter((x) => String(x.name || "").toLowerCase().includes(q))
+        : allServices;
+
+      elServ.innerHTML =
+        `<option value="">—</option>` +
+        filtered.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+
+      // try to keep selection
+      if (selected && filtered.some((x) => x.id === selected)) elServ.value = selected;
+    }
 
     loadServices()
       .then((arr) => {
-        elServ.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-        if (!arr.length) {
+        allServices = Array.isArray(arr) ? arr : [];
+        renderServicesFiltered();
+        if (!allServices.length) {
           renderSelectError(elServ, "PRESTAZIONI", "Nessuna prestazione trovata (tabella vuota o campo nome senza valori). Premi Debug.");
         }
       })
       .catch((e) => renderSelectError(elServ, "PRESTAZIONI", e));
+
+    elServQ?.addEventListener("input", () => renderServicesFiltered());
 
     // patient search
     let patientPicked = { id: "", label: "" };
@@ -1052,7 +1057,6 @@
           endAt: toLocalDateTimeISO(endAt),
           therapistId: String(elOp.value || ""),
           patientId: patientPicked.id || "",
-          locationId: String(elLoc.value || ""),
           serviceId: String(elServ.value || ""),
           type: String(elType.value || ""),
           durationMin: durMin,
