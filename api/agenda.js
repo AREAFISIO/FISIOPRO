@@ -179,16 +179,23 @@ export default async function handler(req, res) {
     // 2) if still missing, discover field names by sampling records and use heuristics
     const startCandidates = [
       process.env.AGENDA_START_FIELD,
+      // Common Italian variants (Airtable field names are case-sensitive)
+      "Data e Ora",
       "Data e ora INIZIO",
+      "Data e Ora INIZIO",
       "Data e ora Inizio",
+      "Data e Ora Inizio",
       "Data INIZIO",
       "Inizio",
       "Start",
       "Start at",
       "Inizio appuntamento",
       "DataOra Inizio",
+      "DataOra INIZIO",
       "Data e ora INIZIO (manuale)",
+      "Data e Ora INIZIO (manuale)",
       "Data e ora Inizio (manuale)",
+      "Data e Ora Inizio (manuale)",
     ].filter(Boolean);
 
     const operatorCandidates = [
