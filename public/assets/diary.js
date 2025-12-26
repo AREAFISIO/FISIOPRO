@@ -812,6 +812,18 @@
     const startAt = ctx?.startAt instanceof Date ? ctx.startAt : new Date();
     const therapistName = String(ctx?.therapistName || "").trim();
 
+    // Header strings (requested: day full, uppercase; date/time larger)
+    let dayUpper = "";
+    let dateStr = "";
+    let timeStr = "";
+    try {
+      dayUpper = String(startAt.toLocaleDateString("it-IT", { weekday: "long" }) || "").toUpperCase();
+      dateStr = String(startAt.toLocaleDateString("it-IT", { year: "numeric", month: "2-digit", day: "2-digit" }) || "");
+      timeStr = String(startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) || "");
+    } catch {
+      // fallback: keep empty strings
+    }
+
     // calcola durata max fino al prossimo appuntamento (stesso giorno e stesso operatore)
     const startMin = minutesOfDay(startAt);
     const endDayMin = END_HOUR * 60;
@@ -833,7 +845,19 @@
 
     modalTitle.textContent = "Nuovo appuntamento";
     modalBody.innerHTML = `
-      <div class="fp-kv"><div class="k">Inizio</div><div class="v">${startAt.toLocaleString("it-IT", { weekday:"short", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })}</div></div>
+      <div style="padding: 8px 0 14px; border-bottom: 1px dashed rgba(255,255,255,.12);">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:14px;">
+          <div style="font-weight: 1000; font-size: 22px; letter-spacing: .04em; text-transform: uppercase;">
+            ${dayUpper || "—"}
+          </div>
+          <div style="font-weight: 1000; font-size: 26px;">
+            ${timeStr || "—"}
+          </div>
+        </div>
+        <div style="margin-top:6px; opacity:.80; font-weight: 900; font-size: 16px;">
+          ${dateStr || "—"}
+        </div>
+      </div>
       <div style="height:10px;"></div>
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
@@ -945,7 +969,8 @@
     }
     async function doSearch() {
       const q = String(qInput.value || "").trim();
-      if (q.length < 2) return hideResults();
+      // Requested: start searching as soon as user types (1+ characters).
+      if (q.length < 1) return hideResults();
       const results = await searchPatients(q);
       if (!results.length) return hideResults();
       resultsEl.innerHTML = results.slice(0, 10).map((r) => `

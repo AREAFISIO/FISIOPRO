@@ -131,7 +131,9 @@ export default async function handler(req, res) {
     ].filter(Boolean);
     const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Collaboratore";
     const FIELD_PATIENT = process.env.AGENDA_PATIENT_FIELD || "Paziente";
-    const FIELD_SERVICE = process.env.AGENDA_SERVICE_FIELD || "Prestazione";
+    // Requested mapping: in "APPUNTAMENTI" the linked field is usually "Servizio" (to PRESTAZIONI).
+    // Keep it overrideable via env, but default to the correct one.
+    const FIELD_SERVICE = process.env.AGENDA_SERVICE_FIELD || "Servizio";
     const FIELD_LOCATION = process.env.AGENDA_LOCATION_FIELD || "Sede";
     const FIELD_TYPE = process.env.AGENDA_TYPE_FIELD || "Tipologia";
     const FIELD_DURATION = process.env.AGENDA_DURATION_FIELD || "Durata";
