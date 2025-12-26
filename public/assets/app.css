@@ -173,28 +173,31 @@ body:not(.fp-right-expanded) .rightbar.fp-rbar{
 body.fp-right-expanded .rightbar.fp-rbar{
   padding: 14px 12px;
   overflow:auto;
-}
-.fp-rmenu{ width:100%; display:none; margin-top: 12px; }
-body.fp-right-expanded .fp-rmenu{ display:block; }
-.fp-rmenu .section{
-  margin: 6px 8px 8px;
-  font-size:12px;
-  color: var(--muted);
-  letter-spacing:.12em;
-  text-transform:uppercase;
-}
-.fp-rmenu a{
   display:flex;
-  align-items:center;
+  flex-direction:column;
   gap:10px;
-  padding:10px 12px;
-  border-radius:12px;
-  color: rgba(255,255,255,.78);
-  border: 1px solid transparent;
+  align-items:stretch;
 }
-.fp-rmenu a:hover{ background: rgba(255,255,255,.05); border-color: var(--border); }
-.fp-rmenu a .i{ width: 22px; text-align:center; opacity:.85; }
-.fp-rmenu a.active{ background: rgba(34,230,195,.10); border-color: rgba(34,230,195,.28); color: var(--text); }
+
+/* Rightbar buttons: icon-only vs icon+label */
+body.fp-right-expanded .rightbar.fp-rbar .rbBtn{
+  width: 100%;
+  height: auto;
+  min-height: 48px;
+  display:flex;
+  justify-content:flex-start;
+  gap: 12px;
+  padding: 12px 12px;
+}
+.rbLabel{
+  display:none;
+  font-weight: 900;
+  color: rgba(255,255,255,.86);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+body.fp-right-expanded .rbLabel{ display:block; }
 .rbBtn{
   width: 44px; height: 44px;
   border-radius: 14px;
