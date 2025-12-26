@@ -519,23 +519,15 @@
 
   async function loadLocations() {
     if (Array.isArray(locationsCache)) return locationsCache;
-    try {
-      const data = await apiGet("/api/locations");
-      locationsCache = data.items || [];
-    } catch {
-      locationsCache = [];
-    }
+    const data = await apiGet("/api/locations");
+    locationsCache = data.items || [];
     return locationsCache;
   }
 
   async function loadServices() {
     if (Array.isArray(servicesCache)) return servicesCache;
-    try {
-      const data = await apiGet("/api/services");
-      servicesCache = data.items || [];
-    } catch {
-      servicesCache = [];
-    }
+    const data = await apiGet("/api/services");
+    servicesCache = data.items || [];
     return servicesCache;
   }
 
@@ -938,12 +930,60 @@
     if (defaultOpId) elOp.value = defaultOpId;
 
     // locations + services
-    loadLocations().then((arr) => {
-      elLoc.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-    });
-    loadServices().then((arr) => {
-      elServ.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-    });
+    const renderSelectError = (selEl, label, err) => {
+      if (!selEl) return;
+      const msg = String(err?.message || err || "Errore caricamento");
+      selEl.innerHTML = `<option value="">${label}: ERRORE</option>`;
+      // Also show details in console to avoid silent failures.
+      console.error(label + " load error:", err);
+      // Add a small helper row below the select (best-effort).
+      const wrap = selEl.closest("label.field");
+      if (wrap) {
+        let hint = wrap.querySelector("[data-fp-loaderr]");
+        if (!hint) {
+          hint = document.createElement("div");
+          hint.setAttribute("data-fp-loaderr", "1");
+          hint.style.marginTop = "6px";
+          hint.style.fontSize = "12px";
+          hint.style.opacity = ".85";
+          hint.style.display = "flex";
+          hint.style.alignItems = "center";
+          hint.style.gap = "10px";
+          wrap.appendChild(hint);
+        }
+        hint.innerHTML = `<span style="color: rgba(255,214,222,.95); font-weight:900;">${msg}</span>
+          <button class="btn" type="button" data-fp-debugbtn style="padding:7px 10px; font-size:12px;">Debug</button>`;
+        const btn = hint.querySelector("[data-fp-debugbtn]");
+        btn.onclick = async () => {
+          try {
+            const dbgUrl = label === "SEDI" ? "/api/locations?debug=1" : "/api/services?debug=1";
+            const dbg = await apiGet(dbgUrl);
+            alert(JSON.stringify(dbg?.debug || dbg, null, 2));
+          } catch (e) {
+            alert(String(e?.message || e || "debug_failed"));
+          }
+        };
+      }
+    };
+
+    loadLocations()
+      .then((arr) => {
+        elLoc.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+        if (!arr.length) {
+          // If empty, offer debug info quickly.
+          renderSelectError(elLoc, "SEDI", "Nessuna sede trovata (tabella vuota o campo nome senza valori). Premi Debug.");
+        }
+      })
+      .catch((e) => renderSelectError(elLoc, "SEDI", e));
+
+    loadServices()
+      .then((arr) => {
+        elServ.innerHTML = `<option value="">—</option>` + arr.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+        if (!arr.length) {
+          renderSelectError(elServ, "PRESTAZIONI", "Nessuna prestazione trovata (tabella vuota o campo nome senza valori). Premi Debug.");
+        }
+      })
+      .catch((e) => renderSelectError(elServ, "PRESTAZIONI", e));
 
     // patient search
     let patientPicked = { id: "", label: "" };
