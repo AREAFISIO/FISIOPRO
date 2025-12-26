@@ -45,6 +45,10 @@
   const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
   const SLOT_PX = 18;
+  // Small visual breathing room above/below the time range.
+  // This affects the grid row height and all y-coordinate calculations.
+  const GRID_PAD_TOP = 10;
+  const GRID_PAD_BOTTOM = 12;
 
   let view = "7days"; // 7days | 5days | day
   let anchorDate = new Date();
@@ -608,7 +612,8 @@
     // Body columns
     const totalMin = (END_HOUR - START_HOUR) * 60;
     const totalSlots = Math.ceil(totalMin / SLOT_MIN);
-    const heightPx = totalSlots * SLOT_PX;
+    const bodyHeightPx = totalSlots * SLOT_PX;
+    const heightPx = bodyHeightPx + GRID_PAD_TOP + GRID_PAD_BOTTOM;
 
     const colsPerDay = multiUser ? Math.max(1, ops.length) : 1;
     const totalDayCols = days * colsPerDay;
@@ -703,7 +708,7 @@
     timeCol.style.background = "rgba(15,26,44,.96)";
 
     for (let h = START_HOUR; h <= END_HOUR; h++) {
-      const y = ((h - START_HOUR) * 60 / SLOT_MIN) * SLOT_PX;
+      const y = GRID_PAD_TOP + (((h - START_HOUR) * 60 / SLOT_MIN) * SLOT_PX);
       const tick = document.createElement("div");
       tick.className = "timeTick";
       tick.style.top = y + "px";
@@ -728,7 +733,7 @@
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
           const m = s * SLOT_MIN;
-          const y = s * SLOT_PX;
+          const y = GRID_PAD_TOP + (s * SLOT_PX);
           const line = document.createElement("div");
           line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
           line.style.top = y + "px";
@@ -743,9 +748,9 @@
 
         const updateHover = (clientY) => {
           const r = col.getBoundingClientRect();
-          const y = clientY - r.top;
+          const y = (clientY - r.top) - GRID_PAD_TOP;
           const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
-          hover.style.top = (idx * SLOT_PX) + "px";
+          hover.style.top = (GRID_PAD_TOP + (idx * SLOT_PX)) + "px";
           hover.style.display = "";
           col.dataset._slotIndex = String(idx);
         };
@@ -1212,7 +1217,7 @@
         const endMin0 = minutesOfDay(it.endAt);
         if (endMin0 > stMin) durMin = endMin0 - stMin;
       }
-      const top = ((Math.max(startMin, stMin) - startMin) / SLOT_MIN) * SLOT_PX;
+      const top = GRID_PAD_TOP + (((Math.max(startMin, stMin) - startMin) / SLOT_MIN) * SLOT_PX);
       const end = Math.min(endMin, stMin + durMin);
       const height = Math.max(SLOT_PX * 2, ((end - Math.max(startMin, stMin)) / SLOT_MIN) * SLOT_PX);
 
