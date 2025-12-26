@@ -57,8 +57,42 @@ async function resolveFieldNameByProbe(tableEnc, candidates) {
   return "";
 }
 
-async function discoverFieldNames(tableEnc) {
-  // Pull some records and union field keys (works without Meta API).
+async function discoverFieldNamesViaMeta(tableName) {
+  // Prefer Airtable Meta API (lists all fields, even if empty in records).
+  // If the token doesn't have meta access, we silently fall back to record sampling.
+  const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return [];
+
+  const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    const text = await res.text();
+    let json = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      json = { raw: text };
+    }
+    if (!res.ok) return [];
+
+    const wanted = String(tableName || "").trim();
+    const tables = json.tables || [];
+    const t =
+      tables.find((x) => String(x?.name || "") === wanted) ||
+      tables.find((x) => String(x?.name || "").toLowerCase() === wanted.toLowerCase()) ||
+      null;
+    const fields = t?.fields || [];
+    return fields.map((f) => String(f?.name || "")).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+async function discoverFieldNames({ tableEnc, tableName }) {
+  const viaMeta = await discoverFieldNamesViaMeta(tableName);
+  if (viaMeta.length) return { fields: viaMeta, source: "meta" };
+
+  // Fallback: pull some records and union field keys (works without Meta API).
   // Note: Airtable omits null/empty fields on each record, so we sample multiple records.
   const found = new Set();
   let offset = null;
@@ -75,7 +109,7 @@ async function discoverFieldNames(tableEnc) {
     offset = data.offset || null;
     if (!offset) break;
   }
-  return Array.from(found);
+  return { fields: Array.from(found), source: "records" };
 }
 
 function resolveFieldNameHeuristic(fieldNames, keywords) {
@@ -126,6 +160,10 @@ export default async function handler(req, res) {
       "Inizio",
       "Start",
       "Start at",
+      "Inizio appuntamento",
+      "DataOra Inizio",
+      "Data e ora INIZIO (manuale)",
+      "Data e ora Inizio (manuale)",
     ].filter(Boolean);
 
     const operatorCandidates = [
@@ -149,13 +187,18 @@ export default async function handler(req, res) {
     }
 
     let discovered = [];
+    let discoveredSource = "";
     if (!FIELD_START || !FIELD_OPERATOR) {
       const discoveredCacheKey = `agenda:fields:${APPTS_TABLE_NAME}`;
-      discovered = memGet(discoveredCacheKey) || [];
+      const cached = memGet(discoveredCacheKey) || null;
+      discovered = cached?.fields || [];
+      discoveredSource = cached?.source || "";
       if (!discovered.length) {
-        discovered = await discoverFieldNames(tableEnc);
+        const fresh = await discoverFieldNames({ tableEnc, tableName: APPTS_TABLE_NAME });
+        discovered = fresh.fields || [];
+        discoveredSource = fresh.source || "";
         // cache discovered fields briefly
-        memSet(discoveredCacheKey, discovered, 10 * 60_000);
+        memSet(discoveredCacheKey, { fields: discovered, source: discoveredSource }, 10 * 60_000);
       }
       if (!FIELD_START) {
         FIELD_START =
@@ -180,6 +223,7 @@ export default async function handler(req, res) {
             start: startCandidates,
             operator: operatorCandidates,
           },
+          discoveredSource,
           discoveredFields: discovered,
         },
       });
