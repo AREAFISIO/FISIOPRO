@@ -95,21 +95,46 @@ async function discoverFieldNames({ tableEnc, tableName }) {
   // Fallback: pull some records and union field keys (works without Meta API).
   // Note: Airtable omits null/empty fields on each record, so we sample multiple records.
   const found = new Set();
+  const seenDateTimeCounts = new Map(); // fieldName -> count of ISO-like datetime values
+  const seenLinkedRecCounts = new Map(); // fieldName -> count of arrays containing rec*
   let offset = null;
   let pages = 0;
-  while (pages < 3) { // up to ~300 records worst-case, but typically far less
+  while (pages < 10) { // up to ~1000 records; only used when schema is unknown
     pages += 1;
     const qs = new URLSearchParams({ pageSize: "100" });
     if (offset) qs.set("offset", offset);
     const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
     for (const r of data.records || []) {
       const f = r.fields || {};
-      for (const k of Object.keys(f)) found.add(k);
+      for (const [k, v] of Object.entries(f)) {
+        found.add(k);
+        if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+          seenDateTimeCounts.set(k, (seenDateTimeCounts.get(k) || 0) + 1);
+        }
+        if (Array.isArray(v) && v.some((x) => typeof x === "string" && x.startsWith("rec"))) {
+          seenLinkedRecCounts.set(k, (seenLinkedRecCounts.get(k) || 0) + 1);
+        }
+      }
     }
     offset = data.offset || null;
+    // Early stop if we already observed enough datetime values (good chance we found the start field)
+    const totalDt = Array.from(seenDateTimeCounts.values()).reduce((a, b) => a + b, 0);
+    if (totalDt >= 25) break;
     if (!offset) break;
   }
-  return { fields: Array.from(found), source: "records" };
+  const pickTop = (m, limit = 5) =>
+    Array.from(m.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([name]) => name);
+  return {
+    fields: Array.from(found),
+    source: "records",
+    observed: {
+      dateTimeFields: pickTop(seenDateTimeCounts, 8),
+      linkedRecordFields: pickTop(seenLinkedRecCounts, 8),
+    },
+  };
 }
 
 function resolveFieldNameHeuristic(fieldNames, keywords) {
@@ -194,17 +219,24 @@ export default async function handler(req, res) {
 
     let discovered = [];
     let discoveredSource = "";
+    let discoveredObserved = {};
     if (!FIELD_START || !FIELD_OPERATOR) {
       const discoveredCacheKey = `agenda:fields:${APPTS_TABLE_NAME}`;
       const cached = memGet(discoveredCacheKey) || null;
       discovered = cached?.fields || [];
       discoveredSource = cached?.source || "";
+      discoveredObserved = cached?.observed || {};
       if (!discovered.length) {
         const fresh = await discoverFieldNames({ tableEnc, tableName: APPTS_TABLE_NAME });
         discovered = fresh.fields || [];
         discoveredSource = fresh.source || "";
+        discoveredObserved = fresh.observed || {};
         // cache discovered fields briefly
-        memSet(discoveredCacheKey, { fields: discovered, source: discoveredSource }, 10 * 60_000);
+        memSet(
+          discoveredCacheKey,
+          { fields: discovered, source: discoveredSource, observed: discoveredObserved },
+          10 * 60_000
+        );
       }
       if (!FIELD_START) {
         FIELD_START =
@@ -218,7 +250,22 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!FIELD_START || !FIELD_OPERATOR) {
+    // If start wasn't found by name, try by observed ISO datetime values (record sampling).
+    if (!FIELD_START) {
+      const dtFields = discoveredObserved?.dateTimeFields || [];
+      if (dtFields.length) FIELD_START = String(dtFields[0] || "").trim();
+    }
+
+    // If operator wasn't found by name, try by observed linked-record arrays.
+    if (!FIELD_OPERATOR) {
+      const linkFields = discoveredObserved?.linkedRecordFields || [];
+      if (linkFields.length) FIELD_OPERATOR = String(linkFields[0] || "").trim();
+    }
+
+    const role = normalizeRole(session.role);
+    // We *must* have a datetime field to filter by date range.
+    // Operator field is required only for physio RBAC; for other roles we can still show agenda without operator mapping.
+    if (!FIELD_START || (role === "physio" && !FIELD_OPERATOR)) {
       return res.status(500).json({
         ok: false,
         error: "agenda_schema_mismatch",
@@ -231,6 +278,7 @@ export default async function handler(req, res) {
             operator: operatorCandidates,
           },
           discoveredSource,
+          discoveredObserved,
           discoveredFields: discovered,
         },
       });
@@ -255,7 +303,6 @@ export default async function handler(req, res) {
       IS_BEFORE({${FIELD_START}}, "${endExclusiveISO}")
     )`;
 
-    const role = normalizeRole(session.role);
     const email = String(session.email || "").toLowerCase();
 
     // RBAC filter for physio:
