@@ -997,6 +997,7 @@
     const resultsEl = modalBody.querySelector("[data-f-patient-results]");
     const clearBtn = modalBody.querySelector("[data-f-patient-clear]");
     let t = null;
+    let reqSeq = 0;
 
     function setPicked(p) {
       patientPicked = p || { id: "", label: "" };
@@ -1016,7 +1017,15 @@
       const q = String(qInput.value || "").trim();
       // Requested: start searching as soon as user types (1+ characters).
       if (q.length < 1) return hideResults();
+
+      // Immediate feedback while typing
+      const mySeq = ++reqSeq;
+      resultsEl.style.display = "";
+      resultsEl.innerHTML = `<div style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); opacity:.85;">Carico…</div>`;
+
       const results = await searchPatients(q);
+      // Ignore late responses
+      if (mySeq !== reqSeq) return;
       if (!results.length) return hideResults();
       resultsEl.innerHTML = results.slice(0, 10).map((r) => `
         <div data-pick="${r.id}" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); cursor:pointer;">
@@ -1038,7 +1047,8 @@
 
     qInput.addEventListener("input", () => {
       clearTimeout(t);
-      t = setTimeout(() => doSearch().catch(()=>{}), 250);
+      // Snappier live search
+      t = setTimeout(() => doSearch().catch(()=>{}), 90);
     });
     qInput.addEventListener("focus", () => doSearch().catch(()=>{}));
     clearBtn.addEventListener("click", () => { qInput.value = ""; setPicked({ id:"", label:"" }); hideResults(); });
