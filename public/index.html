@@ -60,14 +60,6 @@
           <input id="codice" type="password" placeholder="••••••••" required />
         </div>
 
-        <div class="fp-field">
-          <label for="profile">Profilo</label>
-          <select id="profile" style="font-size:18px; padding: 14px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.18); color: rgba(255,255,255,0.92);">
-            <option value="physio">Fisioterapista (agenda personale)</option>
-            <option value="ceo">CEO / Direzione (visione completa)</option>
-          </select>
-        </div>
-
         <div id="errBox" class="fp-err">Credenziali non valide o utente non attivo.</div>
 
         <button id="loginBtn" class="fp-btn" type="submit">Accedi</button>
@@ -102,18 +94,8 @@
     const form = document.querySelector("#loginForm");
     const emailEl = document.querySelector("#email");
     const codiceEl = document.querySelector("#codice");
-    const profileEl = document.querySelector("#profile");
     const errBox = document.querySelector("#errBox");
     const btn = document.querySelector("#loginBtn");
-
-    // Remember last profile choice (per user)
-    try {
-      const saved = localStorage.getItem("fp_login_profile");
-      if (profileEl && saved) profileEl.value = saved;
-      profileEl?.addEventListener("change", () => {
-        try { localStorage.setItem("fp_login_profile", String(profileEl.value || "physio")); } catch {}
-      });
-    } catch {}
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -123,13 +105,12 @@
 
       const email = (emailEl.value || "").trim();
       const codice = (codiceEl.value || "").trim();
-      const asRole = String(profileEl?.value || "physio").trim();
 
       try {
         const r = await fetch("/api/auth-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, codice, asRole })
+          body: JSON.stringify({ email, codice })
         });
 
         if (!r.ok) {
