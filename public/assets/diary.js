@@ -1461,8 +1461,14 @@
       prefMulti.checked = true;
       if (prefDefaultSection) prefDefaultSection.style.display = "";
     }
-    pickMode = "defaults";
-    openOpsMenu();
+    // Apri la lista direttamente sotto (inline, scrollabile)
+    if (prefDefaultPicker) {
+      prefDefaultPicker.style.display = "block";
+      // assicurati che la lista sia aggiornata
+      renderDefaultPickerList();
+      // focus sulla ricerca per rendere evidente la selezione
+      try { prefDefaultSearch?.focus?.(); } catch {}
+    }
   });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
   prefMulti?.addEventListener("change", () => {
