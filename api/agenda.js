@@ -176,6 +176,12 @@ export default async function handler(req, res) {
       "Fisioterapista",
     ].filter(Boolean);
 
+    const envDebug = {
+      AGENDA_TABLE: String(process.env.AGENDA_TABLE || ""),
+      AGENDA_START_FIELD: String(process.env.AGENDA_START_FIELD || ""),
+      AGENDA_OPERATOR_FIELD: String(process.env.AGENDA_OPERATOR_FIELD || ""),
+    };
+
     const schemaCacheKey = `agenda:schema:${APPTS_TABLE_NAME}:${startCandidates.join("|")}:${operatorCandidates.join("|")}`;
     const cachedSchema = memGet(schemaCacheKey);
     let FIELD_START = cachedSchema?.FIELD_START || "";
@@ -218,6 +224,7 @@ export default async function handler(req, res) {
         error: "agenda_schema_mismatch",
         details: {
           table: APPTS_TABLE_NAME,
+          env: envDebug,
           resolved: { FIELD_START, FIELD_OPERATOR },
           tried: {
             start: startCandidates,
@@ -237,6 +244,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         table: APPTS_TABLE_NAME,
+        env: envDebug,
         resolved: { FIELD_START, FIELD_OPERATOR },
         note: "Field names were resolved by probing fields[] (no Airtable Meta API required).",
       });
