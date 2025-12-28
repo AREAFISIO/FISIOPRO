@@ -342,12 +342,29 @@ function buildModal() {
         </div>
 
         <div class="oe-grid">
-          <label class="oe-field"><span>Stato</span><input data-f-status /></label>
-          <label class="oe-field"><span>Prestazione</span><input data-f-service /></label>
-          <label class="oe-field"><span>Durata</span><input data-f-duration /></label>
-          <label class="oe-field"><span>Operatore</span><input data-f-ther /></label>
-          <label class="oe-field oe-field--wide"><span>Nota rapida (interna)</span><textarea data-f-internal maxlength="255"></textarea></label>
-          <label class="oe-field oe-field--wide"><span>Note</span><textarea data-f-patient maxlength="255"></textarea></label>
+          <label class="oe-field"><span>Data e ora INIZIO</span><input data-f-start disabled /></label>
+          <label class="oe-field"><span>Data e ora fine</span><input data-f-end disabled /></label>
+
+          <label class="oe-field"><span>Stato appuntamento</span><input data-f-status placeholder="Es. Non ancora eseguito" /></label>
+          <label class="oe-field"><span>Tipo appuntamento</span><input data-f-type placeholder="Es. Prima visita" /></label>
+
+          <label class="oe-field"><span>Prestazione</span><select data-f-service></select></label>
+          <label class="oe-field"><span>Collaboratore</span><select data-f-operator></select></label>
+
+          <label class="oe-field"><span>Sede</span><select data-f-location></select></label>
+          <label class="oe-field"><span>Durata (min)</span><input type="number" min="0" step="1" data-f-duration /></label>
+
+          <label class="oe-field"><span>Tipi Erogati (separati da virgola)</span><input data-f-tipi placeholder="Es. FKT, MASSO" /></label>
+          <label class="oe-field"><span>Erogato collegato</span><select data-f-erogato></select></label>
+
+          <label class="oe-field"><span>Caso clinico</span><select data-f-case></select></label>
+          <label class="oe-field"><span>Vendita collegata</span><select data-f-sale></select></label>
+
+          <label class="oe-field"><span>VALUTAZIONI</span><select multiple size="4" data-f-evals></select></label>
+          <label class="oe-field"><span>TRATTAMENTI</span><select multiple size="4" data-f-treatments></select></label>
+
+          <label class="oe-field oe-field--wide"><span>Nota rapida</span><textarea data-f-quick maxlength="255"></textarea></label>
+          <label class="oe-field oe-field--wide"><span>Note</span><textarea data-f-notes maxlength="255"></textarea></label>
         </div>
       </div>
 
@@ -361,18 +378,225 @@ function buildModal() {
   return wrap;
 }
 
-function openModal(modal, appt, onSaved) {
+function setSelectOptions(selectEl, items, { placeholder = "—", allowEmpty = true } = {}) {
+  if (!selectEl) return;
+  const prev = selectEl.value;
+  selectEl.innerHTML = "";
+  if (allowEmpty) {
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = placeholder;
+    selectEl.appendChild(opt0);
+  }
+  (items || []).forEach((it) => {
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = it.name || it.label || it.id;
+    selectEl.appendChild(opt);
+  });
+  if (prev) selectEl.value = prev;
+}
+
+function ensureSelectHasValue(selectEl, value, label = null) {
+  if (!selectEl) return;
+  const v = String(value || "");
+  if (!v) return;
+  const exists = Array.from(selectEl.options || []).some((o) => String(o.value) === v);
+  if (exists) return;
+  const opt = document.createElement("option");
+  opt.value = v;
+  opt.textContent = label || v;
+  selectEl.appendChild(opt);
+}
+
+function setMultiSelectValues(selectEl, values) {
+  const want = new Set((values || []).map((x) => String(x)));
+  Array.from(selectEl?.options || []).forEach((opt) => {
+    opt.selected = want.has(String(opt.value));
+  });
+}
+
+function getMultiSelectValues(selectEl) {
+  return Array.from(selectEl?.selectedOptions || []).map((o) => String(o.value)).filter(Boolean);
+}
+
+function parseCommaList(s) {
+  return String(s || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+async function ensureModalStaticOptions(modal) {
+  if (modal.__staticOptsLoaded) return;
+  modal.__staticOptsLoaded = true;
+
+  const serviceSel = modal.querySelector("[data-f-service]");
+  const operatorSel = modal.querySelector("[data-f-operator]");
+  const locationSel = modal.querySelector("[data-f-location]");
+  const treatmentsSel = modal.querySelector("[data-f-treatments]");
+
+  try {
+    const [ops, serv, loc, tr] = await Promise.all([
+      api("/api/operators"),
+      api("/api/services"),
+      api("/api/locations"),
+      api("/api/treatments?activeOnly=1"),
+    ]);
+    setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
+    setSelectOptions(serviceSel, serv.items || [], { placeholder: "—" });
+    setSelectOptions(locationSel, loc.items || [], { placeholder: "—" });
+
+    if (treatmentsSel) {
+      treatmentsSel.innerHTML = "";
+      (tr.items || []).forEach((it) => {
+        const opt = document.createElement("option");
+        opt.value = it.id;
+        opt.textContent = it.name || it.id;
+        treatmentsSel.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    console.warn("Modal static options not available", e);
+    setSelectOptions(operatorSel, [], { placeholder: "(non disponibile)" });
+    setSelectOptions(serviceSel, [], { placeholder: "(non disponibile)" });
+    setSelectOptions(locationSel, [], { placeholder: "(non disponibile)" });
+    if (treatmentsSel) {
+      treatmentsSel.innerHTML = "";
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(non disponibile)";
+      treatmentsSel.appendChild(opt);
+      treatmentsSel.disabled = true;
+    }
+  }
+}
+
+async function loadModalPatientOptions(modal, patientId) {
+  const caseSel = modal.querySelector("[data-f-case]");
+  const saleSel = modal.querySelector("[data-f-sale]");
+  const evalSel = modal.querySelector("[data-f-evals]");
+  const erogatoSel = modal.querySelector("[data-f-erogato]");
+
+  setSelectOptions(caseSel, [], { placeholder: "—" });
+  setSelectOptions(saleSel, [], { placeholder: "—" });
+  setSelectOptions(erogatoSel, [], { placeholder: "—" });
+  if (evalSel) evalSel.innerHTML = "";
+  if (!patientId) return;
+
+  try {
+    const [cases, sales, evals, erogato] = await Promise.all([
+      api(`/api/cases?patientId=${encodeURIComponent(patientId)}`),
+      api(`/api/sales?patientId=${encodeURIComponent(patientId)}`),
+      api(`/api/evaluations?patientId=${encodeURIComponent(patientId)}&maxRecords=50`),
+      api(`/api/erogato?patientId=${encodeURIComponent(patientId)}&maxRecords=100`),
+    ]);
+
+    setSelectOptions(
+      caseSel,
+      (cases.items || []).map((x) => ({ id: x.id, name: [x.data, x.titolo].filter(Boolean).join(" • ") || x.id })),
+      { placeholder: "—" },
+    );
+    setSelectOptions(
+      saleSel,
+      (sales.items || []).map((x) => ({ id: x.id, name: [x.data, x.voce].filter(Boolean).join(" • ") || x.id })),
+      { placeholder: "—" },
+    );
+    setSelectOptions(
+      erogatoSel,
+      (erogato.items || []).map((x) => ({ id: x.id, name: [x.data, x.prestazione].filter(Boolean).join(" • ") || x.id })),
+      { placeholder: "—" },
+    );
+
+    if (evalSel) {
+      evalSel.innerHTML = "";
+      (evals.items || []).forEach((x) => {
+        const opt = document.createElement("option");
+        opt.value = x.id;
+        opt.textContent = [x.data, x.tipo].filter(Boolean).join(" • ") || x.id;
+        evalSel.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    console.warn("Modal patient options not available", e);
+    setSelectOptions(caseSel, [], { placeholder: "(non disponibile)" });
+    setSelectOptions(saleSel, [], { placeholder: "(non disponibile)" });
+    setSelectOptions(erogatoSel, [], { placeholder: "(non disponibile)" });
+    if (evalSel) {
+      evalSel.innerHTML = "";
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "(non disponibile)";
+      evalSel.appendChild(opt);
+      evalSel.disabled = true;
+    }
+  }
+}
+
+async function openModal(modal, appt, onSaved) {
   modal.__current = appt;
 
   modal.querySelector("[data-pname]").textContent = appt.patient_name || "Paziente";
   modal.querySelector("[data-plink]").href = `/pages/paziente.html?id=${encodeURIComponent(appt.patient_id || "")}`;
 
+  await ensureModalStaticOptions(modal);
+  await loadModalPatientOptions(modal, appt.patient_id || "");
+
+  modal.querySelector("[data-f-start]").value = appt.start_at || "";
+  modal.querySelector("[data-f-end]").value = appt.end_at || "";
+
   modal.querySelector("[data-f-status]").value = appt.status || "";
-  modal.querySelector("[data-f-service]").value = appt.service_name || "";
-  modal.querySelector("[data-f-duration]").value = appt.duration_label || "";
-  modal.querySelector("[data-f-ther]").value = appt.therapist_name || "";
-  modal.querySelector("[data-f-internal]").value = appt.internal_note || "";
-  modal.querySelector("[data-f-patient]").value = appt.patient_note || "";
+  modal.querySelector("[data-f-type]").value = appt.appointment_type || "";
+
+  const servSel = modal.querySelector("[data-f-service]");
+  const opSel = modal.querySelector("[data-f-operator]");
+  const locSel = modal.querySelector("[data-f-location]");
+  ensureSelectHasValue(servSel, appt.service_id, appt.service_name || appt.service_id);
+  ensureSelectHasValue(opSel, appt.therapist_id, appt.therapist_name || appt.therapist_id);
+  ensureSelectHasValue(locSel, appt.location_id, appt.location_name || appt.location_id);
+  if (servSel) servSel.value = appt.service_id || "";
+  if (opSel) opSel.value = appt.therapist_id || "";
+  if (locSel) locSel.value = appt.location_id || "";
+
+  const durEl = modal.querySelector("[data-f-duration]");
+  if (durEl) {
+    durEl.value =
+      (appt.duration !== undefined && appt.duration !== null && String(appt.duration).trim() !== "")
+        ? appt.duration
+        : (String(appt.duration_label || "").replace(/[^\d]/g, "") || "");
+  }
+
+  modal.querySelector("[data-f-tipi]").value = Array.isArray(appt.tipi_erogati) ? appt.tipi_erogati.join(", ") : (appt.tipi_erogati || "");
+  const erSel = modal.querySelector("[data-f-erogato]");
+  const caSel = modal.querySelector("[data-f-case]");
+  const saSel = modal.querySelector("[data-f-sale]");
+  ensureSelectHasValue(erSel, appt.erogato_id, appt.erogato_id);
+  ensureSelectHasValue(caSel, appt.caso_clinico_id, appt.caso_clinico_id);
+  ensureSelectHasValue(saSel, appt.vendita_id, appt.vendita_id);
+  if (erSel) erSel.value = appt.erogato_id || "";
+  if (caSel) caSel.value = appt.caso_clinico_id || "";
+  if (saSel) saSel.value = appt.vendita_id || "";
+
+  const evalEl = modal.querySelector("[data-f-evals]");
+  const trEl = modal.querySelector("[data-f-treatments]");
+
+  // Ensure current values are visible even if options couldn't be loaded (RBAC/network).
+  if (evalEl && (evalEl.disabled || (evalEl.options?.length || 0) === 0)) {
+    (appt.valutazioni_ids || []).forEach((id) => {
+      ensureSelectHasValue(evalEl, id, id);
+    });
+  }
+  if (trEl && (trEl.disabled || (trEl.options?.length || 0) === 0)) {
+    (appt.trattamenti_ids || []).forEach((id) => {
+      ensureSelectHasValue(trEl, id, id);
+    });
+  }
+
+  setMultiSelectValues(evalEl, appt.valutazioni_ids || []);
+  setMultiSelectValues(trEl, appt.trattamenti_ids || []);
+
+  modal.querySelector("[data-f-quick]").value = appt.quick_note || appt.internal_note || "";
+  modal.querySelector("[data-f-notes]").value = appt.notes || appt.patient_note || "";
 
   const close = () => { modal.style.display = "none"; };
   modal.querySelector("[data-close]").onclick = close;
@@ -385,11 +609,19 @@ function openModal(modal, appt, onSaved) {
 
     const payload = {
       status: modal.querySelector("[data-f-status]").value,
-      service_name: modal.querySelector("[data-f-service]").value,
-      duration_label: modal.querySelector("[data-f-duration]").value,
-      therapist_name: modal.querySelector("[data-f-ther]").value,
-      internal_note: modal.querySelector("[data-f-internal]").value,
-      patient_note: modal.querySelector("[data-f-patient]").value,
+      appointment_type: modal.querySelector("[data-f-type]").value,
+      serviceId: modal.querySelector("[data-f-service]").value,
+      collaboratoreId: modal.querySelector("[data-f-operator]").value,
+      sedeId: modal.querySelector("[data-f-location]").value,
+      durata: modal.querySelector("[data-f-duration]").value,
+      tipiErogati: parseCommaList(modal.querySelector("[data-f-tipi]").value),
+      valutazioniIds: getMultiSelectValues(modal.querySelector("[data-f-evals]")),
+      trattamentiIds: getMultiSelectValues(modal.querySelector("[data-f-treatments]")),
+      erogatoId: modal.querySelector("[data-f-erogato]").value,
+      casoClinicoId: modal.querySelector("[data-f-case]").value,
+      venditaId: modal.querySelector("[data-f-sale]").value,
+      notaRapida: modal.querySelector("[data-f-quick]").value,
+      note: modal.querySelector("[data-f-notes]").value,
     };
 
     try {
@@ -403,7 +635,8 @@ function openModal(modal, appt, onSaved) {
 
       toast("Salvato");
       close();
-      if (typeof onSaved === "function") onSaved(updated);
+      const apptUpdated = updated.appointment || updated;
+      if (typeof onSaved === "function") onSaved(apptUpdated);
     } catch (err) {
       console.error(err);
       alert("Errore salvataggio su Airtable. Controlla Console/Network.");
