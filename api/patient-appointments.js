@@ -88,9 +88,10 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "agenda_schema_mismatch" });
     }
 
-    // Robust: support both linked-record arrays and plain text fields for patient link.
+    // Robust: support both linked-record and plain text fields for patient link.
+    // Airtable does NOT support IFERROR() in formulas; string-concat coerces both types safely.
     const pid = escAirtableString(patientId);
-    const patientExpr = `IFERROR(ARRAYJOIN({${FIELD_PATIENT}}), {${FIELD_PATIENT}} & "")`;
+    const patientExpr = `{${FIELD_PATIENT}} & ""`;
     const formula = `FIND("${pid}", ${patientExpr})`;
 
     const qs = new URLSearchParams({ pageSize: "100" });
