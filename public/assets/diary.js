@@ -61,6 +61,13 @@
   let operatorNameToRole = new Map(); // name -> role label
   let locationsCache = null; // [{id,name}]
   let servicesCache = null; // [{id,name}]
+  let treatmentsCache = null; // [{id,name}]
+  const patientLinksCache = {
+    evaluations: new Map(), // patientId -> items
+    cases: new Map(),
+    sales: new Map(),
+    erogato: new Map(),
+  };
   let insuranceCache = new Map(); // patientId -> string
   let patientSearchCache = new Map(); // qLower -> [{id,label,phone,email}]
   let selectedTherapists = new Set();
@@ -331,7 +338,7 @@
     // If it contains multiple names, pick the first for column placement
     if (typeof therapist === "string" && therapist.includes(",")) therapist = therapist.split(",")[0].trim();
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
-    const status = pickField(f, ["Stato", "status"]) || "";
+    const status = pickField(f, ["Stato appuntamento", "Stato", "status"]) || "";
 
     // patient can be link-array; attempt text variants, then fallback.
     const patient =
@@ -648,6 +655,53 @@
     const data = await apiGet("/api/services");
     servicesCache = data.items || [];
     return servicesCache;
+  }
+
+  async function loadTreatments() {
+    if (Array.isArray(treatmentsCache)) return treatmentsCache;
+    const data = await apiGet("/api/treatments?activeOnly=1");
+    treatmentsCache = data.items || [];
+    return treatmentsCache;
+  }
+
+  async function loadEvaluationsForPatient(patientId) {
+    const pid = String(patientId || "").trim();
+    if (!pid) return [];
+    if (patientLinksCache.evaluations.has(pid)) return patientLinksCache.evaluations.get(pid) || [];
+    const data = await apiGet(`/api/evaluations?patientId=${encodeURIComponent(pid)}&maxRecords=100`);
+    const items = data.items || [];
+    patientLinksCache.evaluations.set(pid, items);
+    return items;
+  }
+
+  async function loadCasesForPatient(patientId) {
+    const pid = String(patientId || "").trim();
+    if (!pid) return [];
+    if (patientLinksCache.cases.has(pid)) return patientLinksCache.cases.get(pid) || [];
+    const data = await apiGet(`/api/cases?patientId=${encodeURIComponent(pid)}`);
+    const items = data.items || [];
+    patientLinksCache.cases.set(pid, items);
+    return items;
+  }
+
+  async function loadSalesForPatient(patientId) {
+    const pid = String(patientId || "").trim();
+    if (!pid) return [];
+    if (patientLinksCache.sales.has(pid)) return patientLinksCache.sales.get(pid) || [];
+    const data = await apiGet(`/api/sales?patientId=${encodeURIComponent(pid)}`);
+    const items = data.items || [];
+    patientLinksCache.sales.set(pid, items);
+    return items;
+  }
+
+  async function loadErogatoForPatient(patientId) {
+    const pid = String(patientId || "").trim();
+    if (!pid) return [];
+    if (patientLinksCache.erogato.has(pid)) return patientLinksCache.erogato.get(pid) || [];
+    const data = await apiGet(`/api/erogato?patientId=${encodeURIComponent(pid)}&maxRecords=100`);
+    const items = data.items || [];
+    patientLinksCache.erogato.set(pid, items);
+    return items;
   }
 
   async function searchPatients(q) {
