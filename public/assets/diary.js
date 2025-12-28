@@ -401,9 +401,11 @@
     // Prefer mapping by email to COLLABORATORI name
     const email = getUserEmail();
     if (email && knownByEmail.has(email)) return knownByEmail.get(email);
-    // Fallback: auth payload has only "nome"
+    // Fallback: use auth payload (nome + cognome if present)
     const u = window.FP_USER || window.FP_SESSION || null;
-    return String(u?.nome || "").trim();
+    const nome = String(u?.nome || "").trim();
+    const cognome = String(u?.cognome || "").trim();
+    return [nome, cognome].filter(Boolean).join(" ").trim();
   }
 
   function normalizeRoleLabel(roleRaw) {
