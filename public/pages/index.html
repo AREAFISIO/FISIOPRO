@@ -18,7 +18,7 @@
             })();
         const role = (data?.user?.role || data?.session?.role || "").toString();
         if (role === "physio") location.replace("/agenda.html");
-        else if (role === "front") location.replace("/pages/front-office.html");
+        else if (role === "front") location.replace("/pages/dashboard.html");
         else location.replace("/pages/dashboard.html");
       } catch {
         location.replace("/");

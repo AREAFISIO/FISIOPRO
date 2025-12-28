@@ -75,8 +75,6 @@
 
     <nav class="nav">
       <div class="section">Front Office</div>
-      <a data-nav href="front-office.html" class="active" data-role="front,manager">Dashboard</a>
-      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
       <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
       <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
       <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
@@ -85,11 +83,7 @@
 
       <div class="section">Generale</div>
       <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
-      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
       <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
-
-      <div class="section">Sistema</div>
-      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
       <a data-nav href="login.html">Logout</a>
     </nav>
   </aside>
@@ -99,7 +93,6 @@
       <div class="toprow">
         <div class="h1" style="color:#0b2c3d;">Gestione Pazienti <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
-          <button class="btn" style="background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.08);color:#0b2c3d;" onclick="location.href='anagrafica.html'">Cerca</button>
           <button class="btn primary" onclick="location.href='nuovo-paziente.html'">Nuovo</button>
         </div>
       </div>
@@ -109,9 +102,6 @@
       <section class="card soft">
         <div class="head"><h2>ANAGRAFICA E MODULISTICA</h2><span class="chip" style="border-color:rgba(0,0,0,.08);background:rgba(0,0,0,.03);color:#0b2c3d;">Front Office</span></div>
         <div class="body" style="padding-top:6px; display:grid; gap:12px;">
-          <div class="tile" onclick="location.href='anagrafica.html'">
-            <div><h3>Anagrafica</h3><p>Crea e gestisci dati paziente</p></div><div class="go">→</div>
-          </div>
           <div class="tile" onclick="location.href='anamnesi.html'">
             <div><h3>Anamnesi</h3><p>Stato anamnesi e consensi</p></div><div class="go">→</div>
           </div>

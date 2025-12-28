@@ -76,19 +76,14 @@
     <nav class="nav">
       <div class="section">Generale</div>
       <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
-      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
       <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
 
       <div class="section">Front Office</div>
-      <a data-nav href="front-office.html" data-role="front,manager">Dashboard Front-Office</a>
-      <a data-nav href="anagrafica.html" data-role="front,manager">Anagrafica</a>
       <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
       <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
       <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
       <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
 
-      <div class="section">Sistema</div>
-      <a data-nav href="impostazioni.html" data-role="manager">Configurazione</a>
       <a data-nav href="login.html">Logout</a>
     </nav>
   </aside>
@@ -100,7 +95,6 @@
         <div class="actions">
           <button class="btn primary" onclick="location.href='nuovo-paziente.html'">Nuovo paziente</button>
           <button class="btn" onclick="location.href='agenda.html'">Apri Agenda</button>
-          <button class="btn primary" onclick="location.href='anagrafica.html'">Apri Pazienti</button>
         </div>
       </div>
     </div>
@@ -128,17 +122,9 @@
         <div class="head"><h2>Scorciatoie</h2><span class="chip">Operativo</span></div>
         <div class="body">
           <div class="quickGrid">
-            <div class="quick" onclick="location.href='anagrafica.html'">
-              <div class="title">Pazienti</div>
-              <div class="sub">Ricerca, schede paziente, percorsi.</div>
-            </div>
             <div class="quick" onclick="location.href='agenda.html'">
               <div class="title">Agenda</div>
               <div class="sub">Calendario settimanale e appuntamenti.</div>
-            </div>
-            <div class="quick" onclick="location.href='front-office.html'" data-role="front,manager">
-              <div class="title">Dashboard Front-Office</div>
-              <div class="sub">Flusso operativo rapido per segreteria.</div>
             </div>
           </div>
         </div>
@@ -162,7 +148,6 @@
       <div style="height:10px;"></div>
       <button class="btn primary" style="width:100%;" onclick="location.href='agenda.html'">🗓️ Agenda</button>
       <div style="height:10px;"></div>
-      <button class="btn" style="width:100%; display:none;" data-role="manager" onclick="location.href='impostazioni.html'">⚙️ Configurazione</button>
     </div>
   </aside>
 </div>
