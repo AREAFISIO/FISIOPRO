@@ -921,7 +921,9 @@
           const y = (clientY - r.top) - GRID_PAD_TOP;
           const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
           hover.style.top = (GRID_PAD_TOP + (idx * SLOT_PX)) + "px";
-          hover.style.display = "";
+          // NOTE: .slotHover has display:none in agenda.html CSS.
+          // Setting "" would keep it hidden; explicitly show it.
+          hover.style.display = "block";
           col.dataset._slotIndex = String(idx);
 
           // Tooltip slot (ora + sede + operatore)
@@ -1076,6 +1078,16 @@
           </select>
         </label>
 
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Stato appuntamento</span>
+          <input class="input" data-f-status placeholder="Es. Confermato / Non ancora eseguito" />
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Sede</span>
+          <select class="select" data-f-location><option value="">Carico…</option></select>
+        </label>
+
         <label class="field" style="gap:6px; grid-column:1 / -1;">
           <span class="fpFormLabel">Paziente</span>
           <div style="display:flex; gap:10px; align-items:center;">
@@ -1098,8 +1110,43 @@
         </label>
 
         <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span class="fpFormLabel">Tipi Erogati (separati da virgola)</span>
+          <input class="input" data-f-tipi placeholder="Es. FKT, MASSO" />
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Caso clinico</span>
+          <select class="select" data-f-case><option value="">—</option></select>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Vendita collegata</span>
+          <select class="select" data-f-sale><option value="">—</option></select>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span class="fpFormLabel">Erogato collegato</span>
+          <select class="select" data-f-erogato><option value="">—</option></select>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">VALUTAZIONI</span>
+          <select class="select" multiple size="4" data-f-evals></select>
+        </label>
+
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">TRATTAMENTI</span>
+          <select class="select" multiple size="4" data-f-treatments><option value="">Carico…</option></select>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
           <span class="fpFormLabel">Note interne</span>
           <textarea class="textarea" data-f-internal placeholder="Note interne..."></textarea>
+        </label>
+
+        <label class="field" style="gap:6px; grid-column:1 / -1;">
+          <span class="fpFormLabel">Note</span>
+          <textarea class="textarea" data-f-notes placeholder="Note..."></textarea>
         </label>
       </div>
 
@@ -1111,10 +1158,38 @@
 
     const elType = modalBody.querySelector("[data-f-type]");
     const elDur = modalBody.querySelector("[data-f-duration]");
+    const elStatus = modalBody.querySelector("[data-f-status]");
     const elServQ = modalBody.querySelector("[data-f-service-q]");
     const elServ = modalBody.querySelector("[data-f-service]");
     const elOp = modalBody.querySelector("[data-f-operator]");
+    const elLoc = modalBody.querySelector("[data-f-location]");
+    const elTipi = modalBody.querySelector("[data-f-tipi]");
+    const elCase = modalBody.querySelector("[data-f-case]");
+    const elSale = modalBody.querySelector("[data-f-sale]");
+    const elErogato = modalBody.querySelector("[data-f-erogato]");
+    const elEvals = modalBody.querySelector("[data-f-evals]");
+    const elTreatments = modalBody.querySelector("[data-f-treatments]");
     const elInternal = modalBody.querySelector("[data-f-internal]");
+    const elNotes = modalBody.querySelector("[data-f-notes]");
+
+    const parseCommaList = (s) =>
+      String(s || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
+    const getMultiValues = (sel) => Array.from(sel?.selectedOptions || []).map((o) => String(o.value)).filter(Boolean);
+    const setSelectOptions = (sel, items, { placeholder = "—" } = {}) => {
+      if (!sel) return;
+      sel.innerHTML =
+        `<option value="">${placeholder}</option>` +
+        (items || []).map((x) => `<option value="${String(x.id || "")}">${String(x.name || x.label || x.id || "")}</option>`).join("");
+    };
+    const setMultiOptions = (sel, items, labelFn) => {
+      if (!sel) return;
+      sel.innerHTML = (items || [])
+        .map((x) => `<option value="${String(x.id || "")}">${String(labelFn ? labelFn(x) : (x.name || x.label || x.id || ""))}</option>`)
+        .join("");
+    };
 
     // operator select
     const ops = (knownOperators || []).slice();
@@ -1194,6 +1269,27 @@
 
     elServQ?.addEventListener("input", () => renderServicesFiltered());
 
+    // locations
+    const inferredLocName = inferSlotLocation(toYmd(startAt), therapistName);
+    loadLocations()
+      .then((arr) => {
+        const items = Array.isArray(arr) ? arr : [];
+        setSelectOptions(elLoc, items, { placeholder: "—" });
+        if (inferredLocName) {
+          const found = items.find((x) => String(x.name || "").trim().toLowerCase() === String(inferredLocName).trim().toLowerCase());
+          if (found?.id) elLoc.value = String(found.id);
+        }
+      })
+      .catch((e) => renderSelectError(elLoc, "SEDI", e));
+
+    // treatments (multi)
+    loadTreatments()
+      .then((arr) => {
+        const items = Array.isArray(arr) ? arr : [];
+        setMultiOptions(elTreatments, items, (x) => x.name || x.id);
+      })
+      .catch((e) => renderSelectError(elTreatments, "TRATTAMENTI", e));
+
     // patient search
     let patientPicked = { id: "", label: "" };
     const qInput = modalBody.querySelector("[data-f-patient-q]");
@@ -1211,6 +1307,45 @@
       } else {
         pickedEl.style.display = "none";
         pickedEl.textContent = "";
+      }
+    }
+
+    async function refreshPatientLinks(patientId) {
+      const pid = String(patientId || "").trim();
+      // reset selects
+      setSelectOptions(elCase, [], { placeholder: "—" });
+      setSelectOptions(elSale, [], { placeholder: "—" });
+      setSelectOptions(elErogato, [], { placeholder: "—" });
+      if (elEvals) elEvals.innerHTML = "";
+      if (!pid) return;
+
+      try {
+        const [cases, sales, erogato, evals] = await Promise.all([
+          loadCasesForPatient(pid),
+          loadSalesForPatient(pid),
+          loadErogatoForPatient(pid),
+          loadEvaluationsForPatient(pid),
+        ]);
+
+        setSelectOptions(
+          elCase,
+          (cases || []).map((x) => ({ id: x.id, name: [x.data, x.titolo].filter(Boolean).join(" • ") || x.id })),
+          { placeholder: "—" },
+        );
+        setSelectOptions(
+          elSale,
+          (sales || []).map((x) => ({ id: x.id, name: [x.data, x.voce].filter(Boolean).join(" • ") || x.id })),
+          { placeholder: "—" },
+        );
+        setSelectOptions(
+          elErogato,
+          (erogato || []).map((x) => ({ id: x.id, name: [x.data, x.prestazione].filter(Boolean).join(" • ") || x.id })),
+          { placeholder: "—" },
+        );
+
+        setMultiOptions(elEvals, evals || [], (x) => [x.data, x.tipo].filter(Boolean).join(" • ") || x.id);
+      } catch (e) {
+        console.warn("refreshPatientLinks failed", e);
       }
     }
     function hideResults() {
@@ -1244,6 +1379,7 @@
           setPicked(picked);
           hideResults();
           qInput.value = picked?.label || "";
+          refreshPatientLinks(picked?.id || "").catch(()=>{});
         });
       });
       resultsEl.style.display = "";
@@ -1255,7 +1391,7 @@
       t = setTimeout(() => doSearch().catch(()=>{}), 90);
     });
     qInput.addEventListener("focus", () => doSearch().catch(()=>{}));
-    clearBtn.addEventListener("click", () => { qInput.value = ""; setPicked({ id:"", label:"" }); hideResults(); });
+    clearBtn.addEventListener("click", () => { qInput.value = ""; setPicked({ id:"", label:"" }); hideResults(); refreshPatientLinks("").catch(()=>{}); });
 
     // cancel/save
     modalBody.querySelector("[data-f-cancel]").onclick = closeModal;
@@ -1272,9 +1408,18 @@
           therapistId: String(elOp.value || ""),
           patientId: patientPicked.id || "",
           serviceId: String(elServ.value || ""),
+          locationId: String(elLoc?.value || ""),
           type: String(elType.value || ""),
+          status: String(elStatus?.value || ""),
           durationMin: durMin,
           internalNote: String(elInternal.value || ""),
+          notes: String(elNotes?.value || ""),
+          tipiErogati: parseCommaList(elTipi?.value || ""),
+          valutazioniIds: getMultiValues(elEvals),
+          trattamentiIds: getMultiValues(elTreatments),
+          casoClinicoId: String(elCase?.value || ""),
+          venditaId: String(elSale?.value || ""),
+          erogatoId: String(elErogato?.value || ""),
         };
 
         // create uses POST; use fetch directly.

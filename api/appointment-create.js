@@ -48,6 +48,28 @@ function hmFromIso(iso) {
   return s ? s.slice(11, 16) : "";
 }
 
+function toMultiText(v) {
+  if (Array.isArray(v)) return v.filter((x) => typeof x === "string" && x.trim()).map((x) => x.trim());
+  const s = norm(v);
+  if (!s) return [];
+  return s
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function toLinkArrayMaybe(v) {
+  if (Array.isArray(v)) {
+    const ids = v.filter((x) => typeof x === "string" && x.startsWith("rec"));
+    return ids.length ? ids : [];
+  }
+  const s = norm(v);
+  if (!s) return [];
+  // allow comma separated ids too
+  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  return parts.length ? parts : [];
+}
+
 async function tryCreate({ tableName, fields }) {
   const table = encodeURIComponent(tableName);
   const created = await airtableFetch(`${table}`, {
@@ -138,6 +160,14 @@ export default async function handler(req, res) {
     const FIELD_TYPE = process.env.AGENDA_TYPE_FIELD || "Tipologia";
     const FIELD_DURATION = process.env.AGENDA_DURATION_FIELD || "Durata";
     const FIELD_INTERNAL = process.env.AGENDA_INTERNAL_NOTES_FIELD || "Note interne";
+    const FIELD_STATUS = process.env.AGENDA_STATUS_FIELD || "Stato appuntamento";
+    const FIELD_NOTES = process.env.AGENDA_NOTES_FIELD || "Note";
+    const FIELD_TIPI_EROGATI = process.env.AGENDA_TIPI_EROGATI_FIELD || "Tipi Erogati";
+    const FIELD_VALUTAZIONI = process.env.AGENDA_VALUTAZIONI_FIELD || "VALUTAZIONI";
+    const FIELD_TRATTAMENTI = process.env.AGENDA_TRATTAMENTI_FIELD || "TRATTAMENTI";
+    const FIELD_EROGATO = process.env.AGENDA_EROGATO_FIELD || "Erogato collegato";
+    const FIELD_CASE = process.env.AGENDA_CASE_FIELD || "Caso clinico";
+    const FIELD_SALE = process.env.AGENDA_SALE_FIELD || "Vendita collegata";
 
     const startAt = norm(body.startAt || body.start || body["Data e ora INIZIO"]);
     const endAt = norm(body.endAt || body.end || body["Data e ora FINE"]);
@@ -148,6 +178,14 @@ export default async function handler(req, res) {
     const type = norm(body.type || body.tipologia);
     const durationMin = Number(body.durationMin ?? body.durataMin ?? body.durata ?? "");
     const internalNote = norm(body.internalNote || body.noteInterne || body.note);
+    const status = norm(body.status || body.stato || body.statoAppuntamento);
+    const notes = norm(body.notes || body.notePaziente || body.patientNote);
+    const tipiErogati = body.tipiErogati ?? body.tipi_erogati ?? body["Tipi Erogati"];
+    const valutazioniIds = body.valutazioniIds ?? body.valutazioni_ids ?? body.VALUTAZIONI;
+    const trattamentiIds = body.trattamentiIds ?? body.trattamenti_ids ?? body.TRATTAMENTI;
+    const erogatoId = norm(body.erogatoId || body.erogato_id);
+    const caseId = norm(body.casoClinicoId || body.caso_clinico_id || body.caseId);
+    const saleId = norm(body.venditaId || body.vendita_id || body.saleId);
 
     if (!startAt || !endAt) {
       return res.status(400).json({ ok: false, error: "missing_datetime" });
@@ -167,6 +205,24 @@ export default async function handler(req, res) {
       if (includeDuration && !Number.isNaN(durationMin) && durationMin > 0) baseFields[FIELD_DURATION] = durationMin;
       if (type) baseFields[FIELD_TYPE] = type;
       if (internalNote) baseFields[FIELD_INTERNAL] = internalNote;
+      if (status) baseFields[FIELD_STATUS] = status;
+      if (notes) baseFields[FIELD_NOTES] = notes;
+      if (FIELD_TIPI_EROGATI && (tipiErogati !== undefined && tipiErogati !== null)) {
+        const arr = toMultiText(tipiErogati);
+        if (arr.length) baseFields[FIELD_TIPI_EROGATI] = arr;
+      }
+
+      const evalArr = toLinkArrayMaybe(valutazioniIds);
+      if (evalArr.length) baseFields[FIELD_VALUTAZIONI] = evalArr;
+      const trArr = toLinkArrayMaybe(trattamentiIds);
+      if (trArr.length) baseFields[FIELD_TRATTAMENTI] = trArr;
+
+      const eroArr = asLinkArray(erogatoId);
+      if (eroArr) baseFields[FIELD_EROGATO] = eroArr;
+      const caseArr = asLinkArray(caseId);
+      if (caseArr) baseFields[FIELD_CASE] = caseArr;
+      const saleArr = asLinkArray(saleId);
+      if (saleArr) baseFields[FIELD_SALE] = saleArr;
 
       // linked records (best effort)
       const opArr = asLinkArray(therapistId);
@@ -185,20 +241,48 @@ export default async function handler(req, res) {
     const cached = memGet(schemaKey);
 
     const createWithRetryForDuration = async (fields, includedDuration) => {
-      try {
-        return await tryCreate({ tableName, fields });
-      } catch (e) {
-        const msg = String(e?.message || "");
-        const fieldName = parseAirtableFieldNameFromError(msg);
-        if (includedDuration && fieldName === FIELD_DURATION && isComputedFieldError(msg)) {
-          // Mark duration as not writable and retry once without it.
-          memSet(durationWritableKey, false, 60 * 60_000);
-          const next = { ...fields };
-          delete next[FIELD_DURATION];
-          return await tryCreate({ tableName, fields: next });
+      // Best-effort: if some optional fields are missing/readonly in the base,
+      // drop them and still create the appointment.
+      const optionalFields = new Set([
+        FIELD_STATUS,
+        FIELD_NOTES,
+        FIELD_TIPI_EROGATI,
+        FIELD_VALUTAZIONI,
+        FIELD_TRATTAMENTI,
+        FIELD_EROGATO,
+        FIELD_CASE,
+        FIELD_SALE,
+      ].filter(Boolean));
+
+      let current = { ...fields };
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        try {
+          return await tryCreate({ tableName, fields: current });
+        } catch (e) {
+          const msg = String(e?.message || "");
+          const fieldName = parseAirtableFieldNameFromError(msg);
+
+          if (includedDuration && fieldName === FIELD_DURATION && isComputedFieldError(msg)) {
+            memSet(durationWritableKey, false, 60 * 60_000);
+            const next = { ...current };
+            delete next[FIELD_DURATION];
+            current = next;
+            continue;
+          }
+
+          if (fieldName && optionalFields.has(fieldName) && (isComputedFieldError(msg) || isUnknownFieldError(msg))) {
+            const next = { ...current };
+            delete next[fieldName];
+            current = next;
+            continue;
+          }
+
+          throw e;
         }
-        throw e;
       }
+
+      // If we exhausted retries, bubble up the last error by doing one final attempt.
+      return await tryCreate({ tableName, fields: current });
     };
 
     const attemptDatetime = async (FIELD_START, FIELD_END) => {
