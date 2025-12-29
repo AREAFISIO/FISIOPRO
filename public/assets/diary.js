@@ -11,7 +11,7 @@
     window.__FP_DIARY_CLEANUP = null;
 
     // build marker (helps verify cache busting)
-    console.log("FISIOPRO diary build", "7e72bca");
+    console.log("FISIOPRO diary build", "2b3c1d2");
     const root = document.querySelector("[data-diary]");
     if (!root) return;
 
@@ -417,6 +417,12 @@
     return [nome, cognome].filter(Boolean).join(" ").trim();
   }
 
+  function ensureMeInSelection(set) {
+    if (!set) return;
+    const me = String(getUserName() || "").trim();
+    if (me) set.add(me);
+  }
+
   function normalizeRoleLabel(roleRaw) {
     const r = String(roleRaw || "").trim();
     if (!r) return "";
@@ -457,6 +463,24 @@
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
+  }
+
+  function initSelectionFromPrefs() {
+    // Apply saved preferences immediately (before network fetch),
+    // so multi-user view doesn't "pop in" late.
+    const me = String(getUserName() || "").trim();
+    if (multiUser) {
+      const base = (prefs.defaultOperators || []).filter(Boolean);
+      selectedTherapists = new Set(base);
+      // Always keep the current user's agenda visible in multi-user mode.
+      ensureMeInSelection(selectedTherapists);
+      // If nothing selected, fallback to self (or first known later).
+      if (!selectedTherapists.size && me) selectedTherapists.add(me);
+    } else {
+      selectedTherapists = new Set();
+      if (me) selectedTherapists.add(me);
+    }
+    if (selectedTherapists.size) didApplyDefaultSelectionOnce = true;
   }
   function savePrefs() {
     try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
@@ -764,7 +788,10 @@
     // - if multi-user is enabled, apply defaultOperators ONCE (first load after access)
     if (!didApplyDefaultSelectionOnce && knownTherapists.length) {
       const me = getUserName();
-      if (multiUser && (prefs.defaultOperators || []).length) selectedTherapists = new Set(prefs.defaultOperators);
+      if (multiUser && (prefs.defaultOperators || []).length) {
+        selectedTherapists = new Set(prefs.defaultOperators);
+        ensureMeInSelection(selectedTherapists);
+      }
       else if (!multiUser && me) selectedTherapists = new Set([me]);
       else if (me) selectedTherapists = new Set([me]);
       else selectedTherapists = new Set([knownTherapists[0]]);
@@ -773,6 +800,7 @@
 
     // keep selection valid
     if (selectedTherapists.size === 0 && knownTherapists.length) selectedTherapists.add(knownTherapists[0]);
+    if (multiUser) ensureMeInSelection(selectedTherapists);
 
     syncOpsBar();
     render();
@@ -1664,11 +1692,15 @@
       savePrefs();
       renderDefaultDots();
       // apply immediately if multi-user is on
-      if (multiUser) selectedTherapists = new Set(prefs.defaultOperators);
+      if (multiUser) {
+        selectedTherapists = new Set(prefs.defaultOperators);
+        ensureMeInSelection(selectedTherapists);
+      }
     } else {
       selectedTherapists = new Set(draftSelected);
     }
     multiUser = Boolean(opsMulti?.checked);
+    if (multiUser) ensureMeInSelection(selectedTherapists);
     syncOpsBar();
     closeOpsMenu();
     render();
@@ -1727,6 +1759,10 @@
       if (me) selectedTherapists = new Set([me]);
     } else if ((prefs.defaultOperators || []).length) {
       selectedTherapists = new Set(prefs.defaultOperators);
+      ensureMeInSelection(selectedTherapists);
+    } else {
+      selectedTherapists = new Set();
+      ensureMeInSelection(selectedTherapists);
     }
 
     syncOpsBar();
@@ -1742,7 +1778,10 @@
   } catch {}
 
   loadPrefs();
+  initSelectionFromPrefs();
   syncLoginName();
+  // Render immediately with saved selection (empty grid), then load data.
+  try { render(); } catch {}
   setView("7days");
   // Cleanup (remove global listeners + ephemeral DOM)
   window.__FP_DIARY_CLEANUP = () => {
