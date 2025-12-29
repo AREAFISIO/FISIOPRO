@@ -793,8 +793,10 @@
       const headerH = multiUser ? (58 + 42 + 34) : (showCancelBand ? (58 + 42) : 58);
       const available = Math.max(0, outerH - headerH);
       const pad = GRID_PAD_TOP + GRID_PAD_BOTTOM;
+      // Small bottom safety margin so the last hour label (21:00) isn't clipped.
+      const bottomReserve = 16;
       if (available > 0) {
-        const ideal = Math.floor((available - pad) / Math.max(1, totalSlots));
+        const ideal = Math.floor((available - pad - bottomReserve) / Math.max(1, totalSlots));
         // Clamp to keep UI sane across screens.
         SLOT_PX = Math.max(14, Math.min(28, ideal || SLOT_PX));
       }
