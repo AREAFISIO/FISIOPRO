@@ -120,9 +120,10 @@ body.fp-has-topbar .app{
 }
 .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.11)}
 .btn.primary{
-  border-color:rgba(34,230,195,.35);
-  background:linear-gradient(135deg, rgba(34,230,195,.18), rgba(74,163,255,.12));
-  box-shadow:0 16px 36px rgba(34,230,195,.10)
+  /* Requested: remove gradient, keep a single light grey */
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.11);
+  box-shadow: none;
 }
 .btn.danger{border-color:rgba(255,77,109,.35);background:rgba(255,77,109,.10)}
 
