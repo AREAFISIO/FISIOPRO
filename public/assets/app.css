@@ -645,6 +645,7 @@ td{ font-size: var(--fs-base); }
 .oe-field span{ opacity: .85; }
 
 .oe-field input,
+.oe-field select,
 .oe-field textarea{
   border: 1px solid rgba(0,0,0,.14);
   border-radius: 10px;
@@ -797,6 +798,7 @@ td{ font-size: var(--fs-base); }
 .oe-field span{ opacity: .85; }
 
 .oe-field input,
+.oe-field select,
 .oe-field textarea{
   border: 1px solid rgba(0,0,0,.14);
   border-radius: 10px;

@@ -28,18 +28,36 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: form.status ?? "",
-          service_name: form.service_name ?? "",
-          duration_label: form.duration_label ?? "",
-          therapist_name: form.therapist_name ?? "",
-          internal_note: form.internal_note ?? "",
-          patient_note: form.patient_note ?? "",
+          appointment_type: form.appointment_type ?? "",
+          serviceId: form.service_id ?? "",
+          collaboratoreId: form.therapist_id ?? "",
+          sedeId: form.location_id ?? "",
+          durata: form.duration ?? "",
+          tipiErogati:
+            typeof form.tipi_erogati === "string"
+              ? form.tipi_erogati.split(",").map((x) => x.trim()).filter(Boolean)
+              : (form.tipi_erogati ?? []),
+          valutazioniIds:
+            typeof (form.valutazioni_ids as any) === "string"
+              ? String(form.valutazioni_ids).split(",").map((x) => x.trim()).filter(Boolean)
+              : (form.valutazioni_ids ?? []),
+          trattamentiIds:
+            typeof (form.trattamenti_ids as any) === "string"
+              ? String(form.trattamenti_ids).split(",").map((x) => x.trim()).filter(Boolean)
+              : (form.trattamenti_ids ?? []),
+          erogatoId: form.erogato_id ?? "",
+          casoClinicoId: form.caso_clinico_id ?? "",
+          venditaId: form.vendita_id ?? "",
+          notaRapida: form.quick_note ?? form.internal_note ?? "",
+          note: form.notes ?? form.patient_note ?? "",
         }),
       });
 
       const json = await res.json();
       if (!res.ok) throw new Error(JSON.stringify(json));
 
-      onSaved?.(json as Appointment);
+      const updated = (json?.appointment ?? json) as Appointment;
+      onSaved?.(updated);
       onClose();
     } catch (e) {
       console.error(e);
@@ -74,7 +92,17 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
 
           <div className="oe-grid">
             <label className="oe-field">
-              <span>Stato</span>
+              <span>Data e ora INIZIO</span>
+              <input value={appt.start_at ?? ""} disabled />
+            </label>
+
+            <label className="oe-field">
+              <span>Data e ora fine</span>
+              <input value={appt.end_at ?? ""} disabled />
+            </label>
+
+            <label className="oe-field">
+              <span>Stato appuntamento</span>
               <input
                 value={form.status ?? ""}
                 onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
@@ -83,37 +111,109 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
             </label>
 
             <label className="oe-field">
-              <span>Prestazione</span>
+              <span>Tipo appuntamento</span>
               <input
-                value={form.service_name ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, service_name: e.target.value }))}
-                placeholder="Es. FASDAC"
+                value={form.appointment_type ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, appointment_type: e.target.value }))}
+                placeholder="Es. Prima visita"
               />
             </label>
 
             <label className="oe-field">
-              <span>Durata</span>
+              <span>Prestazione (record id)</span>
               <input
-                value={form.duration_label ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, duration_label: e.target.value }))}
-                placeholder="Es. 1 ora"
+                value={form.service_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, service_id: e.target.value }))}
+                placeholder="rec..."
               />
             </label>
 
             <label className="oe-field">
-              <span>Operatore</span>
+              <span>Collaboratore (record id)</span>
               <input
-                value={form.therapist_name ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, therapist_name: e.target.value }))}
-                placeholder="Es. Andrea Franceschelli"
+                value={form.therapist_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, therapist_id: e.target.value }))}
+                placeholder="rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>Sede (record id)</span>
+              <input
+                value={form.location_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, location_id: e.target.value }))}
+                placeholder="rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>Durata (min)</span>
+              <input
+                value={String(form.duration ?? "")}
+                onChange={(e) => setForm((p) => ({ ...p, duration: e.target.value }))}
+                placeholder="60"
               />
             </label>
 
             <label className="oe-field oe-field--wide">
-              <span>Nota rapida (interna)</span>
+              <span>Tipi Erogati (separati da virgola)</span>
+              <input
+                value={Array.isArray(form.tipi_erogati) ? form.tipi_erogati.join(", ") : (form.tipi_erogati ?? "")}
+                onChange={(e) => setForm((p) => ({ ...p, tipi_erogati: e.target.value }))}
+                placeholder="FKT, MASSO"
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>VALUTAZIONI (ids, virgola)</span>
+              <input
+                value={(form.valutazioni_ids ?? []).join(", ")}
+                onChange={(e) => setForm((p) => ({ ...p, valutazioni_ids: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) }))}
+                placeholder="rec..., rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>TRATTAMENTI (ids, virgola)</span>
+              <input
+                value={(form.trattamenti_ids ?? []).join(", ")}
+                onChange={(e) => setForm((p) => ({ ...p, trattamenti_ids: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) }))}
+                placeholder="rec..., rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>Erogato collegato (id)</span>
+              <input
+                value={form.erogato_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, erogato_id: e.target.value }))}
+                placeholder="rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>Caso clinico (id)</span>
+              <input
+                value={form.caso_clinico_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, caso_clinico_id: e.target.value }))}
+                placeholder="rec..."
+              />
+            </label>
+
+            <label className="oe-field">
+              <span>Vendita collegata (id)</span>
+              <input
+                value={form.vendita_id ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, vendita_id: e.target.value }))}
+                placeholder="rec..."
+              />
+            </label>
+
+            <label className="oe-field oe-field--wide">
+              <span>Nota rapida</span>
               <textarea
-                value={form.internal_note ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, internal_note: e.target.value }))}
+                value={form.quick_note ?? form.internal_note ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, quick_note: e.target.value }))}
                 maxLength={255}
               />
             </label>
@@ -121,8 +221,8 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
             <label className="oe-field oe-field--wide">
               <span>Note</span>
               <textarea
-                value={form.patient_note ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, patient_note: e.target.value }))}
+                value={form.notes ?? form.patient_note ?? ""}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                 maxLength={255}
               />
             </label>
