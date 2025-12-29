@@ -921,7 +921,9 @@
           const y = (clientY - r.top) - GRID_PAD_TOP;
           const idx = Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
           hover.style.top = (GRID_PAD_TOP + (idx * SLOT_PX)) + "px";
-          hover.style.display = "";
+          // NOTE: .slotHover has display:none in agenda.html CSS.
+          // Setting "" would keep it hidden; explicitly show it.
+          hover.style.display = "block";
           col.dataset._slotIndex = String(idx);
 
           // Tooltip slot (ora + sede + operatore)
