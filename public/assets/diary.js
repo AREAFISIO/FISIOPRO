@@ -44,7 +44,9 @@
   const START_HOUR = 7;
   const END_HOUR = 21;
   let SLOT_MIN = 30; // user preference
-  const SLOT_PX = 18;
+  // SLOT_PX is dynamically adjusted to fill available vertical space.
+  // Default is 18px (good density on laptops).
+  let SLOT_PX = 18;
   // Small visual breathing room above/below the time range.
   // This affects the grid row height and all y-coordinate calculations.
   const GRID_PAD_TOP = 10;
@@ -782,6 +784,22 @@
     // Body columns
     const totalMin = (END_HOUR - START_HOUR) * 60;
     const totalSlots = Math.ceil(totalMin / SLOT_MIN);
+    // Resize slot height to fit viewport, leaving ~<1 slot of empty space.
+    // This fixes the large empty area at the bottom of the agenda on tall screens.
+    {
+      const outer = gridEl.parentElement; // .calGridOuter
+      const outerH = Number(outer?.clientHeight || 0);
+      const showCancelBand = true;
+      const headerH = multiUser ? (58 + 42 + 34) : (showCancelBand ? (58 + 42) : 58);
+      const available = Math.max(0, outerH - headerH);
+      const pad = GRID_PAD_TOP + GRID_PAD_BOTTOM;
+      if (available > 0) {
+        const ideal = Math.floor((available - pad) / Math.max(1, totalSlots));
+        // Clamp to keep UI sane across screens.
+        SLOT_PX = Math.max(14, Math.min(28, ideal || SLOT_PX));
+      }
+    }
+
     const bodyHeightPx = totalSlots * SLOT_PX;
     const heightPx = bodyHeightPx + GRID_PAD_TOP + GRID_PAD_BOTTOM;
 
@@ -1617,7 +1635,16 @@
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
   const onDocScroll = () => { hideHover(); hideSlotHover(); };
-  const onResize = () => { hideHover(); hideSlotHover(); };
+  let resizeT = null;
+  const onResize = () => {
+    hideHover();
+    hideSlotHover();
+    // Rebuild grid to re-fit SLOT_PX to new height.
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => {
+      try { render(); } catch {}
+    }, 80);
+  };
   document.addEventListener("scroll", onDocScroll, true);
   window.addEventListener("resize", onResize);
 
