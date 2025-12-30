@@ -1108,8 +1108,8 @@
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Tipologia</span>
-          <select class="select" data-f-type>
+          <span class="fpFormLabel">Voce agenda</span>
+          <select class="select" data-f-voce>
             <option value="Appuntamento paziente">Appuntamento paziente</option>
             <option value="Indisponibilità">Indisponibilità</option>
             <option value="Appuntamento società">Appuntamento società</option>
@@ -1204,7 +1204,7 @@
       </div>
     `;
 
-    const elType = modalBody.querySelector("[data-f-type]");
+    const elVoce = modalBody.querySelector("[data-f-voce]");
     const elDur = modalBody.querySelector("[data-f-duration]");
     const elStatus = modalBody.querySelector("[data-f-status]");
     const elServQ = modalBody.querySelector("[data-f-service-q]");
@@ -1457,7 +1457,7 @@
           patientId: patientPicked.id || "",
           serviceId: String(elServ.value || ""),
           locationId: String(elLoc?.value || ""),
-          type: String(elType.value || ""),
+          voceAgenda: String(elVoce?.value || ""),
           status: String(elStatus?.value || ""),
           durationMin: durMin,
           internalNote: String(elInternal.value || ""),
@@ -1479,6 +1479,13 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) throw new Error(data.error || ("HTTP " + res.status));
+
+        // Ensure the appointment shows under the chosen collaborator.
+        try {
+          const opId = String(elOp.value || "").trim();
+          const opName = (knownOperators || []).find((x) => String(x.id || "") === opId)?.name || "";
+          if (multiUser && opName) selectedTherapists.add(String(opName).trim());
+        } catch {}
 
         closeModal();
         load().catch(()=>{});

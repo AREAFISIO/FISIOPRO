@@ -157,7 +157,7 @@ export default async function handler(req, res) {
     // Keep it overrideable via env, but default to the correct one.
     const FIELD_SERVICE = process.env.AGENDA_SERVICE_FIELD || "Servizio";
     const FIELD_LOCATION = process.env.AGENDA_LOCATION_FIELD || "Sede";
-    const FIELD_TYPE = process.env.AGENDA_TYPE_FIELD || "Tipologia";
+    const FIELD_VOCE_AGENDA = process.env.AGENDA_VOCE_AGENDA_FIELD || process.env.AGENDA_TYPE_FIELD || "Voce agenda";
     const FIELD_DURATION = process.env.AGENDA_DURATION_FIELD || "Durata";
     const FIELD_INTERNAL = process.env.AGENDA_INTERNAL_NOTES_FIELD || "Note interne";
     const FIELD_STATUS = process.env.AGENDA_STATUS_FIELD || "Stato appuntamento";
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
     const patientId = norm(body.patientId || body.pazienteId);
     const serviceId = norm(body.serviceId || body.prestazioneId);
     const locationId = norm(body.locationId || body.sedeId);
-    const type = norm(body.type || body.tipologia);
+    const voceAgenda = norm(body.voceAgenda || body["Voce agenda"] || body.type || body.tipologia);
     const durationMin = Number(body.durationMin ?? body.durataMin ?? body.durata ?? "");
     const internalNote = norm(body.internalNote || body.noteInterne || body.note);
     const status = norm(body.status || body.stato || body.statoAppuntamento);
@@ -203,7 +203,7 @@ export default async function handler(req, res) {
     const buildBaseFields = (includeDuration) => {
       const baseFields = {};
       if (includeDuration && !Number.isNaN(durationMin) && durationMin > 0) baseFields[FIELD_DURATION] = durationMin;
-      if (type) baseFields[FIELD_TYPE] = type;
+      if (voceAgenda) baseFields[FIELD_VOCE_AGENDA] = voceAgenda;
       if (internalNote) baseFields[FIELD_INTERNAL] = internalNote;
       if (status) baseFields[FIELD_STATUS] = status;
       if (notes) baseFields[FIELD_NOTES] = notes;
@@ -231,8 +231,10 @@ export default async function handler(req, res) {
       if (patArr) baseFields[FIELD_PATIENT] = patArr;
       const servArr = asLinkArray(serviceId);
       if (servArr) baseFields[FIELD_SERVICE] = servArr;
-      const locArr = asLinkArray(locationId);
-      if (locArr) baseFields[FIELD_LOCATION] = locArr;
+      // "Sede" may be linked-record OR single-select/text depending on base.
+      // If we receive a record id (rec...), write as link; otherwise write as string.
+      const loc = norm(locationId);
+      if (loc) baseFields[FIELD_LOCATION] = loc.startsWith("rec") ? [loc] : loc;
 
       return baseFields;
     };
