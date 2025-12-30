@@ -1109,14 +1109,7 @@
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
         <label class="field" style="gap:6px;">
           <span class="fpFormLabel">Voce agenda</span>
-          <select class="select" data-f-voce>
-            <option value="Appuntamento paziente">Appuntamento paziente</option>
-            <option value="Indisponibilità">Indisponibilità</option>
-            <option value="Appuntamento società">Appuntamento società</option>
-            <option value="Ferie">Ferie</option>
-            <option value="Appuntamento di gruppo">Appuntamento di gruppo</option>
-            <option value="Proposta di appuntamento">Proposta di appuntamento</option>
-          </select>
+          <select class="select" data-f-voce><option value="">Carico…</option></select>
         </label>
 
         <label class="field" style="gap:6px;">
@@ -1128,7 +1121,7 @@
 
         <label class="field" style="gap:6px;">
           <span class="fpFormLabel">Stato appuntamento</span>
-          <input class="input" data-f-status placeholder="Es. Confermato / Non ancora eseguito" />
+          <select class="select" data-f-status><option value="">Carico…</option></select>
         </label>
 
         <label class="field" style="gap:6px;">
@@ -1316,6 +1309,22 @@
       .catch((e) => renderSelectError(elServ, "PRESTAZIONI", e));
 
     elServQ?.addEventListener("input", () => renderServicesFiltered());
+
+    // Voce agenda + Stato appuntamento options (from Airtable)
+    apiGet(`/api/appointment-field-options?table=${encodeURIComponent("APPUNTAMENTI")}&field=${encodeURIComponent("Voce agenda")}`)
+      .then((d) => {
+        const items = d.items || [];
+        setSelectOptions(elVoce, items, { placeholder: "—" });
+        // default: keep empty, user picks
+      })
+      .catch((e) => renderSelectError(elVoce, "VOCE AGENDA", e));
+
+    apiGet(`/api/appointment-field-options?table=${encodeURIComponent("APPUNTAMENTI")}&field=${encodeURIComponent("Stato appuntamento")}`)
+      .then((d) => {
+        const items = d.items || [];
+        setSelectOptions(elStatus, items, { placeholder: "—" });
+      })
+      .catch((e) => renderSelectError(elStatus, "STATO APPUNTAMENTO", e));
 
     // locations
     const inferredLocName = inferSlotLocation(toYmd(startAt), therapistName);
