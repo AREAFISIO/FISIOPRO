@@ -30,6 +30,39 @@ body.fp-theme-pro{
   --panelSolid2: rgba(39,68,111,.96);
 }
 
+/* Pro theme: clear, readable, “premium” */
+body.fp-theme-pro .card{
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+  border-color: rgba(255,255,255,.22);
+  box-shadow: 0 22px 70px rgba(0,0,0,.32);
+}
+body.fp-theme-pro .sidebar{
+  background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.05));
+}
+body.fp-theme-pro .btn{
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.22);
+}
+body.fp-theme-pro .btn:hover{ background: rgba(255,255,255,.16); }
+body.fp-theme-pro .nav a{ font-size: 16px; padding: 12px 14px; }
+body.fp-theme-pro .h1{ font-size: 24px; font-weight: 950; letter-spacing: -.3px; }
+body.fp-theme-pro .topbar{ padding: 16px 10px 16px; }
+body.fp-theme-pro .pill{ border-color: rgba(255,255,255,.22); color: rgba(255,255,255,.90); }
+
+/* Typography scale (net difference Standard vs Pro) */
+body.fp-theme-standard{ font-size: 16px; line-height: 1.45; }
+body.fp-theme-pro{ font-size: 18px; line-height: 1.55; }
+body.fp-theme-standard h1{ font-size: 26px; }
+body.fp-theme-pro h1{ font-size: 32px; }
+body.fp-theme-standard h2{ font-size: 20px; }
+body.fp-theme-pro h2{ font-size: 24px; }
+body.fp-theme-standard label,
+body.fp-theme-standard button,
+body.fp-theme-standard input{ font-size: 16px; }
+body.fp-theme-pro label,
+body.fp-theme-pro button,
+body.fp-theme-pro input{ font-size: 18px; }
+
 *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial}
 html,body{height:100%}
 body{
@@ -1150,10 +1183,6 @@ body.oe-hide-right .rightbar *{ display:none !important; }
   gap:10px;
   min-width: 0;
 }
-html { font-size: 18px; }
-body { font-size: 18px; }
-h1 { font-size: 28px; }
-h2 { font-size: 22px; }
-label, button, input { font-size: 18px; }
+/* (moved to theme-scoped typography above) */
 
 
