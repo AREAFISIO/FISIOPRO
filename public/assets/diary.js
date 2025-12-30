@@ -275,7 +275,7 @@
 
   // Global availability (from "Impostazioni Disponibilità" modal in app.js).
   // Stored in localStorage as: fp_settings_availability_<emailLower>.
-  let settingsAvailabilityCache = null; // { dayMin: Map<wIdx, Map<minute, {status, locationId}>> }
+  let settingsAvailabilityCache = null; // { byTher: Map<therKey, Map<wIdx, Map<minute, {status, locationId}>> > }
 
   function settingsKeyAvailability() {
     const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
@@ -293,13 +293,15 @@
 
   function loadSettingsAvailability() {
     if (settingsAvailabilityCache) return settingsAvailabilityCache;
-    const dayMin = new Map();
+    const byTher = new Map();
 
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(settingsKeyAvailability()) || "null"); } catch {}
 
-    const slots = saved && typeof saved === "object" ? (saved.slots || null) : null;
-    if (slots && typeof slots === "object") {
+    const parseSlotsMap = (slotsObj) => {
+      const dayMin = new Map();
+      const slots = slotsObj && typeof slotsObj === "object" ? slotsObj : null;
+      if (!slots) return dayMin;
       for (const [k, v] of Object.entries(slots)) {
         const key = String(k || "");
         const m = key.match(/^(\d+):(\d+)$/);
@@ -320,9 +322,21 @@
         if (!dayMin.has(wIdx)) dayMin.set(wIdx, new Map());
         dayMin.get(wIdx).set(minute, { status, locationId });
       }
+      return dayMin;
+    };
+
+    const sObj = saved && typeof saved === "object" ? saved : null;
+    const byTherRaw = sObj?.byTherapist && typeof sObj.byTherapist === "object" ? sObj.byTherapist : null;
+    if (byTherRaw) {
+      for (const [ther, slots] of Object.entries(byTherRaw)) {
+        byTher.set(String(ther || "DEFAULT"), parseSlotsMap(slots));
+      }
+    } else if (sObj?.slots && typeof sObj.slots === "object") {
+      byTher.set("DEFAULT", parseSlotsMap(sObj.slots));
     } else {
       // legacy: saved.on = ["d:r", ...] => work
-      const on = Array.isArray(saved?.on) ? saved.on : [];
+      const dayMin = new Map();
+      const on = Array.isArray(sObj?.on) ? sObj.on : [];
       on.forEach((k) => {
         const key = String(k || "");
         const m = key.match(/^(\d+):(\d+)$/);
@@ -334,9 +348,10 @@
         if (!dayMin.has(wIdx)) dayMin.set(wIdx, new Map());
         dayMin.get(wIdx).set(minute, { status: "work", locationId: "" });
       });
+      byTher.set("DEFAULT", dayMin);
     }
 
-    settingsAvailabilityCache = { dayMin };
+    settingsAvailabilityCache = { byTher };
     return settingsAvailabilityCache;
   }
 
@@ -367,7 +382,12 @@
     // Fallback to global availability settings (new modal).
     const av = loadSettingsAvailability();
     const mm = Number(m);
-    const byW = av?.dayMin?.get?.(wIdx) || null;
+    const therKey = normTherapistKeyForSlots(therapistName);
+    const dayMinMap =
+      av?.byTher?.get?.(therKey) ||
+      av?.byTher?.get?.("DEFAULT") ||
+      null;
+    const byW = dayMinMap ? (dayMinMap.get(wIdx) || null) : null;
     const rec = byW ? (byW.get(mm) || null) : null;
     if (rec && typeof rec === "object") {
       const on = String(rec.status) === "work";
