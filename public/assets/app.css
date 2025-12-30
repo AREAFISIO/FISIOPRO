@@ -12,6 +12,24 @@
   --panelSolid2: rgba(30,53,90,.96);
 }
 
+/* Theme presets (toggle via body class) */
+body.fp-theme-standard{
+  /* no overrides: uses :root */
+}
+body.fp-theme-pro{
+  /* slightly brighter, higher-contrast surfaces for readability */
+  --bg:#1a2f50;
+  --panel:#213a60;
+  --panel-2:#27446f;
+  --border:rgba(255,255,255,.22);
+  --text:rgba(255,255,255,.96);
+  --muted:rgba(255,255,255,.78);
+  --shadow:0 18px 54px rgba(0,0,0,.28);
+  --panelGlass: rgba(33,58,96,.74);
+  --panelSolid: rgba(33,58,96,.96);
+  --panelSolid2: rgba(39,68,111,.96);
+}
+
 *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial}
 html,body{height:100%}
 body{

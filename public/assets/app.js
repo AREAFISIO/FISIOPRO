@@ -34,6 +34,31 @@ async function ensureAuth() {
   }
 }
 
+// =====================
+// THEME (Standard vs Pro)
+// =====================
+function fpThemeKey() {
+  const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+  return `fp_settings_theme_${email}`;
+}
+function applyTheme(theme) {
+  const t = String(theme || "").trim().toLowerCase();
+  const cls = t === "pro" ? "fp-theme-pro" : "fp-theme-standard";
+  document.body.classList.remove("fp-theme-pro", "fp-theme-standard");
+  document.body.classList.add(cls);
+}
+function loadTheme() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(fpThemeKey()) || "null"); } catch {}
+  const t = String(s?.theme || "standard").toLowerCase();
+  return t === "pro" ? "pro" : "standard";
+}
+function saveTheme(theme) {
+  const t = String(theme || "").toLowerCase() === "pro" ? "pro" : "standard";
+  try { localStorage.setItem(fpThemeKey(), JSON.stringify({ theme: t })); } catch {}
+  applyTheme(t);
+}
+
 function roleGuard(role) {
   document.querySelectorAll("[data-role]").forEach(el => {
     const allowed = (el.getAttribute("data-role") || "").split(",").map(s=>s.trim()).filter(Boolean);
@@ -1002,6 +1027,47 @@ function ensureSettingsModals() {
     `;
     document.body.appendChild(back);
   }
+
+  // Theme
+  if (!document.querySelector("[data-fp-theme-back]")) {
+    const back = document.createElement("div");
+    back.className = "fp-set-back";
+    back.setAttribute("data-fp-theme-back", "1");
+    back.innerHTML = `
+      <div class="fp-set-panel" role="dialog" aria-modal="true" style="width:760px;">
+        <div class="fp-set-head">
+          <div class="fp-set-title"><span style="font-size:18px;">🎨</span> Tema</div>
+          <button class="btn" type="button" data-fp-theme-close>Chiudi</button>
+        </div>
+        <div class="fp-set-body">
+          <div class="card" style="padding:14px;">
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Standard</div>
+                <div class="sub">Tema attuale (baseline).</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="radio" name="fp_theme" value="standard" data-fp-theme-opt /><span class="slider"></span></label>
+              </div>
+            </div>
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Pro (più leggibile)</div>
+                <div class="sub">Superfici più chiare, contrasto migliore, bordi più definiti.</div>
+              </div>
+              <div class="right">
+                <label class="switch"><input type="radio" name="fp_theme" value="pro" data-fp-theme-opt /><span class="slider"></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fp-set-foot">
+          <button class="btn primary" type="button" data-fp-theme-save>Salva</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+  }
 }
 
 function fpSettingsKey(suffix) {
@@ -1030,6 +1096,33 @@ function openAppointmentsModal() {
 }
 function closeAppointmentsModal() {
   const back = document.querySelector("[data-fp-appt-back]");
+  if (back) back.style.display = "none";
+}
+
+function openThemeModal() {
+  ensureSettingsModals();
+  const back = document.querySelector("[data-fp-theme-back]");
+  if (!back) return;
+  const current = loadTheme();
+  back.querySelectorAll("[data-fp-theme-opt]").forEach((r) => {
+    r.checked = String(r.value) === current;
+  });
+  back.style.display = "block";
+  const panel = back.querySelector(".fp-set-panel");
+  const close = back.querySelector("[data-fp-theme-close]");
+  const save = back.querySelector("[data-fp-theme-save]");
+  close && (close.onclick = () => closeThemeModal());
+  back.onclick = (e) => { if (e.target === back) closeThemeModal(); };
+  save && (save.onclick = () => {
+    const sel = back.querySelector("[data-fp-theme-opt]:checked");
+    const val = String(sel?.value || "standard");
+    saveTheme(val);
+    closeThemeModal();
+    toast("Salvato");
+  });
+}
+function closeThemeModal() {
+  const back = document.querySelector("[data-fp-theme-back]");
   if (back) back.style.display = "none";
 }
 
@@ -1609,6 +1702,10 @@ function normalizeRightbar() {
       <span class="rbIcon">✅</span>
       <span class="rbLabel">Impostazioni Appuntamenti</span>
     </button>
+    <button class="rbBtn" data-open-theme title="Tema">
+      <span class="rbIcon">🎨</span>
+      <span class="rbLabel">Tema</span>
+    </button>
   `;
 }
 
@@ -1727,6 +1824,13 @@ function setupSpaRouter() {
       if (openAppt) {
         e.preventDefault();
         openAppointmentsModal();
+        return;
+      }
+
+      const openTheme = e.target?.closest?.("[data-open-theme]");
+      if (openTheme) {
+        e.preventDefault();
+        openThemeModal();
         return;
       }
 
@@ -2058,6 +2162,9 @@ async function initAgenda() {
 
   // SPA router: keep left/right menus mounted, swap only center content.
   setupSpaRouter();
+
+  // Apply theme ASAP after auth (per-user).
+  try { applyTheme(loadTheme()); } catch {}
 
   initLogoutLinks();
   setUserBadges(user);
