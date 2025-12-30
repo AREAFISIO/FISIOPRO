@@ -220,17 +220,6 @@
     multiUser: false,
     defaultOperators: [],
     doubleOperators: [],
-    // Work hours per weekday (Mon..Sun). When on=false the day is "non lavorativo".
-    // Times are "HH:MM" in local time.
-    workHours: [
-      { on: true, start: "08:00", end: "20:00" }, // LUN
-      { on: true, start: "08:00", end: "20:00" }, // MAR
-      { on: true, start: "08:00", end: "20:00" }, // MER
-      { on: true, start: "08:00", end: "20:00" }, // GIO
-      { on: true, start: "08:00", end: "20:00" }, // VEN
-      { on: true, start: "08:00", end: "14:00" }, // SAB
-      { on: false, start: "08:00", end: "14:00" }, // DOM
-    ],
     // Per-operator slot overrides:
     // {
     //   "<therapistName|DEFAULT>": {
@@ -242,8 +231,6 @@
     dayNav: false,
     userColor: "",
   };
-
-  const prefWorkHours = document.querySelector("[data-pref-workhours]");
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function timeToMin(s) {
@@ -263,17 +250,6 @@
   }
   function weekdayIdxMon0(d) { return (d.getDay() + 6) % 7; } // lun=0..dom=6
   const WEEKDAY_LABELS = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
-
-  function normalizeWorkHours(x) {
-    const out = Array.isArray(x) ? x.slice(0, 7) : [];
-    while (out.length < 7) out.push({ on: true, start: "08:00", end: "20:00" });
-    return out.map((it, i) => {
-      const on = Boolean(it?.on);
-      const start = String(it?.start || "").trim() || (i === 5 ? "08:00" : "08:00");
-      const end = String(it?.end || "").trim() || (i === 5 ? "14:00" : "20:00");
-      return { on, start, end };
-    });
-  }
 
   function normTherapistKeyForSlots(name) {
     const s = String(name || "").trim();
@@ -299,12 +275,8 @@
     const hit = byDay ? byDay[m] : null;
     if (hit && typeof hit === "object") return { on: Boolean(hit.on), locationId: hit.locationId || "", locationName: hit.locationName || "" };
 
-    // fallback to workHours band
-    const wh = getWorkForDate(dateObj);
-    if (!wh.on) return { on: false, locationId: "", locationName: "" };
-    const md = clamp(Number(minuteOfDay) || 0, 0, MINUTES_PER_DAY - 1);
-    const on = md >= wh.startMin && md < wh.endMin;
-    return { on, locationId: "", locationName: "" };
+    // Default baseline: NON lavorativo (OsteoEasy-like).
+    return { on: false, locationId: "", locationName: "" };
   }
 
   function setSlotRuleRange({ therapistName, dateObj, startMin, endMinExclusive, on, locationId, locationName }) {
@@ -475,78 +447,7 @@
     back.style.display = "flex";
   }
 
-  function renderWorkHoursEditor() {
-    if (!prefWorkHours) return;
-    prefs.workHours = normalizeWorkHours(prefs.workHours);
-    prefWorkHours.innerHTML = "";
-
-    const wrap = document.createElement("div");
-    wrap.style.display = "grid";
-    wrap.style.gridTemplateColumns = "1fr";
-    wrap.style.gap = "8px";
-
-    prefs.workHours.forEach((wh, idx) => {
-      const row = document.createElement("div");
-      row.className = "prefPickRow";
-      row.style.cursor = "default";
-      row.style.alignItems = "center";
-      row.style.gap = "12px";
-      row.style.padding = "10px 12px";
-
-      row.innerHTML = `
-        <div class="prefPickLeft" style="gap:12px; min-width:0;">
-          <label class="switch" title="Lavorativo / Non lavorativo">
-            <input type="checkbox" data-wh-on="${idx}" ${wh.on ? "checked" : ""} />
-            <span class="slider"></span>
-          </label>
-          <div style="min-width:0;">
-            <div class="prefPickName">${WEEKDAY_LABELS[idx]}</div>
-            <div class="prefPickMini">${wh.on ? "Lavorativo" : "Non lavorativo"}</div>
-          </div>
-        </div>
-        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:0 0 auto;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <div class="opsMini" style="opacity:.75;">Inizio</div>
-            <input type="time" data-wh-start="${idx}" value="${wh.start}" ${wh.on ? "" : "disabled"} style="height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.18); color: rgba(255,255,255,.90); padding: 0 10px; min-width: 118px;" />
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <div class="opsMini" style="opacity:.75;">Fine</div>
-            <input type="time" data-wh-end="${idx}" value="${wh.end}" ${wh.on ? "" : "disabled"} style="height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.18); color: rgba(255,255,255,.90); padding: 0 10px; min-width: 118px;" />
-          </div>
-        </div>
-      `;
-
-      wrap.appendChild(row);
-    });
-
-    prefWorkHours.appendChild(wrap);
-
-    // wire events (delegated)
-    prefWorkHours.querySelectorAll("input[data-wh-on]").forEach((el) => {
-      el.addEventListener("change", () => {
-        const idx = Number(el.getAttribute("data-wh-on"));
-        if (!Number.isFinite(idx)) return;
-        prefs.workHours[idx].on = Boolean(el.checked);
-        renderWorkHoursEditor();
-      });
-    });
-    prefWorkHours.querySelectorAll("input[data-wh-start]").forEach((el) => {
-      el.addEventListener("change", () => {
-        const idx = Number(el.getAttribute("data-wh-start"));
-        const v = String(el.value || "").trim();
-        if (!Number.isFinite(idx)) return;
-        prefs.workHours[idx].start = v;
-      });
-    });
-    prefWorkHours.querySelectorAll("input[data-wh-end]").forEach((el) => {
-      el.addEventListener("change", () => {
-        const idx = Number(el.getAttribute("data-wh-end"));
-        const v = String(el.value || "").trim();
-        if (!Number.isFinite(idx)) return;
-        prefs.workHours[idx].end = v;
-      });
-    });
-  }
+  // NOTE: removed "work hours default" editor. Availability is only slot-based.
 
   function pad2(n) { return String(n).padStart(2, "0"); }
   function toYmd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -849,15 +750,6 @@
       multiUser: false,
       defaultOperators: [],
       doubleOperators: [],
-      workHours: [
-        { on: true, start: "08:00", end: "20:00" },
-        { on: true, start: "08:00", end: "20:00" },
-        { on: true, start: "08:00", end: "20:00" },
-        { on: true, start: "08:00", end: "20:00" },
-        { on: true, start: "08:00", end: "20:00" },
-        { on: true, start: "08:00", end: "14:00" },
-        { on: false, start: "08:00", end: "14:00" },
-      ],
       workSlots: {},
       showService: true,
       dayNav: false,
@@ -880,7 +772,6 @@
     if (prefDoublePicker && !prefMulti?.checked) prefDoublePicker.style.display = "none";
     renderDefaultDots();
     renderDoubleDots();
-    renderWorkHoursEditor();
   }
   function openPrefs() {
     if (!prefsBack) return;
@@ -1257,36 +1148,43 @@
     render();
   }
 
-  function getWorkForDate(d) {
-    prefs.workHours = normalizeWorkHours(prefs.workHours);
-    const idx = weekdayIdxMon0(d);
-    const wh = prefs.workHours[idx] || { on: true, start: "08:00", end: "20:00" };
-    const st = timeToMin(wh.start);
-    const en = timeToMin(wh.end);
-    if (!wh.on || st === null || en === null || en <= st) return { on: false, startMin: null, endMin: null };
-    return { on: true, startMin: st, endMin: en };
-  }
-
   function computeGridRange(start, days) {
-    const perDay = [];
+    // Infer grid range from selected "working" slots. If none exist, fallback 08:00–20:00.
+    let minOn = null;
+    let maxOn = null;
+
+    const visibleTherapists = multiUser ? Array.from(selectedTherapists) : [Array.from(selectedTherapists)[0] || ""];
+    const store = prefs.workSlots || {};
+
     for (let dIdx = 0; dIdx < days; dIdx++) {
-      const d = addDays(start, dIdx);
-      perDay.push(getWorkForDate(d));
+      const day = addDays(start, dIdx);
+      const wIdx = String(weekdayIdxMon0(day));
+      for (const t of visibleTherapists) {
+        const key = normTherapistKeyForSlots(t);
+        const byDay = store?.[key]?.[wIdx] || null;
+        if (!byDay) continue;
+        for (const [k, v] of Object.entries(byDay)) {
+          if (!v || typeof v !== "object") continue;
+          if (v.on !== true) continue;
+          const mm = Number(k);
+          if (!Number.isFinite(mm)) continue;
+          minOn = (minOn === null) ? mm : Math.min(minOn, mm);
+          maxOn = (maxOn === null) ? (mm + BASE_SLOT_MIN) : Math.max(maxOn, mm + BASE_SLOT_MIN);
+        }
+      }
     }
-    const starts = perDay.filter((x) => x.on).map((x) => x.startMin);
-    const ends = perDay.filter((x) => x.on).map((x) => x.endMin);
-    let startMin = starts.length ? Math.min(...starts) : (8 * 60);
-    let endMin = ends.length ? Math.max(...ends) : (20 * 60);
+
+    let startMin = minOn === null ? (8 * 60) : minOn;
+    let endMin = maxOn === null ? (20 * 60) : maxOn;
     startMin = clamp(startMin, 0, 23 * 60);
     endMin = clamp(endMin, startMin + 60, 24 * 60);
-    // align to hour ticks for UI
     startMin = Math.floor(startMin / 60) * 60;
     endMin = Math.ceil(endMin / 60) * 60;
     endMin = clamp(endMin, startMin + 60, 24 * 60);
-    return { startMin, endMin, perDay };
+    return { startMin, endMin };
   }
 
-  function buildGridSkeleton(start, days, ops, { gridStartMin, gridEndMin, workPerDay } = {}) {
+  function buildGridSkeleton(start, days, ops, { gridStartMin, gridEndMin } = {}) {
     gridEl.innerHTML = "";
 
     // Body columns
@@ -1354,17 +1252,7 @@
       const startCol = 2 + dIdx * colsPerDay;
       dh.style.gridColumn = `${startCol} / span ${colsPerDay}`;
       dh.style.gridRow = "1";
-      const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(d);
-      const startT = wh.on ? minToTime(wh.startMin) : "—";
-      const endT = wh.on ? minToTime(wh.endMin) : "—";
-      const sub =
-        wh.on
-          ? `<div class="d2" style="display:flex; gap:10px; margin-top:6px; font-size:12px; opacity:.85;">
-              <span style="display:flex; gap:6px; align-items:center;"><span style="opacity:.75;">Inizio</span><span style="font-weight:900;">${startT}</span></span>
-              <span style="display:flex; gap:6px; align-items:center;"><span style="opacity:.75;">Fine</span><span style="font-weight:900;">${endT}</span></span>
-            </div>`
-          : `<div class="d2" style="margin-top:6px; font-size:12px; opacity:.75; font-weight:900;">Non lavorativo</div>`;
-      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>${sub}`;
+      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
       gridEl.appendChild(dh);
     }
 
@@ -1720,8 +1608,24 @@
 
     // calcola durata max fino al prossimo appuntamento (stesso giorno e stesso operatore)
     const startMin = minutesOfDay(startAt);
-    const wh = getWorkForDate(startAt);
-    const endDayMin = wh.on ? wh.endMin : (20 * 60);
+    // Max duration limited by last "working" slot (if defined), else 20:00.
+    let endDayMin = 20 * 60;
+    try {
+      const key = normTherapistKeyForSlots(therapistName);
+      const wIdx = String(weekdayIdxMon0(startAt));
+      const byDay = prefs.workSlots?.[key]?.[wIdx] || null;
+      if (byDay) {
+        let maxOn = null;
+        for (const [k, v] of Object.entries(byDay)) {
+          if (!v || typeof v !== "object") continue;
+          if (v.on !== true) continue;
+          const mm = Number(k);
+          if (!Number.isFinite(mm)) continue;
+          maxOn = (maxOn === null) ? (mm + BASE_SLOT_MIN) : Math.max(maxOn, mm + BASE_SLOT_MIN);
+        }
+        if (maxOn !== null) endDayMin = clamp(maxOn, 60, 24 * 60);
+      }
+    } catch {}
     let nextMin = endDayMin;
     for (const it of rawItems || []) {
       if (!it.startAt) continue;
@@ -2249,7 +2153,6 @@
     buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1), {
       gridStartMin: range.startMin,
       gridEndMin: range.endMin,
-      workPerDay: range.perDay,
     });
 
     // Render cancelled appointments into the band (also when single-operator view).
