@@ -43,6 +43,22 @@ function parseIsoOrEmpty(v) {
   return d.toISOString();
 }
 
+function parseIsoOrThrow(v, label = "datetime") {
+  const s = norm(v);
+  if (!s) {
+    const err = new Error(`missing_${label}`);
+    err.status = 400;
+    throw err;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) {
+    const err = new Error(`invalid_${label}`);
+    err.status = 400;
+    throw err;
+  }
+  return d.toISOString();
+}
+
 function ymdToRange(dateYMD) {
   const [y, m, d] = String(dateYMD).split("-").map((x) => parseInt(x, 10));
   const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
@@ -554,6 +570,19 @@ export default async function handler(req, res) {
       }
       if (schema.FIELD_NOTES && ("notes" in body || "note" in body || "patient_note" in body)) {
         fields[schema.FIELD_NOTES] = norm(body.notes ?? body.note ?? body.patient_note);
+      }
+
+      // Date/time fields (drag & drop support)
+      const startRaw = body.start_at ?? body.startAt ?? body.startISO ?? body.start;
+      if (schema.FIELD_START && startRaw !== undefined) {
+        const iso = startRaw === null || String(startRaw).trim() === "" ? "" : parseIsoOrThrow(startRaw, "start_at");
+        // Allow clearing only if caller explicitly passes empty; otherwise require a valid datetime.
+        fields[schema.FIELD_START] = iso || null;
+      }
+      const endRaw = body.end_at ?? body.endAt ?? body.endISO ?? body.end;
+      if (schema.FIELD_END && endRaw !== undefined) {
+        const iso = endRaw === null || String(endRaw).trim() === "" ? "" : parseIsoOrThrow(endRaw, "end_at");
+        fields[schema.FIELD_END] = iso || null;
       }
 
       // Linked fields

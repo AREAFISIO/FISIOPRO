@@ -339,8 +339,9 @@ export default async function handler(req, res) {
       }
     }
 
+    const noCache = String(req.query?.nocache || "") === "1";
     const listCacheKey = `agenda:list:${APPTS_TABLE_NAME}:${FIELD_START}:${FIELD_OPERATOR}:${role}:${email}:${from}:${to}`;
-    const data = await memGetOrSet(listCacheKey, 15_000, async () => {
+    const fetchList = async () => {
       const qs = new URLSearchParams({
         filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
         pageSize: "100",
@@ -348,7 +349,8 @@ export default async function handler(req, res) {
         "sort[0][direction]": "asc",
       });
       return await airtableFetch(`${tableEnc}?${qs.toString()}`);
-    });
+    };
+    const data = noCache ? await fetchList() : await memGetOrSet(listCacheKey, 15_000, fetchList);
 
     // If Collaboratore/Operatore is a linked-record field, Airtable returns record IDs.
     // Resolve to names via COLLABORATORI table so the UI can show proper operator names.

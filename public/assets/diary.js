@@ -83,6 +83,28 @@
   const BASE_SLOT_MIN = 30;
   const MINUTES_PER_DAY = 24 * 60;
 
+  // Appointments settings (from app.js "Impostazioni Appuntamenti")
+  let appointmentsSettingsCache = null; // { cancelband: boolean, drag: boolean, ... }
+  function settingsKeyAppointments() {
+    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+    return `fp_settings_appointments_${email}`;
+  }
+  function loadAppointmentsSettingsFromStorage() {
+    if (appointmentsSettingsCache) return appointmentsSettingsCache;
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(settingsKeyAppointments()) || "null"); } catch {}
+    const obj = s && typeof s === "object" ? s : {};
+    appointmentsSettingsCache = {
+      cancelband: Boolean(obj.cancelband ?? true),
+      drag: Boolean(obj.drag ?? true),
+      billing: Boolean(obj.billing ?? true),
+      showname: Boolean(obj.showname ?? false),
+      name: String(obj.name ?? ""),
+      info: String(obj.info ?? ""),
+    };
+    return appointmentsSettingsCache;
+  }
+
   // Hover card (info rapida)
   const hoverCard = document.createElement("div");
   hoverCard.className = "fpHover";
@@ -1164,7 +1186,7 @@
     return items;
   }
 
-  async function load() {
+  async function load(opts = {}) {
     const start = view === "day"
       ? new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate())
       : startOfWeekMonday(anchorDate);
@@ -1178,7 +1200,8 @@
 
     // Fetch operators + agenda in parallel (reduces initial load latency).
     const opsPromise = apiGet("/api/operators").catch(() => null);
-    const agendaPromise = apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    const nocache = opts && opts.nocache ? "&nocache=1" : "";
+    const agendaPromise = apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${nocache}`);
 
     const [ops, data] = await Promise.all([opsPromise, agendaPromise]);
 
@@ -1308,11 +1331,14 @@
     const totalDayCols = days * colsPerDay;
 
     // Colonne sempre visibili: si stringono (no orizzontale) quando aggiungo operatori
-    const showCancelBand = true; // requested: show "disdette" band even in single-operator view
+    const apptSettings = loadAppointmentsSettingsFromStorage();
+    const showCancelBand = Boolean(apptSettings.cancelband);
+    // Make sticky offsets match the presence/absence of the band.
+    try { document.documentElement.style.setProperty("--fpCancelH", showCancelBand ? "42px" : "0px"); } catch {}
     gridEl.style.gridTemplateColumns = `64px repeat(${totalDayCols}, minmax(0, 1fr))`;
-    if (multiUser) gridEl.style.gridTemplateRows = `58px 42px 34px ${heightPx}px`;
-    else if (showCancelBand) gridEl.style.gridTemplateRows = `58px 42px ${heightPx}px`;
-    else gridEl.style.gridTemplateRows = `58px ${heightPx}px`;
+    const cancelH = showCancelBand ? 42 : 0;
+    if (multiUser) gridEl.style.gridTemplateRows = `58px ${cancelH}px 34px ${heightPx}px`;
+    else gridEl.style.gridTemplateRows = `58px ${cancelH}px ${heightPx}px`;
 
     // Corner (day header)
     const corner = document.createElement("div");
@@ -1335,10 +1361,11 @@
     }
 
     // Cancelled-band row: between day header and operator header (or before grid in single-user)
-    if (multiUser || showCancelBand) {
+    // We keep the row even when disabled (height 0) to keep row indices stable.
+    {
       const blank = document.createElement("div");
       blank.className = "corner";
-      blank.style.height = "42px";
+      blank.style.height = (showCancelBand ? "42px" : "0px");
       blank.style.gridColumn = "1";
       blank.style.gridRow = "2";
       gridEl.appendChild(blank);
@@ -1396,7 +1423,7 @@
     timeCol.className = "timeCol";
     timeCol.style.height = heightPx + "px";
     timeCol.style.gridColumn = "1";
-    timeCol.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
+    timeCol.style.gridRow = multiUser ? "4" : "3";
     timeCol.style.position = "sticky";
     timeCol.style.left = "0";
     timeCol.style.zIndex = "4";
@@ -1436,7 +1463,7 @@
         }
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-        col.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
+        col.style.gridRow = multiUser ? "4" : "3";
 
         // Availability overlay (slot-based). Base is "non-working" dark, with "working" green blocks.
         {
@@ -2236,8 +2263,17 @@
       gridEndMin: range.endMin,
     });
 
-    // Render cancelled appointments into the band (also when single-operator view).
+    const apptSettings = loadAppointmentsSettingsFromStorage();
+    const showCancelBand = Boolean(apptSettings.cancelband);
+    const dragEnabled = Boolean(apptSettings.drag);
+
+    // Render cancelled appointments into the band.
     {
+      if (!showCancelBand) {
+        // ensure empty if disabled
+        const cancelWraps = Array.from(document.querySelectorAll("[data-cancel-wrap]"));
+        cancelWraps.forEach((w) => (w.innerHTML = ""));
+      } else {
       const cancelWraps = Array.from(document.querySelectorAll("[data-cancel-wrap]"));
       cancelWraps.forEach((w) => (w.innerHTML = ""));
 
@@ -2296,11 +2332,13 @@
           wrap.appendChild(more);
         }
       }
+      }
     }
 
     const cols = Array.from(document.querySelectorAll(".dayCol"));
     const startMin = range.startMin;
     const endMin = range.endMin;
+    const totalSlotsForDnD = Math.max(1, Math.ceil((endMin - startMin) / SLOT_MIN));
 
     items.forEach((it) => {
       let col = null;
@@ -2347,7 +2385,175 @@
         <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
-      ev.onclick = () => openDetailsModal(it);
+      // Click vs drag: if drag is enabled, click only fires when user didn't move.
+      let dragStart = null;
+      let dragMoved = false;
+      let dragCleanup = null;
+
+      const fmtDT = (d) => {
+        try { return d.toLocaleString("it-IT", { weekday:"short", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }); } catch { return String(d); }
+      };
+
+      const clearDropIndicator = () => {
+        document.querySelectorAll("[data-fp-drop-indicator]").forEach((x) => x.remove());
+      };
+      const showDropIndicator = (colEl, topPx, heightPx) => {
+        if (!colEl) return;
+        clearDropIndicator();
+        const ind = document.createElement("div");
+        ind.setAttribute("data-fp-drop-indicator", "1");
+        ind.style.position = "absolute";
+        ind.style.left = "10px";
+        ind.style.right = "10px";
+        ind.style.top = Math.round(topPx) + "px";
+        ind.style.height = Math.max(8, Math.round(heightPx)) + "px";
+        ind.style.border = "2px dashed rgba(255, 122, 0, .95)";
+        ind.style.borderRadius = "10px";
+        ind.style.background = "rgba(255, 122, 0, .10)";
+        ind.style.pointerEvents = "none";
+        ind.style.zIndex = "6";
+        colEl.appendChild(ind);
+      };
+
+      const applyMove = async ({ targetDayIndex, targetTherapist, targetStartMin }) => {
+        const dayObj = addDays(start, targetDayIndex);
+        const rule = getSlotRule(targetTherapist || it.therapist, dayObj, targetStartMin);
+        if (!rule?.on) {
+          toast?.("Fuori orario di lavoro");
+          return;
+        }
+
+        const durMin = (() => {
+          const stMin0 = minutesOfDay(it.startAt);
+          let d0 = 30;
+          if (it.endAt) {
+            const en0 = minutesOfDay(it.endAt);
+            if (en0 > stMin0) d0 = en0 - stMin0;
+          }
+          return d0;
+        })();
+
+        const newStart = new Date(dayObj.getFullYear(), dayObj.getMonth(), dayObj.getDate(), 0, 0, 0, 0);
+        newStart.setMinutes(targetStartMin);
+        const newEnd = new Date(newStart.getTime() + durMin * 60000);
+
+        const fromLabel = `${fmtDT(it.startAt)} • ${String(it.therapist || "").trim() || "—"}`;
+        const toLabel = `${fmtDT(newStart)} • ${String(targetTherapist || it.therapist || "").trim() || "—"}`;
+        const ok = window.confirm(`Confermi lo spostamento dell'appuntamento?\n\nDa: ${fromLabel}\nA:  ${toLabel}`);
+        if (!ok) return;
+
+        const payload = {
+          start_at: newStart.toISOString(),
+          end_at: newEnd.toISOString(),
+        };
+
+        // If moving across therapists, update collaborator link (best-effort).
+        const therTrim = String(targetTherapist || "").trim();
+        if (multiUser && therTrim && therTrim !== String(it.therapist || "").trim()) {
+          const opId = operatorNameToId.get(therTrim) || "";
+          if (opId) payload.therapist_id = opId;
+        }
+
+        try {
+          const res = await fetch(`/api/appointments?id=${encodeURIComponent(it.id)}`, {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+
+          // Optimistic local update for immediate UI response.
+          it.startAt = newStart;
+          it.endAt = newEnd;
+          if (multiUser && therTrim) it.therapist = therTrim;
+          toast?.("Spostato");
+
+          // Reload without cache so it reflects instantly.
+          load({ nocache: true }).catch(() => {});
+        } catch (e) {
+          console.error(e);
+          alert(e.message || "Errore spostamento appuntamento");
+        }
+      };
+
+      const onClick = () => openDetailsModal(it);
+
+      if (!dragEnabled) {
+        ev.onclick = onClick;
+      } else {
+        ev.addEventListener("mousedown", (e) => {
+          if (editHoursMode) return; // don't conflict with slot-edit mode
+          if (e.button !== 0) return;
+          dragMoved = false;
+          dragStart = { x: e.clientX, y: e.clientY };
+          ev.classList.add("isDragging");
+          try { e.preventDefault(); } catch {}
+          try { e.stopPropagation(); } catch {}
+
+          const onMove = (me) => {
+            if (!dragStart) return;
+            const dx = Math.abs(me.clientX - dragStart.x);
+            const dy = Math.abs(me.clientY - dragStart.y);
+            if (dx + dy > 5) dragMoved = true;
+
+            const under = document.elementFromPoint(me.clientX, me.clientY);
+            const colEl = under?.closest?.(".dayCol") || null;
+            if (!colEl) return;
+            const dIdx = Number(colEl.dataset.dayIndex || "0");
+            const ther = multiUser ? String(colEl.dataset.therapist || "").trim() : String(it.therapist || "").trim();
+            const r = colEl.getBoundingClientRect();
+            const y = (me.clientY - r.top) - GRID_PAD_TOP;
+          const idx = Math.max(0, Math.min(totalSlotsForDnD - 1, Math.floor(y / SLOT_PX)));
+            const slotStartMin = startMin + idx * SLOT_MIN;
+            showDropIndicator(colEl, GRID_PAD_TOP + idx * SLOT_PX, height);
+            ev.dataset.fpDragTarget = JSON.stringify({ dIdx, ther, slotStartMin });
+          };
+
+          const onUp = (ue) => {
+            const tgtRaw = ev.dataset.fpDragTarget || "";
+            ev.dataset.fpDragTarget = "";
+            ev.classList.remove("isDragging");
+            clearDropIndicator();
+            if (dragCleanup) dragCleanup();
+            dragCleanup = null;
+
+            const moved = dragMoved;
+            dragStart = null;
+            dragMoved = false;
+
+            if (!moved) {
+              onClick();
+              return;
+            }
+
+            let tgt = null;
+            try { tgt = tgtRaw ? JSON.parse(tgtRaw) : null; } catch { tgt = null; }
+            if (!tgt) return;
+
+            applyMove({
+              targetDayIndex: Number(tgt.dIdx || 0),
+              targetTherapist: String(tgt.ther || "").trim() || String(it.therapist || "").trim(),
+              targetStartMin: Number(tgt.slotStartMin || startMin),
+            });
+          };
+
+          document.addEventListener("mousemove", onMove, true);
+          document.addEventListener("mouseup", onUp, true);
+          dragCleanup = () => {
+            document.removeEventListener("mousemove", onMove, true);
+            document.removeEventListener("mouseup", onUp, true);
+          };
+        });
+        // Also keep click accessible when drag setting is on.
+        ev.addEventListener("click", (e) => {
+          if (dragMoved) {
+            try { e.preventDefault(); } catch {}
+            try { e.stopPropagation(); } catch {}
+          }
+        });
+      }
       ev.addEventListener("mousemove", (e) => showHover(it, e.clientX, e.clientY));
       ev.addEventListener("mouseleave", hideHover);
 
@@ -2535,11 +2741,19 @@
   };
   window.addEventListener("fpAvailabilityChanged", onAvailabilityChanged);
 
+  // If "Impostazioni Appuntamenti" changes, refresh cache + re-render.
+  const onAppointmentsSettingsChanged = () => {
+    appointmentsSettingsCache = null;
+    try { render(); } catch {}
+  };
+  window.addEventListener("fpAppointmentsSettingsChanged", onAppointmentsSettingsChanged);
+
   // Cleanup (remove global listeners + ephemeral DOM)
   window.__FP_DIARY_CLEANUP = () => {
     try { document.removeEventListener("scroll", onDocScroll, true); } catch {}
     try { window.removeEventListener("resize", onResize); } catch {}
     try { window.removeEventListener("fpAvailabilityChanged", onAvailabilityChanged); } catch {}
+    try { window.removeEventListener("fpAppointmentsSettingsChanged", onAppointmentsSettingsChanged); } catch {}
     try { hoverCard?.remove?.(); } catch {}
     try { slotHoverCard?.remove?.(); } catch {}
   };

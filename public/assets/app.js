@@ -1416,6 +1416,7 @@ function loadAppointmentsSettings() {
   reset && (reset.onclick = () => {
     localStorage.removeItem(key);
     loadAppointmentsSettings();
+    try { window.dispatchEvent(new CustomEvent("fpAppointmentsSettingsChanged")); } catch {}
   });
   save && (save.onclick = () => {
     const next = {
@@ -1430,6 +1431,7 @@ function loadAppointmentsSettings() {
     try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
     closeAppointmentsModal();
     toast("Salvato");
+    try { window.dispatchEvent(new CustomEvent("fpAppointmentsSettingsChanged")); } catch {}
   });
 }
 
