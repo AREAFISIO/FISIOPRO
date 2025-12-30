@@ -381,19 +381,13 @@ body.fp-right-expanded .rbLabel{ display:block; }
 .fp-av-cell:last-child{ border-right:none; }
 .fp-av-cell.on,
 .fp-av-cell.work{
-  background: rgba(34,230,195,.22);
-  outline: 1px solid rgba(34,230,195,.35);
+  /* background is set inline (per-collaborator color), keep a subtle ring */
+  outline: 1px solid rgba(255,255,255,.18);
 }
 .fp-av-cell.off{
-  background:
-    repeating-linear-gradient(
-      135deg,
-      rgba(255,77,109,.12) 0px,
-      rgba(255,77,109,.12) 8px,
-      rgba(255,255,255,.01) 8px,
-      rgba(255,255,255,.01) 16px
-    );
-  outline: 1px solid rgba(255,77,109,.26);
+  /* requested: no red "non lavorativo" visuals */
+  background: rgba(255,255,255,.02);
+  outline: none;
 }
 .fp-av-cell.sel{
   outline: 2px solid rgba(74,163,255,.95);
@@ -429,16 +423,19 @@ body.fp-right-expanded .rbLabel{ display:block; }
 }
 .fp-av-toolbar label{
   font-weight: 900;
-  color: rgba(255,255,255,.82);
+  color: rgba(255,255,255,.86);
+  font-size: 16px;
 }
 .fp-av-toolbar select{
-  height: 34px;
+  height: 48px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,.18);
   background: rgba(0,0,0,.18);
   color: rgba(255,255,255,.92);
   padding: 0 10px;
   min-width: min(320px, 82vw);
+  font-size: 22px;
+  font-weight: 1000;
 }
 .fp-av-editor__head{
   padding: 14px 14px 10px 14px;
