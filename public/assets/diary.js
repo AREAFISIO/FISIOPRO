@@ -32,6 +32,7 @@
   const opsBtnAll = document.querySelector("[data-ops-all]");
   const btnOpenPrefs = document.querySelector("[data-open-prefs]");
   const btnOpenOps = document.querySelector("[data-open-ops]");
+  const btnOpenHours = document.querySelector("[data-open-hours]");
   const btnPrev = document.querySelector("[data-cal-prev]");
   const btnNext = document.querySelector("[data-cal-next]");
   const btnToday = document.querySelector("[data-cal-today]");
@@ -76,6 +77,11 @@
   let draftSelected = new Set();
   let pickMode = "view"; // view | defaults
   let didApplyDefaultSelectionOnce = false;
+  let editHoursMode = false;
+
+  // Work slots are stored at 30-min base resolution (stable even if grid slot is 60).
+  const BASE_SLOT_MIN = 30;
+  const MINUTES_PER_DAY = 24 * 60;
 
   // Hover card (info rapida)
   const hoverCard = document.createElement("div");
@@ -225,6 +231,13 @@
       { on: true, start: "08:00", end: "14:00" }, // SAB
       { on: false, start: "08:00", end: "14:00" }, // DOM
     ],
+    // Per-operator slot overrides:
+    // {
+    //   "<therapistName|DEFAULT>": {
+    //     "0".."6": { "<minute>": { on:boolean, locationId?:string, locationName?:string } }
+    //   }
+    // }
+    workSlots: {},
     showService: true,
     dayNav: false,
     userColor: "",
@@ -260,6 +273,206 @@
       const end = String(it?.end || "").trim() || (i === 5 ? "14:00" : "20:00");
       return { on, start, end };
     });
+  }
+
+  function normTherapistKeyForSlots(name) {
+    const s = String(name || "").trim();
+    return s || "DEFAULT";
+  }
+
+  function roundDownToBase(min) {
+    const m = clamp(Number(min) || 0, 0, MINUTES_PER_DAY - 1);
+    return Math.floor(m / BASE_SLOT_MIN) * BASE_SLOT_MIN;
+  }
+  function roundUpToBaseExclusive(min) {
+    const m = clamp(Number(min) || 0, 0, MINUTES_PER_DAY);
+    return Math.ceil(m / BASE_SLOT_MIN) * BASE_SLOT_MIN;
+  }
+
+  function getSlotRule(therapistName, dateObj, minuteOfDay) {
+    const key = normTherapistKeyForSlots(therapistName);
+    const wIdx = weekdayIdxMon0(dateObj);
+    const m = String(roundDownToBase(minuteOfDay));
+    const store = prefs.workSlots || {};
+    const byTher = store[key] || store.DEFAULT || null;
+    const byDay = byTher ? (byTher[String(wIdx)] || null) : null;
+    const hit = byDay ? byDay[m] : null;
+    if (hit && typeof hit === "object") return { on: Boolean(hit.on), locationId: hit.locationId || "", locationName: hit.locationName || "" };
+
+    // fallback to workHours band
+    const wh = getWorkForDate(dateObj);
+    if (!wh.on) return { on: false, locationId: "", locationName: "" };
+    const md = clamp(Number(minuteOfDay) || 0, 0, MINUTES_PER_DAY - 1);
+    const on = md >= wh.startMin && md < wh.endMin;
+    return { on, locationId: "", locationName: "" };
+  }
+
+  function setSlotRuleRange({ therapistName, dateObj, startMin, endMinExclusive, on, locationId, locationName }) {
+    const key = normTherapistKeyForSlots(therapistName);
+    const wIdx = String(weekdayIdxMon0(dateObj));
+    prefs.workSlots = prefs.workSlots && typeof prefs.workSlots === "object" ? prefs.workSlots : {};
+    if (!prefs.workSlots[key]) prefs.workSlots[key] = {};
+    if (!prefs.workSlots[key][wIdx]) prefs.workSlots[key][wIdx] = {};
+    const dayMap = prefs.workSlots[key][wIdx];
+
+    const a = roundDownToBase(startMin);
+    const b = roundUpToBaseExclusive(endMinExclusive);
+    for (let m = a; m < b; m += BASE_SLOT_MIN) {
+      dayMap[String(m)] = on
+        ? { on: true, locationId: String(locationId || ""), locationName: String(locationName || "") }
+        : { on: false };
+    }
+  }
+
+  function clearSelectionOverlays() {
+    document.querySelectorAll("[data-slot-sel]").forEach((el) => el.remove());
+  }
+
+  function showSelectionOverlay(col, topPx, heightPx) {
+    if (!col) return;
+    clearSelectionOverlays();
+    const sel = document.createElement("div");
+    sel.setAttribute("data-slot-sel", "1");
+    sel.style.position = "absolute";
+    sel.style.left = "10px";
+    sel.style.right = "10px";
+    sel.style.top = Math.round(topPx) + "px";
+    sel.style.height = Math.max(8, Math.round(heightPx)) + "px";
+    sel.style.border = "2px solid rgba(75, 165, 255, .95)";
+    sel.style.borderRadius = "8px";
+    sel.style.boxShadow = "0 0 0 2px rgba(0,0,0,.15) inset";
+    sel.style.background = "rgba(75, 165, 255, .12)";
+    sel.style.pointerEvents = "none";
+    sel.style.zIndex = "5";
+    col.appendChild(sel);
+  }
+
+  function buildSlotEditModal() {
+    if (document.querySelector("[data-slot-edit-back]")) return;
+    const back = document.createElement("div");
+    back.className = "oe-modal__backdrop";
+    back.style.display = "none";
+    back.setAttribute("data-slot-edit-back", "1");
+    back.innerHTML = `
+      <div class="oe-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
+        <div class="oe-modal__header">
+          <div class="oe-modal__title">1 slot selezionato</div>
+          <button class="oe-modal__x" data-slot-edit-close aria-label="Chiudi">×</button>
+        </div>
+        <div class="oe-modal__body">
+          <div style="display:flex; align-items:center; gap:18px; margin-bottom: 10px;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:900;">
+              <input type="radio" name="fp_slot_mode" value="off" />
+              <span>Non lavorativo</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:900;">
+              <input type="radio" name="fp_slot_mode" value="on" checked />
+              <span>Lavorativo</span>
+            </label>
+          </div>
+          <div style="opacity:.85; font-weight:900; margin: 10px 0 8px;">Luogo di lavoro:</div>
+          <div data-slot-edit-locs style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+        <div class="oe-modal__footer">
+          <button class="oe-btn oe-btn--primary" data-slot-edit-ok>OK</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+  }
+
+  async function openSlotEditModal({ therapistName, dateObj, startMin, endMinExclusive }) {
+    buildSlotEditModal();
+    const back = document.querySelector("[data-slot-edit-back]");
+    if (!back) return;
+    const title = back.querySelector(".oe-modal__title");
+    const list = back.querySelector("[data-slot-edit-locs]");
+    const btnOk = back.querySelector("[data-slot-edit-ok]");
+    const btnClose = back.querySelector("[data-slot-edit-close]");
+    const radios = Array.from(back.querySelectorAll("input[name=\"fp_slot_mode\"]"));
+
+    const slots = [];
+    for (let m = roundDownToBase(startMin); m < roundUpToBaseExclusive(endMinExclusive); m += BASE_SLOT_MIN) {
+      slots.push(getSlotRule(therapistName, dateObj, m));
+    }
+    const count = slots.length;
+    if (title) title.textContent = `${count} slot selezionat${count === 1 ? "o" : "i"}`;
+
+    // Infer current selection (if all same)
+    const allOn = slots.every((s) => s.on === true);
+    const allOff = slots.every((s) => s.on === false);
+    const mode = allOff ? "off" : "on"; // default to on when mixed
+    radios.forEach((r) => { r.checked = (r.value === mode); });
+
+    let chosenLocId = "";
+    if (allOn) {
+      const ids = new Set(slots.map((s) => String(s.locationId || "")).filter(Boolean));
+      if (ids.size === 1) chosenLocId = Array.from(ids)[0];
+    }
+
+    // Load locations
+    let locs = [];
+    try {
+      locs = await loadLocations();
+    } catch (e) {
+      console.warn("loadLocations failed", e);
+      locs = [];
+    }
+    if (list) {
+      list.innerHTML = "";
+      const items = Array.isArray(locs) ? locs : [];
+      items.forEach((x) => {
+        const id = String(x.id || "");
+        const name = String(x.name || x.label || id);
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "btn";
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.justifyContent = "space-between";
+        row.style.padding = "12px 14px";
+        row.style.borderRadius = "14px";
+        row.style.border = chosenLocId === id ? "1px solid rgba(34,230,195,.55)" : "1px solid rgba(255,255,255,.16)";
+        row.style.background = chosenLocId === id ? "rgba(34,230,195,.12)" : "rgba(255,255,255,.04)";
+        row.style.fontWeight = "1000";
+        row.innerHTML = `<span style="display:flex; align-items:center; gap:10px;">
+            <span style="width:22px; height:22px; border-radius:8px; display:grid; place-items:center; border:1px solid rgba(255,255,255,.18); background:${chosenLocId === id ? "rgba(34,230,195,.22)" : "rgba(0,0,0,.10)"};">
+              ${chosenLocId === id ? "✓" : ""}
+            </span>
+            <span>${name}</span>
+          </span>`;
+        row.addEventListener("click", () => {
+          chosenLocId = id;
+          // rerender highlight quickly
+          openSlotEditModal({ therapistName, dateObj, startMin, endMinExclusive }).catch(()=>{});
+        }, { once: true });
+        list.appendChild(row);
+      });
+    }
+
+    const close = () => { back.style.display = "none"; clearSelectionOverlays(); };
+    btnClose && (btnClose.onclick = close);
+    back.onclick = (e) => { if (e.target === back) close(); };
+
+    btnOk && (btnOk.onclick = () => {
+      const chosenMode = (radios.find((r) => r.checked)?.value || "on");
+      const on = chosenMode === "on";
+      const loc = (Array.isArray(locs) ? locs : []).find((x) => String(x.id || "") === String(chosenLocId || "")) || null;
+      setSlotRuleRange({
+        therapistName,
+        dateObj,
+        startMin,
+        endMinExclusive,
+        on,
+        locationId: on ? (loc?.id || chosenLocId || "") : "",
+        locationName: on ? (loc?.name || "") : "",
+      });
+      savePrefs();
+      close();
+      render();
+    });
+
+    back.style.display = "flex";
   }
 
   function renderWorkHoursEditor() {
@@ -645,6 +858,7 @@
         { on: true, start: "08:00", end: "14:00" },
         { on: false, start: "08:00", end: "14:00" },
       ],
+      workSlots: {},
       showService: true,
       dayNav: false,
       userColor: "",
@@ -1258,48 +1472,51 @@
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
 
-        // work hours overlay (non-working areas)
-        const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(addDays(start, dIdx));
-        if (!wh.on) {
-          const mask = document.createElement("div");
-          mask.style.position = "absolute";
-          mask.style.left = "0";
-          mask.style.right = "0";
-          mask.style.top = GRID_PAD_TOP + "px";
-          mask.style.height = (totalSlots * SLOT_PX) + "px";
-          mask.style.background = "rgba(0,0,0,.18)";
-          mask.style.pointerEvents = "none";
-          mask.style.zIndex = "1";
-          col.appendChild(mask);
-        } else {
-          const topPx = GRID_PAD_TOP + (((wh.startMin - startMinRange) / SLOT_MIN) * SLOT_PX);
-          const botPx = GRID_PAD_TOP + (((wh.endMin - startMinRange) / SLOT_MIN) * SLOT_PX);
+        // Availability overlay (slot-based). Base is "non-working" dark, with "working" green blocks.
+        {
+          const therapistForCol = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
+          const dayObj = addDays(start, dIdx);
           const endPx = GRID_PAD_TOP + (totalSlots * SLOT_PX);
-          // pre-work
-          if (topPx > GRID_PAD_TOP + 1) {
-            const maskA = document.createElement("div");
-            maskA.style.position = "absolute";
-            maskA.style.left = "0";
-            maskA.style.right = "0";
-            maskA.style.top = GRID_PAD_TOP + "px";
-            maskA.style.height = Math.max(0, topPx - GRID_PAD_TOP) + "px";
-            maskA.style.background = "rgba(0,0,0,.16)";
-            maskA.style.pointerEvents = "none";
-            maskA.style.zIndex = "1";
-            col.appendChild(maskA);
+
+          // full dark mask
+          const dark = document.createElement("div");
+          dark.style.position = "absolute";
+          dark.style.left = "0";
+          dark.style.right = "0";
+          dark.style.top = GRID_PAD_TOP + "px";
+          dark.style.height = (totalSlots * SLOT_PX) + "px";
+          dark.style.background = "rgba(0,0,0,.16)";
+          dark.style.pointerEvents = "none";
+          dark.style.zIndex = "1";
+          col.appendChild(dark);
+
+          // green working segments (merge consecutive slots)
+          let segStart = null; // px
+          for (let s = 0; s < totalSlots; s++) {
+            const minute = startMinRange + s * SLOT_MIN;
+            const rule = getSlotRule(therapistForCol, dayObj, minute);
+            const on = Boolean(rule.on);
+            const y = GRID_PAD_TOP + (s * SLOT_PX);
+            if (on && segStart === null) segStart = y;
+            if ((!on || s === totalSlots - 1) && segStart !== null) {
+              const segEnd = (!on ? y : (y + SLOT_PX));
+              const block = document.createElement("div");
+              block.style.position = "absolute";
+              block.style.left = "0";
+              block.style.right = "0";
+              block.style.top = segStart + "px";
+              block.style.height = Math.max(2, segEnd - segStart) + "px";
+              block.style.background = "rgba(34,230,195,.14)";
+              block.style.pointerEvents = "none";
+              block.style.zIndex = "2";
+              col.appendChild(block);
+              segStart = null;
+            }
           }
-          // post-work
-          if (botPx < endPx - 1) {
-            const maskB = document.createElement("div");
-            maskB.style.position = "absolute";
-            maskB.style.left = "0";
-            maskB.style.right = "0";
-            maskB.style.top = Math.max(GRID_PAD_TOP, botPx) + "px";
-            maskB.style.height = Math.max(0, endPx - botPx) + "px";
-            maskB.style.background = "rgba(0,0,0,.16)";
-            maskB.style.pointerEvents = "none";
-            maskB.style.zIndex = "1";
-            col.appendChild(maskB);
+
+          // Clamp overlays within grid
+          if (endPx <= GRID_PAD_TOP + 1) {
+            // no-op safeguard
           }
         }
 
@@ -1361,8 +1578,76 @@
         });
         col.addEventListener("mouseleave", () => { hover.style.display = "none"; hideSlotHover(); });
 
+        // Slot editing: click+drag selects slots and opens editor.
+        let dragStartIdx = null;
+        let dragActive = false;
+        let dragDay = null;
+        let dragTherapist = "";
+
+        const slotIdxFromClientY = (clientY) => {
+          const r = col.getBoundingClientRect();
+          const y = (clientY - r.top) - GRID_PAD_TOP;
+          return Math.max(0, Math.min(totalSlots - 1, Math.floor(y / SLOT_PX)));
+        };
+
+        const applyDragOverlay = (idxA, idxB) => {
+          const a = Math.min(idxA, idxB);
+          const b = Math.max(idxA, idxB);
+          const top = GRID_PAD_TOP + a * SLOT_PX;
+          const h = (b - a + 1) * SLOT_PX;
+          showSelectionOverlay(col, top, h);
+        };
+
+        col.addEventListener("mousedown", (e) => {
+          if (!editHoursMode) return;
+          if (e.button !== 0) return;
+          if (e.target && e.target.closest && e.target.closest(".event")) return;
+          dragActive = true;
+          dragStartIdx = slotIdxFromClientY(e.clientY);
+          dragDay = addDays(start, dIdx);
+          dragTherapist = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
+          applyDragOverlay(dragStartIdx, dragStartIdx);
+          try { e.preventDefault(); } catch {}
+        });
+        col.addEventListener("mousemove", (e) => {
+          if (!editHoursMode) return;
+          if (!dragActive || dragStartIdx === null) return;
+          const idx = slotIdxFromClientY(e.clientY);
+          applyDragOverlay(dragStartIdx, idx);
+        });
+        const finishDrag = (e) => {
+          if (!editHoursMode) return;
+          if (!dragActive || dragStartIdx === null) return;
+          dragActive = false;
+          const endIdx = slotIdxFromClientY(e.clientY);
+          const a = Math.min(dragStartIdx, endIdx);
+          const b = Math.max(dragStartIdx, endIdx);
+          const selStartMin = startMinRange + a * SLOT_MIN;
+          const selEndMinEx = startMinRange + (b + 1) * SLOT_MIN;
+          openSlotEditModal({
+            therapistName: dragTherapist,
+            dateObj: dragDay || addDays(start, dIdx),
+            startMin: selStartMin,
+            endMinExclusive: selEndMinEx,
+          }).catch((err) => {
+            console.error(err);
+            clearSelectionOverlays();
+          });
+          dragStartIdx = null;
+        };
+        col.addEventListener("mouseup", (e) => finishDrag(e));
+        col.addEventListener("mouseleave", () => {
+          if (!editHoursMode) return;
+          // if user drags outside, keep overlay; mouseup on window will close it.
+        });
+        window.addEventListener("mouseup", (e) => {
+          // capture drag end even outside column
+          try { finishDrag(e); } catch {}
+        });
+
         col.addEventListener("click", (e) => {
           if (e.target && e.target.closest && e.target.closest(".event")) return;
+          if (editHoursMode) return; // in edit mode, click is handled by drag selection
           hideSlotHover();
           const idx = Number(col.dataset._slotIndex || "0");
           const slotStartMin = startMinRange + idx * SLOT_MIN;
@@ -1372,8 +1657,9 @@
           dt.setMinutes(slotStartMin);
 
           // Block creating appointments outside working hours (default behavior).
-          const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(day);
-          if (!wh.on || slotStartMin < wh.startMin || slotStartMin >= wh.endMin) {
+          const therapistNameForRule = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
+          const rule = getSlotRule(therapistNameForRule, day, slotStartMin);
+          if (!rule.on) {
             toast?.("Fuori orario di lavoro");
             return;
           }
@@ -2160,6 +2446,11 @@
   // Right bar buttons
   btnOpenPrefs?.addEventListener("click", openPrefs);
   btnOpenOps?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
+  btnOpenHours?.addEventListener("click", () => {
+    editHoursMode = !editHoursMode;
+    clearSelectionOverlays();
+    toast?.(editHoursMode ? "Modalità orari a slot: ON" : "Modalità orari a slot: OFF");
+  });
 
   // Preferences modal events
   prefsClose?.addEventListener("click", closePrefs);
