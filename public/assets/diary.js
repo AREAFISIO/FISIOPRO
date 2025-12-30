@@ -41,8 +41,8 @@
   const modalBody = document.querySelector("[data-cal-modal-body]");
   const modalClose = document.querySelector("[data-cal-modal-close]");
 
-  const START_HOUR = 7;
-  const END_HOUR = 21;
+  // Grid time range is computed dynamically from user "work hours" preferences.
+  // (Fallback defaults below, can be overridden in preferences.)
   let SLOT_MIN = 30; // user preference
   // SLOT_PX is dynamically adjusted to fill available vertical space.
   // Default is 18px (good density on laptops).
@@ -214,10 +214,126 @@
     multiUser: false,
     defaultOperators: [],
     doubleOperators: [],
+    // Work hours per weekday (Mon..Sun). When on=false the day is "non lavorativo".
+    // Times are "HH:MM" in local time.
+    workHours: [
+      { on: true, start: "08:00", end: "20:00" }, // LUN
+      { on: true, start: "08:00", end: "20:00" }, // MAR
+      { on: true, start: "08:00", end: "20:00" }, // MER
+      { on: true, start: "08:00", end: "20:00" }, // GIO
+      { on: true, start: "08:00", end: "20:00" }, // VEN
+      { on: true, start: "08:00", end: "14:00" }, // SAB
+      { on: false, start: "08:00", end: "14:00" }, // DOM
+    ],
     showService: true,
     dayNav: false,
     userColor: "",
   };
+
+  const prefWorkHours = document.querySelector("[data-pref-workhours]");
+
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  function timeToMin(s) {
+    const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+    return hh * 60 + mm;
+  }
+  function minToTime(min) {
+    const m = clamp(Number(min) || 0, 0, 24 * 60 - 1);
+    const hh = String(Math.floor(m / 60)).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+  function weekdayIdxMon0(d) { return (d.getDay() + 6) % 7; } // lun=0..dom=6
+  const WEEKDAY_LABELS = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
+
+  function normalizeWorkHours(x) {
+    const out = Array.isArray(x) ? x.slice(0, 7) : [];
+    while (out.length < 7) out.push({ on: true, start: "08:00", end: "20:00" });
+    return out.map((it, i) => {
+      const on = Boolean(it?.on);
+      const start = String(it?.start || "").trim() || (i === 5 ? "08:00" : "08:00");
+      const end = String(it?.end || "").trim() || (i === 5 ? "14:00" : "20:00");
+      return { on, start, end };
+    });
+  }
+
+  function renderWorkHoursEditor() {
+    if (!prefWorkHours) return;
+    prefs.workHours = normalizeWorkHours(prefs.workHours);
+    prefWorkHours.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.style.display = "grid";
+    wrap.style.gridTemplateColumns = "1fr";
+    wrap.style.gap = "8px";
+
+    prefs.workHours.forEach((wh, idx) => {
+      const row = document.createElement("div");
+      row.className = "prefPickRow";
+      row.style.cursor = "default";
+      row.style.alignItems = "center";
+      row.style.gap = "12px";
+      row.style.padding = "10px 12px";
+
+      row.innerHTML = `
+        <div class="prefPickLeft" style="gap:12px; min-width:0;">
+          <label class="switch" title="Lavorativo / Non lavorativo">
+            <input type="checkbox" data-wh-on="${idx}" ${wh.on ? "checked" : ""} />
+            <span class="slider"></span>
+          </label>
+          <div style="min-width:0;">
+            <div class="prefPickName">${WEEKDAY_LABELS[idx]}</div>
+            <div class="prefPickMini">${wh.on ? "Lavorativo" : "Non lavorativo"}</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; flex:0 0 auto;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="opsMini" style="opacity:.75;">Inizio</div>
+            <input type="time" data-wh-start="${idx}" value="${wh.start}" ${wh.on ? "" : "disabled"} style="height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.18); color: rgba(255,255,255,.90); padding: 0 10px; min-width: 118px;" />
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="opsMini" style="opacity:.75;">Fine</div>
+            <input type="time" data-wh-end="${idx}" value="${wh.end}" ${wh.on ? "" : "disabled"} style="height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.18); color: rgba(255,255,255,.90); padding: 0 10px; min-width: 118px;" />
+          </div>
+        </div>
+      `;
+
+      wrap.appendChild(row);
+    });
+
+    prefWorkHours.appendChild(wrap);
+
+    // wire events (delegated)
+    prefWorkHours.querySelectorAll("input[data-wh-on]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const idx = Number(el.getAttribute("data-wh-on"));
+        if (!Number.isFinite(idx)) return;
+        prefs.workHours[idx].on = Boolean(el.checked);
+        renderWorkHoursEditor();
+      });
+    });
+    prefWorkHours.querySelectorAll("input[data-wh-start]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const idx = Number(el.getAttribute("data-wh-start"));
+        const v = String(el.value || "").trim();
+        if (!Number.isFinite(idx)) return;
+        prefs.workHours[idx].start = v;
+      });
+    });
+    prefWorkHours.querySelectorAll("input[data-wh-end]").forEach((el) => {
+      el.addEventListener("change", () => {
+        const idx = Number(el.getAttribute("data-wh-end"));
+        const v = String(el.value || "").trim();
+        if (!Number.isFinite(idx)) return;
+        prefs.workHours[idx].end = v;
+      });
+    });
+  }
 
   function pad2(n) { return String(n).padStart(2, "0"); }
   function toYmd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -248,8 +364,7 @@
     return `${pad2(start.getDate())}/${pad2(start.getMonth() + 1)} → ${pad2(end.getDate())}/${pad2(end.getMonth() + 1)}`;
   }
   function itDayLabel(d) {
-    const days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
-    return days[(d.getDay() + 6) % 7];
+    return WEEKDAY_LABELS[(d.getDay() + 6) % 7];
   }
 
   function minutesOfDay(dt) { return dt.getHours() * 60 + dt.getMinutes(); }
@@ -516,7 +631,24 @@
     try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
   }
   function resetPrefs() {
-    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], doubleOperators: [], showService: true, dayNav: false, userColor: "" };
+    prefs = {
+      slotMin: 30,
+      multiUser: false,
+      defaultOperators: [],
+      doubleOperators: [],
+      workHours: [
+        { on: true, start: "08:00", end: "20:00" },
+        { on: true, start: "08:00", end: "20:00" },
+        { on: true, start: "08:00", end: "20:00" },
+        { on: true, start: "08:00", end: "20:00" },
+        { on: true, start: "08:00", end: "20:00" },
+        { on: true, start: "08:00", end: "14:00" },
+        { on: false, start: "08:00", end: "14:00" },
+      ],
+      showService: true,
+      dayNav: false,
+      userColor: "",
+    };
     SLOT_MIN = 30;
     multiUser = false;
     savePrefs();
@@ -534,6 +666,7 @@
     if (prefDoublePicker && !prefMulti?.checked) prefDoublePicker.style.display = "none";
     renderDefaultDots();
     renderDoubleDots();
+    renderWorkHoursEditor();
   }
   function openPrefs() {
     if (!prefsBack) return;
@@ -910,11 +1043,42 @@
     render();
   }
 
-  function buildGridSkeleton(start, days, ops) {
+  function getWorkForDate(d) {
+    prefs.workHours = normalizeWorkHours(prefs.workHours);
+    const idx = weekdayIdxMon0(d);
+    const wh = prefs.workHours[idx] || { on: true, start: "08:00", end: "20:00" };
+    const st = timeToMin(wh.start);
+    const en = timeToMin(wh.end);
+    if (!wh.on || st === null || en === null || en <= st) return { on: false, startMin: null, endMin: null };
+    return { on: true, startMin: st, endMin: en };
+  }
+
+  function computeGridRange(start, days) {
+    const perDay = [];
+    for (let dIdx = 0; dIdx < days; dIdx++) {
+      const d = addDays(start, dIdx);
+      perDay.push(getWorkForDate(d));
+    }
+    const starts = perDay.filter((x) => x.on).map((x) => x.startMin);
+    const ends = perDay.filter((x) => x.on).map((x) => x.endMin);
+    let startMin = starts.length ? Math.min(...starts) : (8 * 60);
+    let endMin = ends.length ? Math.max(...ends) : (20 * 60);
+    startMin = clamp(startMin, 0, 23 * 60);
+    endMin = clamp(endMin, startMin + 60, 24 * 60);
+    // align to hour ticks for UI
+    startMin = Math.floor(startMin / 60) * 60;
+    endMin = Math.ceil(endMin / 60) * 60;
+    endMin = clamp(endMin, startMin + 60, 24 * 60);
+    return { startMin, endMin, perDay };
+  }
+
+  function buildGridSkeleton(start, days, ops, { gridStartMin, gridEndMin, workPerDay } = {}) {
     gridEl.innerHTML = "";
 
     // Body columns
-    const totalMin = (END_HOUR - START_HOUR) * 60;
+    const startMinRange = Number(gridStartMin ?? (8 * 60));
+    const endMinRange = Number(gridEndMin ?? (20 * 60));
+    const totalMin = Math.max(60, endMinRange - startMinRange);
     const totalSlots = Math.ceil(totalMin / SLOT_MIN);
     // Resize slot height to fit viewport, leaving ~<1 slot of empty space.
     // This fixes the large empty area at the bottom of the agenda on tall screens.
@@ -976,7 +1140,17 @@
       const startCol = 2 + dIdx * colsPerDay;
       dh.style.gridColumn = `${startCol} / span ${colsPerDay}`;
       dh.style.gridRow = "1";
-      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>`;
+      const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(d);
+      const startT = wh.on ? minToTime(wh.startMin) : "—";
+      const endT = wh.on ? minToTime(wh.endMin) : "—";
+      const sub =
+        wh.on
+          ? `<div class="d2" style="display:flex; gap:10px; margin-top:6px; font-size:12px; opacity:.85;">
+              <span style="display:flex; gap:6px; align-items:center;"><span style="opacity:.75;">Inizio</span><span style="font-weight:900;">${startT}</span></span>
+              <span style="display:flex; gap:6px; align-items:center;"><span style="opacity:.75;">Fine</span><span style="font-weight:900;">${endT}</span></span>
+            </div>`
+          : `<div class="d2" style="margin-top:6px; font-size:12px; opacity:.75; font-weight:900;">Non lavorativo</div>`;
+      dh.innerHTML = `<div class="d1">${itDayLabel(d)}</div><div class="d2">${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}</div>${sub}`;
       gridEl.appendChild(dh);
     }
 
@@ -1048,8 +1222,11 @@
     timeCol.style.zIndex = "4";
     timeCol.style.background = "rgba(15,26,44,.96)";
 
-    for (let h = START_HOUR; h <= END_HOUR; h++) {
-      const y = GRID_PAD_TOP + (((h - START_HOUR) * 60 / SLOT_MIN) * SLOT_PX);
+    const startHour = Math.floor(startMinRange / 60);
+    const endHour = Math.ceil(endMinRange / 60);
+    for (let h = startHour; h <= endHour; h++) {
+      const y = GRID_PAD_TOP + ((((h * 60) - startMinRange) / SLOT_MIN) * SLOT_PX);
+      if (y < GRID_PAD_TOP - 2 || y > (GRID_PAD_TOP + totalSlots * SLOT_PX + 2)) continue;
       const tick = document.createElement("div");
       tick.className = "timeTick";
       tick.style.top = y + "px";
@@ -1064,6 +1241,7 @@
       for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
         const col = document.createElement("div");
         col.className = "dayCol";
+        col.style.position = "relative";
         if (dIdx > 0 && oIdx === 0) col.classList.add("daySep");
         col.dataset.dayIndex = String(dIdx);
         if (multiUser) {
@@ -1079,6 +1257,51 @@
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
+
+        // work hours overlay (non-working areas)
+        const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(addDays(start, dIdx));
+        if (!wh.on) {
+          const mask = document.createElement("div");
+          mask.style.position = "absolute";
+          mask.style.left = "0";
+          mask.style.right = "0";
+          mask.style.top = GRID_PAD_TOP + "px";
+          mask.style.height = (totalSlots * SLOT_PX) + "px";
+          mask.style.background = "rgba(0,0,0,.18)";
+          mask.style.pointerEvents = "none";
+          mask.style.zIndex = "1";
+          col.appendChild(mask);
+        } else {
+          const topPx = GRID_PAD_TOP + (((wh.startMin - startMinRange) / SLOT_MIN) * SLOT_PX);
+          const botPx = GRID_PAD_TOP + (((wh.endMin - startMinRange) / SLOT_MIN) * SLOT_PX);
+          const endPx = GRID_PAD_TOP + (totalSlots * SLOT_PX);
+          // pre-work
+          if (topPx > GRID_PAD_TOP + 1) {
+            const maskA = document.createElement("div");
+            maskA.style.position = "absolute";
+            maskA.style.left = "0";
+            maskA.style.right = "0";
+            maskA.style.top = GRID_PAD_TOP + "px";
+            maskA.style.height = Math.max(0, topPx - GRID_PAD_TOP) + "px";
+            maskA.style.background = "rgba(0,0,0,.16)";
+            maskA.style.pointerEvents = "none";
+            maskA.style.zIndex = "1";
+            col.appendChild(maskA);
+          }
+          // post-work
+          if (botPx < endPx - 1) {
+            const maskB = document.createElement("div");
+            maskB.style.position = "absolute";
+            maskB.style.left = "0";
+            maskB.style.right = "0";
+            maskB.style.top = Math.max(GRID_PAD_TOP, botPx) + "px";
+            maskB.style.height = Math.max(0, endPx - botPx) + "px";
+            maskB.style.background = "rgba(0,0,0,.16)";
+            maskB.style.pointerEvents = "none";
+            maskB.style.zIndex = "1";
+            col.appendChild(maskB);
+          }
+        }
 
         // grid lines
         for (let s = 0; s <= totalSlots; s++) {
@@ -1107,7 +1330,7 @@
           col.dataset._slotIndex = String(idx);
 
           // Tooltip slot (ora + sede + operatore)
-          const slotStartMin = START_HOUR * 60 + idx * SLOT_MIN;
+          const slotStartMin = startMinRange + idx * SLOT_MIN;
           const day = addDays(start, dIdx);
           const dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
           dt.setMinutes(slotStartMin);
@@ -1142,11 +1365,18 @@
           if (e.target && e.target.closest && e.target.closest(".event")) return;
           hideSlotHover();
           const idx = Number(col.dataset._slotIndex || "0");
-          const slotStartMin = START_HOUR * 60 + idx * SLOT_MIN;
+          const slotStartMin = startMinRange + idx * SLOT_MIN;
 
           const day = addDays(start, dIdx);
           const dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
           dt.setMinutes(slotStartMin);
+
+          // Block creating appointments outside working hours (default behavior).
+          const wh = (workPerDay && workPerDay[dIdx]) ? workPerDay[dIdx] : getWorkForDate(day);
+          if (!wh.on || slotStartMin < wh.startMin || slotStartMin >= wh.endMin) {
+            toast?.("Fuori orario di lavoro");
+            return;
+          }
 
           const therapistName = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
           openCreateModal({ startAt: dt, therapistName });
@@ -1204,7 +1434,8 @@
 
     // calcola durata max fino al prossimo appuntamento (stesso giorno e stesso operatore)
     const startMin = minutesOfDay(startAt);
-    const endDayMin = END_HOUR * 60;
+    const wh = getWorkForDate(startAt);
+    const endDayMin = wh.on ? wh.endMin : (20 * 60);
     let nextMin = endDayMin;
     for (const it of rawItems || []) {
       if (!it.startAt) continue;
@@ -1652,6 +1883,7 @@
       : startOfWeekMonday(anchorDate);
     const days = view === "day" ? 1 : (view === "5days" ? 5 : 7);
     const ops = Array.from(selectedTherapists);
+    const range = computeGridRange(start, days);
 
     const q = String(qEl?.value || "").trim().toLowerCase();
     const items = rawItems
@@ -1728,7 +1960,11 @@
       items.forEach((it) => { it._lane = 0; });
     }
 
-    buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1));
+    buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1), {
+      gridStartMin: range.startMin,
+      gridEndMin: range.endMin,
+      workPerDay: range.perDay,
+    });
 
     // Render cancelled appointments into the band (also when single-operator view).
     {
@@ -1793,8 +2029,8 @@
     }
 
     const cols = Array.from(document.querySelectorAll(".dayCol"));
-    const startMin = START_HOUR * 60;
-    const endMin = END_HOUR * 60;
+    const startMin = range.startMin;
+    const endMin = range.endMin;
 
     items.forEach((it) => {
       let col = null;
