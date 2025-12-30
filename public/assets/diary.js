@@ -251,6 +251,73 @@
   function weekdayIdxMon0(d) { return (d.getDay() + 6) % 7; } // lun=0..dom=6
   const WEEKDAY_LABELS = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
 
+  // Global availability (from "Impostazioni Disponibilità" modal in app.js).
+  // Stored in localStorage as: fp_settings_availability_<emailLower>.
+  let settingsAvailabilityCache = null; // { dayMin: Map<wIdx, Map<minute, {status, locationId}>> }
+
+  function settingsKeyAvailability() {
+    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+    return `fp_settings_availability_${email}`;
+  }
+
+  function getLocationNameSync(locationId) {
+    const id = String(locationId || "").trim();
+    if (!id) return "";
+    const items = Array.isArray(locationsCache) ? locationsCache : null;
+    if (!items) return "";
+    const hit = items.find((x) => String(x?.id || "").trim() === id);
+    return hit ? String(hit.name || hit.nome || hit.label || hit.id || "").trim() : "";
+  }
+
+  function loadSettingsAvailability() {
+    if (settingsAvailabilityCache) return settingsAvailabilityCache;
+    const dayMin = new Map();
+
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(settingsKeyAvailability()) || "null"); } catch {}
+
+    const slots = saved && typeof saved === "object" ? (saved.slots || null) : null;
+    if (slots && typeof slots === "object") {
+      for (const [k, v] of Object.entries(slots)) {
+        const key = String(k || "");
+        const m = key.match(/^(\d+):(\d+)$/);
+        if (!m) continue;
+        const wIdx = Number(m[1]);          // 0..6 (lun..dom)
+        const rIdx = Number(m[2]);          // 30-min row from 07:00
+        if (!Number.isFinite(wIdx) || !Number.isFinite(rIdx)) continue;
+        if (wIdx < 0 || wIdx > 6) continue;
+        if (rIdx < 0 || rIdx > 1000) continue;
+
+        const status = String(v?.status || "").toLowerCase();
+        if (status !== "work" && status !== "off") continue;
+        const locationId = String(v?.locationId || "");
+
+        const minute = (7 * 60) + (rIdx * 30);
+        if (minute < 0 || minute >= MINUTES_PER_DAY) continue;
+
+        if (!dayMin.has(wIdx)) dayMin.set(wIdx, new Map());
+        dayMin.get(wIdx).set(minute, { status, locationId });
+      }
+    } else {
+      // legacy: saved.on = ["d:r", ...] => work
+      const on = Array.isArray(saved?.on) ? saved.on : [];
+      on.forEach((k) => {
+        const key = String(k || "");
+        const m = key.match(/^(\d+):(\d+)$/);
+        if (!m) return;
+        const wIdx = Number(m[1]);
+        const rIdx = Number(m[2]);
+        if (!Number.isFinite(wIdx) || !Number.isFinite(rIdx)) return;
+        const minute = (7 * 60) + (rIdx * 30);
+        if (!dayMin.has(wIdx)) dayMin.set(wIdx, new Map());
+        dayMin.get(wIdx).set(minute, { status: "work", locationId: "" });
+      });
+    }
+
+    settingsAvailabilityCache = { dayMin };
+    return settingsAvailabilityCache;
+  }
+
   function normTherapistKeyForSlots(name) {
     const s = String(name || "").trim();
     return s || "DEFAULT";
@@ -274,6 +341,18 @@
     const byDay = byTher ? (byTher[String(wIdx)] || null) : null;
     const hit = byDay ? byDay[m] : null;
     if (hit && typeof hit === "object") return { on: Boolean(hit.on), locationId: hit.locationId || "", locationName: hit.locationName || "" };
+
+    // Fallback to global availability settings (new modal).
+    const av = loadSettingsAvailability();
+    const mm = Number(m);
+    const byW = av?.dayMin?.get?.(wIdx) || null;
+    const rec = byW ? (byW.get(mm) || null) : null;
+    if (rec && typeof rec === "object") {
+      const on = String(rec.status) === "work";
+      const locationId = String(rec.locationId || "");
+      const locationName = getLocationNameSync(locationId);
+      return { on, locationId, locationName };
+    }
 
     // Default baseline: NON lavorativo (OsteoEasy-like).
     return { on: false, locationId: "", locationName: "" };
@@ -1154,20 +1233,14 @@
     let maxOn = null;
 
     const visibleTherapists = multiUser ? Array.from(selectedTherapists) : [Array.from(selectedTherapists)[0] || ""];
-    const store = prefs.workSlots || {};
 
+    // Use getSlotRule so global availability also affects grid range.
     for (let dIdx = 0; dIdx < days; dIdx++) {
       const day = addDays(start, dIdx);
-      const wIdx = String(weekdayIdxMon0(day));
       for (const t of visibleTherapists) {
-        const key = normTherapistKeyForSlots(t);
-        const byDay = store?.[key]?.[wIdx] || null;
-        if (!byDay) continue;
-        for (const [k, v] of Object.entries(byDay)) {
-          if (!v || typeof v !== "object") continue;
-          if (v.on !== true) continue;
-          const mm = Number(k);
-          if (!Number.isFinite(mm)) continue;
+        for (let mm = 0; mm < MINUTES_PER_DAY; mm += BASE_SLOT_MIN) {
+          const r = getSlotRule(t, day, mm);
+          if (!r?.on) continue;
           minOn = (minOn === null) ? mm : Math.min(minOn, mm);
           maxOn = (maxOn === null) ? (mm + BASE_SLOT_MIN) : Math.max(maxOn, mm + BASE_SLOT_MIN);
         }
@@ -1447,7 +1520,8 @@
           const role = roleForOperatorName(therapistName);
           const therLabel = therapistName ? (therapistName + (role ? " • " + role : "")) : "—";
 
-          const loc = inferSlotLocation(toYmd(day), therapistName) || "—";
+          const ruleForHover = getSlotRule(therapistName, day, slotStartMin);
+          const loc = (ruleForHover?.locationName || inferSlotLocation(toYmd(day), therapistName) || "—");
           showSlotHover({ time: timeStr, therapist: therLabel, location: loc }, lastMouseX, lastMouseY);
         };
 
@@ -1880,7 +1954,9 @@
       .catch((e) => renderSelectError(elStatus, "STATO APPUNTAMENTO", e));
 
     // locations
-    const inferredLocName = inferSlotLocation(toYmd(startAt), therapistName);
+    const startMinOfDay = (startAt?.getHours?.() || 0) * 60 + (startAt?.getMinutes?.() || 0);
+    const ruleLoc = getSlotRule(therapistName, startAt, startMinOfDay);
+    const inferredLocName = (ruleLoc?.locationName || inferSlotLocation(toYmd(startAt), therapistName));
     loadLocations()
       .then((arr) => {
         const items = Array.isArray(arr) ? arr : [];
@@ -2445,10 +2521,20 @@
   // Render immediately with saved selection (empty grid), then load data.
   try { render(); } catch {}
   setView("7days");
+
+  // If "Impostazioni Disponibilità" changes, refresh availability cache + re-render.
+  const onAvailabilityChanged = () => {
+    settingsAvailabilityCache = null;
+    // If we already loaded locations once, location names become immediately available.
+    try { render(); } catch {}
+  };
+  window.addEventListener("fpAvailabilityChanged", onAvailabilityChanged);
+
   // Cleanup (remove global listeners + ephemeral DOM)
   window.__FP_DIARY_CLEANUP = () => {
     try { document.removeEventListener("scroll", onDocScroll, true); } catch {}
     try { window.removeEventListener("resize", onResize); } catch {}
+    try { window.removeEventListener("fpAvailabilityChanged", onAvailabilityChanged); } catch {}
     try { hoverCard?.remove?.(); } catch {}
     try { slotHoverCard?.remove?.(); } catch {}
   };

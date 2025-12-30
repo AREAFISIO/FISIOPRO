@@ -1038,8 +1038,6 @@ function buildAvailabilityUI() {
   if (!grid) return;
 
   const days = ["LUN", "MAR", "MER", "GIO", "VEN", "SAB", "DOM"];
-  const startDefault = ["07:00","07:00","07:00","07:00","07:00","07:00","07:00"];
-  const endDefault = ["21:00","21:00","21:00","21:00","21:00","20:00","20:00"];
 
   // 30-min slots 07:00-21:00 (last start: 20:30)
   const startMin = 7 * 60;
@@ -1056,7 +1054,8 @@ function buildAvailabilityUI() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(stateKey) || "null"); } catch {}
 
-  const ranges = saved?.ranges || days.map((_, i) => ({ start: startDefault[i], end: endDefault[i] }));
+  // ranges kept for backwards compatibility, but not shown in UI (user requested).
+  const ranges = saved?.ranges || [];
 
   // slot state model:
   // - saved.slots: { [key]: { status: "work"|"off", locationId?: string } }
@@ -1095,8 +1094,6 @@ function buildAvailabilityUI() {
     .map((d, idx) => `
       <div class="fp-av-dayhead">
         <div class="d">${d}</div>
-        <div class="row"><span style="opacity:.85;">Inizio</span><input data-av-start="${idx}" value="${ranges[idx]?.start || startDefault[idx]}" /></div>
-        <div class="row"><span style="opacity:.85;">Fine</span><input data-av-end="${idx}" value="${ranges[idx]?.end || endDefault[idx]}" /></div>
       </div>
     `)
     .join("");
@@ -1357,13 +1354,11 @@ function buildAvailabilityUI() {
   };
   reset && (reset.onclick = () => {
     localStorage.removeItem(stateKey);
+    try { window.dispatchEvent(new CustomEvent("fpAvailabilityChanged")); } catch {}
     buildAvailabilityUI();
   });
   save && (save.onclick = () => {
-    const nextRanges = days.map((_, i) => ({
-      start: String(grid.querySelector(`[data-av-start="${i}"]`)?.value || startDefault[i]).trim(),
-      end: String(grid.querySelector(`[data-av-end="${i}"]`)?.value || endDefault[i]).trim(),
-    }));
+    const nextRanges = Array.isArray(ranges) ? ranges : [];
     try {
       localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, slots: slotState, last }));
     } catch {}
@@ -1371,6 +1366,7 @@ function buildAvailabilityUI() {
     closeEditor();
     closeAvailabilityModal();
     toast("Salvato");
+    try { window.dispatchEvent(new CustomEvent("fpAvailabilityChanged")); } catch {}
   });
 }
 
