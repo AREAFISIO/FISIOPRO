@@ -2394,25 +2394,49 @@
         try { return d.toLocaleString("it-IT", { weekday:"short", day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }); } catch { return String(d); }
       };
 
-      const clearDropIndicator = () => {
-        document.querySelectorAll("[data-fp-drop-indicator]").forEach((x) => x.remove());
+      const clearDragPreview = () => {
+        document.querySelectorAll("[data-fp-drop-preview]").forEach((x) => x.remove());
       };
-      const showDropIndicator = (colEl, topPx, heightPx) => {
+      const showDragPreview = ({ colEl, topPx, heightPx, label, valid }) => {
         if (!colEl) return;
-        clearDropIndicator();
+        clearDragPreview();
         const ind = document.createElement("div");
-        ind.setAttribute("data-fp-drop-indicator", "1");
+        ind.setAttribute("data-fp-drop-preview", "1");
         ind.style.position = "absolute";
         ind.style.left = "10px";
         ind.style.right = "10px";
         ind.style.top = Math.round(topPx) + "px";
-        ind.style.height = Math.max(8, Math.round(heightPx)) + "px";
-        ind.style.border = "2px dashed rgba(255, 122, 0, .95)";
-        ind.style.borderRadius = "10px";
-        ind.style.background = "rgba(255, 122, 0, .10)";
+        ind.style.height = Math.max(18, Math.round(heightPx)) + "px";
+        ind.style.border = valid ? "2px dashed rgba(255, 122, 0, .95)" : "2px dashed rgba(255, 77, 109, .95)";
+        ind.style.borderRadius = "12px";
+        ind.style.background = valid ? "rgba(255, 122, 0, .14)" : "rgba(255, 77, 109, .14)";
         ind.style.pointerEvents = "none";
         ind.style.zIndex = "6";
+        ind.style.display = "flex";
+        ind.style.alignItems = "flex-start";
+        ind.style.justifyContent = "space-between";
+        ind.style.padding = "8px 10px";
+        ind.style.gap = "10px";
+        ind.style.boxShadow = "0 18px 60px rgba(0,0,0,.22)";
+        ind.innerHTML = `
+          <div style="min-width:0; font-weight:900; font-size:12px; color:rgba(255,255,255,.92); text-shadow:0 2px 10px rgba(0,0,0,.35); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${escapeHtml(label || "")}
+          </div>
+          <div style="flex:0 0 auto; font-weight:1000; font-size:12px; color:rgba(255,255,255,.92); opacity:.92;">
+            ${valid ? "↔" : "✖"}
+          </div>
+        `;
         colEl.appendChild(ind);
+      };
+
+      const autoScrollOnDrag = (clientY) => {
+        const sc = document.querySelector(".calGridOuter");
+        if (!sc) return;
+        const r = sc.getBoundingClientRect();
+        const margin = 46;
+        const step = 18;
+        if (clientY < r.top + margin) sc.scrollTop -= step;
+        else if (clientY > r.bottom - margin) sc.scrollTop += step;
       };
 
       const applyMove = async ({ targetDayIndex, targetTherapist, targetStartMin }) => {
@@ -2447,11 +2471,15 @@
           end_at: newEnd.toISOString(),
         };
 
-        // If moving across therapists, update collaborator link (best-effort).
+        // If moving across therapists, update collaborator link (required for correct column on reload).
         const therTrim = String(targetTherapist || "").trim();
         if (multiUser && therTrim && therTrim !== String(it.therapist || "").trim()) {
           const opId = operatorNameToId.get(therTrim) || "";
-          if (opId) payload.therapist_id = opId;
+          if (!opId) {
+            toast?.("Operatore non mappato: impossibile spostare su altra agenda");
+            return;
+          }
+          payload.therapist_id = opId;
         }
 
         try {
@@ -2494,6 +2522,7 @@
 
           const onMove = (me) => {
             if (!dragStart) return;
+            autoScrollOnDrag(me.clientY);
             const dx = Math.abs(me.clientX - dragStart.x);
             const dy = Math.abs(me.clientY - dragStart.y);
             if (dx + dy > 5) dragMoved = true;
@@ -2505,17 +2534,29 @@
             const ther = multiUser ? String(colEl.dataset.therapist || "").trim() : String(it.therapist || "").trim();
             const r = colEl.getBoundingClientRect();
             const y = (me.clientY - r.top) - GRID_PAD_TOP;
-          const idx = Math.max(0, Math.min(totalSlotsForDnD - 1, Math.floor(y / SLOT_PX)));
+            // Snap to nearest slot (more natural than always "down").
+            const idxFloat = y / SLOT_PX;
+            const idx = Math.max(0, Math.min(totalSlotsForDnD - 1, Math.round(idxFloat)));
             const slotStartMin = startMin + idx * SLOT_MIN;
-            showDropIndicator(colEl, GRID_PAD_TOP + idx * SLOT_PX, height);
-            ev.dataset.fpDragTarget = JSON.stringify({ dIdx, ther, slotStartMin });
+
+            const dayObj = addDays(start, dIdx);
+            const rule = getSlotRule(ther || it.therapist, dayObj, slotStartMin);
+            const valid = Boolean(rule?.on);
+
+            const hh = pad2(Math.floor(slotStartMin / 60));
+            const mm = pad2(slotStartMin % 60);
+            const therChip = therapistKey(ther) || ther || "—";
+            const label = valid ? `${hh}:${mm} • ${therChip}` : `${hh}:${mm} • ${therChip} • Fuori orario`;
+
+            showDragPreview({ colEl, topPx: GRID_PAD_TOP + idx * SLOT_PX, heightPx: height, label, valid });
+            ev.dataset.fpDragTarget = JSON.stringify({ dIdx, ther, slotStartMin, valid });
           };
 
           const onUp = (ue) => {
             const tgtRaw = ev.dataset.fpDragTarget || "";
             ev.dataset.fpDragTarget = "";
             ev.classList.remove("isDragging");
-            clearDropIndicator();
+            clearDragPreview();
             if (dragCleanup) dragCleanup();
             dragCleanup = null;
 
