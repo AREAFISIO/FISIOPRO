@@ -1120,6 +1120,25 @@ function buildAvailabilityUI() {
   let currentTherapist = String(saved?.lastTherapist || window.__FP_AV_LAST_THER || "DEFAULT").trim() || "DEFAULT";
   window.__FP_AV_LAST_THER = currentTherapist;
 
+  function hashHue(s) {
+    const str = String(s || "");
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h % 360;
+  }
+  function workBgForTherapist(name) {
+    const n = String(name || "").trim();
+    if (!n || n === "DEFAULT") return "rgba(34,230,195,.22)";
+    const hue = hashHue(n);
+    return `hsla(${hue} 78% 58% / 0.22)`;
+  }
+  function workOutlineForTherapist(name) {
+    const n = String(name || "").trim();
+    if (!n || n === "DEFAULT") return "rgba(34,230,195,.35)";
+    const hue = hashHue(n);
+    return `hsla(${hue} 78% 58% / 0.40)`;
+  }
+
   const ensureTherBucket = (ther) => {
     const k = String(ther || "").trim() || "DEFAULT";
     if (!slotsByTherapist[k] || typeof slotsByTherapist[k] !== "object") slotsByTherapist[k] = {};
@@ -1180,8 +1199,11 @@ function buildAvailabilityUI() {
             ${times.map((t, rIdx) => {
               const key = `${dIdx}:${rIdx}`;
               const st = getSlotRec(currentTherapist, key)?.status || "";
-              const cls = st === "work" ? "work" : (st === "off" ? "off" : "");
-              return `<div class="fp-av-cell ${cls}" data-av-cell="${key}"></div>`;
+              const cls = st === "work" ? "work" : "";
+              const style = st === "work"
+                ? `style="background:${workBgForTherapist(currentTherapist)}; outline:1px solid ${workOutlineForTherapist(currentTherapist)};"`
+                : "";
+              return `<div class="fp-av-cell ${cls}" ${style} data-av-cell="${key}"></div>`;
             }).join("")}
           </div>
         `;
@@ -1235,8 +1257,12 @@ function buildAvailabilityUI() {
   const setCellVisualState = (cellEl, st) => {
     if (!cellEl) return;
     cellEl.classList.remove("work", "off", "on");
-    if (st === "work") cellEl.classList.add("work");
-    if (st === "off") cellEl.classList.add("off");
+    cellEl.removeAttribute("style");
+    if (st === "work") {
+      cellEl.classList.add("work");
+      cellEl.style.background = workBgForTherapist(currentTherapist);
+      cellEl.style.outline = `1px solid ${workOutlineForTherapist(currentTherapist)}`;
+    }
   };
 
   const clearSelection = () => {
@@ -1479,7 +1505,7 @@ function buildAvailabilityUI() {
     grid.querySelectorAll("[data-av-cell]").forEach((c) => {
       const key = String(c.getAttribute("data-av-cell") || "");
       const st = getSlotRec(currentTherapist, key)?.status || "";
-      setCellVisualState(c, st === "work" ? "work" : (st === "off" ? "off" : ""));
+      setCellVisualState(c, st === "work" ? "work" : "");
     });
     sel.onchange = () => {
       currentTherapist = String(sel.value || "DEFAULT");
@@ -1489,7 +1515,7 @@ function buildAvailabilityUI() {
       grid.querySelectorAll("[data-av-cell]").forEach((c) => {
         const key = String(c.getAttribute("data-av-cell") || "");
         const st = getSlotRec(currentTherapist, key)?.status || "";
-        setCellVisualState(c, st === "work" ? "work" : (st === "off" ? "off" : ""));
+        setCellVisualState(c, st === "work" ? "work" : "");
       });
     };
   })();
