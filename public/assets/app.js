@@ -830,7 +830,8 @@ async function ensureDiaryLoaded() {
 
   await new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "/assets/diary.js";
+    // Cache-bust diary.js to ensure UI updates propagate quickly.
+    s.src = "/assets/diary.js?v=20251230-1";
     s.async = true;
     s.onload = () => resolve();
     s.onerror = () => reject(new Error("diary_load_failed"));
