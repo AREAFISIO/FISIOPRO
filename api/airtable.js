@@ -15,26 +15,41 @@ function isUnknownFieldError(msg) {
   return s.includes("unknown field name") || s.includes("unknown field names");
 }
 
-async function probeField(tableEnc, candidate) {
-  const name = String(candidate || "").trim();
-  if (!name) return false;
-  const qs = new URLSearchParams({ pageSize: "1" });
-  qs.append("fields[]", name);
-  try {
-    await airtableFetch(`${tableEnc}?${qs.toString()}`);
-    return true;
-  } catch (e) {
-    if (isUnknownFieldError(e?.message)) return false;
-    throw e;
-  }
+function normalizeKeyLoose(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
-async function resolveFieldName(tableEnc, cacheKey, candidates) {
+function resolveFieldKeyFromKeys(keys, candidates) {
+  const list = Array.isArray(keys) ? keys : [];
+  if (!list.length) return "";
+
+  const byLower = new Map(list.map((k) => [String(k).toLowerCase(), String(k)]));
+  for (const c of candidates || []) {
+    const want = String(c || "").trim();
+    if (!want) continue;
+    const hit = byLower.get(want.toLowerCase());
+    if (hit) return hit;
+  }
+
+  const byLoose = new Map(list.map((k) => [normalizeKeyLoose(k), String(k)]));
+  for (const c of candidates || []) {
+    const wantLoose = normalizeKeyLoose(c);
+    if (!wantLoose) continue;
+    const hit = byLoose.get(wantLoose);
+    if (hit) return hit;
+  }
+
+  return "";
+}
+
+async function inferTableFieldKeys(tableEnc, cacheKey) {
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
-    for (const c of candidates || []) {
-      if (await probeField(tableEnc, c)) return String(c).trim();
-    }
-    return "";
+    // Single call: fetch one record without fields[] so we can see real keys.
+    const data = await airtableFetch(`${tableEnc}?pageSize=1`);
+    const first = data?.records?.[0]?.fields || {};
+    return Object.keys(first || {});
   });
 }
 
@@ -63,46 +78,40 @@ export default async function handler(req, res) {
 
     const table = encodeURIComponent(TABLE_PATIENTS);
 
-    // Resolve real field names (to avoid "Unknown field name" errors).
-    // This is cached for warm instances; if fields are correct in env, it's fast.
-    const FIELD_NAME = await resolveFieldName(
-      table,
-      `patients:field:name:${TABLE_PATIENTS}`,
+    // Resolve real field names (to avoid "Unknown field name" errors) WITHOUT probing many times.
+    // We infer keys from a single sample record and match candidates (case-insensitive / loose).
+    const tableKeys = await inferTableFieldKeys(table, `patients:keys:${TABLE_PATIENTS}`);
+
+    const FIELD_NAME = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_NAME_ENV, "Cognome e Nome", "Nome completo", "Full Name", "Name"].filter(Boolean),
     );
-    const FIELD_PHONE = await resolveFieldName(
-      table,
-      `patients:field:phone:${TABLE_PATIENTS}`,
+    const FIELD_PHONE = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_PHONE_ENV, "Telefono", "Numero di telefono", "Cellulare", "Mobile"].filter(Boolean),
     );
-    const FIELD_EMAIL = await resolveFieldName(
-      table,
-      `patients:field:email:${TABLE_PATIENTS}`,
+    const FIELD_EMAIL = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_EMAIL_ENV, "Email", "E-mail", "E mail"].filter(Boolean),
     );
-    const FIELD_FIRSTNAME = await resolveFieldName(
-      table,
-      `patients:field:firstname:${TABLE_PATIENTS}`,
+    const FIELD_FIRSTNAME = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_FIRSTNAME_ENV, "Nome", "First name", "Firstname"].filter(Boolean),
     );
-    const FIELD_LASTNAME = await resolveFieldName(
-      table,
-      `patients:field:lastname:${TABLE_PATIENTS}`,
+    const FIELD_LASTNAME = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_LASTNAME_ENV, "Cognome", "Last name", "Lastname"].filter(Boolean),
     );
-    const FIELD_FISCAL = await resolveFieldName(
-      table,
-      `patients:field:fiscal:${TABLE_PATIENTS}`,
+    const FIELD_FISCAL = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_FISCAL_ENV, "Codice Fiscale", "Codice fiscale", "CF"].filter(Boolean),
     );
-    const FIELD_DOB = await resolveFieldName(
-      table,
-      `patients:field:dob:${TABLE_PATIENTS}`,
+    const FIELD_DOB = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_DOB_ENV, "Data di nascita", "Nascita", "DOB", "Birthdate"].filter(Boolean),
     );
-    const FIELD_CHANNELS = await resolveFieldName(
-      table,
-      `patients:field:channels:${TABLE_PATIENTS}`,
+    const FIELD_CHANNELS = resolveFieldKeyFromKeys(
+      tableKeys,
       [FIELD_CHANNELS_ENV, "Canali di comunicazione preferiti", "Canali preferiti", "Canali"].filter(Boolean),
     );
 
@@ -222,24 +231,27 @@ export default async function handler(req, res) {
         qs.set("filterByFormula", formula);
       }
 
-      const data = await airtableFetch(`${table}?${qs.toString()}`);
-      const items = (data.records || []).map((r) => {
-        const f = r.fields || {};
-        const out = {
-          id: r.id,
-          Nome: (FIELD_FIRSTNAME ? f[FIELD_FIRSTNAME] : undefined) ?? f["Nome"] ?? "",
-          Cognome: (FIELD_LASTNAME ? f[FIELD_LASTNAME] : undefined) ?? f["Cognome"] ?? "",
-          "Codice Fiscale": (FIELD_FISCAL ? f[FIELD_FISCAL] : undefined) ?? f["Codice Fiscale"] ?? f["Codice fiscale"] ?? "",
-          Email: (FIELD_EMAIL ? f[FIELD_EMAIL] : undefined) ?? f["Email"] ?? f["E-mail"] ?? "",
-          Telefono: (FIELD_PHONE ? f[FIELD_PHONE] : undefined) ?? f["Telefono"] ?? f["Numero di telefono"] ?? "",
-          "Data di nascita": (FIELD_DOB ? f[FIELD_DOB] : undefined) ?? f["Data di nascita"] ?? "",
-          "Canali di comunicazione preferiti":
-            (FIELD_CHANNELS ? f[FIELD_CHANNELS] : undefined) ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
-          // fallback utile se il base ha il campo unico
-          "Cognome e Nome": (FIELD_NAME ? f[FIELD_NAME] : undefined) ?? f["Cognome e Nome"] ?? "",
-        };
-        if (includeFields) out._fields = f;
-        return out;
+      const cacheKey = `patientsFull:${TABLE_PATIENTS}:${q}:${maxRecords}:${pageSize}`;
+      const items = await memGetOrSet(cacheKey, 30_000, async () => {
+        const data = await airtableFetch(`${table}?${qs.toString()}`);
+        return (data.records || []).map((r) => {
+          const f = r.fields || {};
+          const out = {
+            id: r.id,
+            Nome: (FIELD_FIRSTNAME ? f[FIELD_FIRSTNAME] : undefined) ?? f["Nome"] ?? "",
+            Cognome: (FIELD_LASTNAME ? f[FIELD_LASTNAME] : undefined) ?? f["Cognome"] ?? "",
+            "Codice Fiscale": (FIELD_FISCAL ? f[FIELD_FISCAL] : undefined) ?? f["Codice Fiscale"] ?? f["Codice fiscale"] ?? "",
+            Email: (FIELD_EMAIL ? f[FIELD_EMAIL] : undefined) ?? f["Email"] ?? f["E-mail"] ?? "",
+            Telefono: (FIELD_PHONE ? f[FIELD_PHONE] : undefined) ?? f["Telefono"] ?? f["Numero di telefono"] ?? "",
+            "Data di nascita": (FIELD_DOB ? f[FIELD_DOB] : undefined) ?? f["Data di nascita"] ?? "",
+            "Canali di comunicazione preferiti":
+              (FIELD_CHANNELS ? f[FIELD_CHANNELS] : undefined) ?? f["Canali di comunicazione preferiti"] ?? f["Canali preferiti"] ?? "",
+            // fallback utile se il base ha il campo unico
+            "Cognome e Nome": (FIELD_NAME ? f[FIELD_NAME] : undefined) ?? f["Cognome e Nome"] ?? "",
+          };
+          if (includeFields) out._fields = f;
+          return out;
+        });
       });
 
       return res.status(200).json({ ok: true, items });
