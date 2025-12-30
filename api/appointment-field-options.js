@@ -53,23 +53,23 @@ function resolveFieldKeyFromRecord(fieldsObj, candidates) {
 
 async function getFieldsFromMeta(tableName) {
   const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
-  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return [];
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return { fields: [], metaStatus: 0 };
   const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
   try {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
     const text = await res.text();
     let json = {};
     try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
-    if (!res.ok) return [];
+    if (!res.ok) return { fields: [], metaStatus: res.status || 0 };
     const tables = json.tables || [];
     const wanted = String(tableName || "").trim();
     const t =
       tables.find((x) => String(x?.name || "") === wanted) ||
       tables.find((x) => String(x?.name || "").toLowerCase() === wanted.toLowerCase()) ||
       null;
-    return (t?.fields || []).filter(Boolean);
+    return { fields: (t?.fields || []).filter(Boolean), metaStatus: 200 };
   } catch {
-    return [];
+    return { fields: [], metaStatus: 0 };
   }
 }
 
@@ -203,7 +203,8 @@ export default async function handler(req, res) {
     const cacheKey = `fieldOptions:${tableName}:${fieldCandidates.join("|")}`;
     const items = await memGetOrSet(cacheKey, 10 * 60_000, async () => {
       // 1) Try Meta API for true single-select choices.
-      const metaFields = await getFieldsFromMeta(tableName);
+      const metaRes = await getFieldsFromMeta(tableName);
+      const metaFields = metaRes.fields || [];
       for (const cand of fieldCandidates) {
         const meta =
           metaFields.find((f) => String(f?.name || "") === cand) ||
@@ -223,6 +224,15 @@ export default async function handler(req, res) {
         const err = new Error(`Field not found: ${requestedField}`);
         err.status = 404;
         err.details = { table: tableName, requestedField, tried: fieldCandidates };
+        throw err;
+      }
+      // If Meta API is forbidden, we can't list single-select choices that are not used yet in records.
+      // In that case, returning [] is confusing: surface a clear error instead.
+      const metaDenied = metaRes.metaStatus === 401 || metaRes.metaStatus === 403;
+      if (metaDenied && sampled.values.length === 0) {
+        const err = new Error("Airtable token senza permesso schema: impossibile caricare le opzioni del campo (serve schema read).");
+        err.status = 424;
+        err.details = { table: tableName, requestedField, metaStatus: metaRes.metaStatus, tried: fieldCandidates };
         throw err;
       }
       return sampled.values;
