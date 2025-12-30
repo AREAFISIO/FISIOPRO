@@ -17,75 +17,75 @@ body.fp-theme-standard{
   /* no overrides: uses :root */
 }
 body.fp-theme-pro{
-  /* COMPLETELY DIFFERENT THEME: light / high-contrast */
-  --bg:#f4f7ff;
-  --panel:#ffffff;
-  --panel-2:#f7f9ff;
-  --border:rgba(15,23,42,.12);
-  --text:rgba(15,23,42,.96);
-  --muted:rgba(15,23,42,.62);
-  --accent:#0ea5e9;
-  --accent-2:#6366f1;
-  --warn:#ef4444;
-  --ok:#22c55e;
-  --shadow:0 18px 60px rgba(15,23,42,.12);
-  --panelGlass: rgba(255,255,255,.82);
-  --panelSolid: rgba(255,255,255,.96);
-  --panelSolid2: rgba(247,249,255,.96);
+  /* Pro: darker, higher contrast (NOT light) */
+  --bg:#0c1526;
+  --panel:#101c33;
+  --panel-2:#132241;
+  --border:rgba(255,255,255,.20);
+  --text:rgba(255,255,255,.96);
+  --muted:rgba(255,255,255,.76);
+  --accent:#22e6c3;
+  --accent-2:#4aa3ff;
+  --warn:#ff4d6d;
+  --ok:#29d39a;
+  --shadow:0 22px 70px rgba(0,0,0,.34);
+  --panelGlass: rgba(16,28,51,.82);
+  --panelSolid: rgba(16,28,51,.96);
+  --panelSolid2: rgba(19,34,65,.96);
 }
 
 /* Pro theme: clear, readable, “premium” */
 body.fp-theme-pro .card{
-  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,249,255,.96));
-  border-color: rgba(15,23,42,.12);
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+  border-color: rgba(255,255,255,.20);
   box-shadow: var(--shadow);
 }
 body.fp-theme-pro .sidebar{
-  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(247,249,255,.92));
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
 }
 body.fp-theme-pro .btn{
-  background: rgba(15,23,42,.04);
-  border-color: rgba(15,23,42,.12);
-  color: rgba(15,23,42,.92);
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.20);
+  color: rgba(255,255,255,.92);
 }
-body.fp-theme-pro .btn:hover{ background: rgba(15,23,42,.07); }
+body.fp-theme-pro .btn:hover{ background: rgba(255,255,255,.14); }
 body.fp-theme-pro .nav a{
   font-size: 16px;
   padding: 12px 14px;
-  color: rgba(15,23,42,.78);
+  color: rgba(255,255,255,.80);
 }
-body.fp-theme-pro .nav a:hover{ background: rgba(15,23,42,.04); border-color: rgba(15,23,42,.10); }
+body.fp-theme-pro .nav a:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.20); }
 body.fp-theme-pro .nav a.active{
-  background: rgba(14,165,233,.12);
-  border-color: rgba(14,165,233,.28);
-  color: rgba(15,23,42,.92);
+  background: rgba(34,230,195,.12);
+  border-color: rgba(34,230,195,.28);
+  color: rgba(255,255,255,.96);
 }
 body.fp-theme-pro .h1{ font-size: 24px; font-weight: 950; letter-spacing: -.3px; }
 body.fp-theme-pro .topbar{ padding: 16px 10px 16px; }
-body.fp-theme-pro .pill{ border-color: rgba(15,23,42,.16); color: rgba(15,23,42,.78); }
+body.fp-theme-pro .pill{ border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.86); }
 
 /* Global surfaces */
 body.fp-theme-pro{
   background:
-    radial-gradient(1200px 600px at 30% -10%, rgba(14,165,233,.18), transparent 60%),
-    radial-gradient(900px 500px at 95% 20%, rgba(99,102,241,.14), transparent 55%),
+    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.18), transparent 60%),
+    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.16), transparent 55%),
     var(--bg);
 }
 body.fp-theme-pro .fp-topbar{
   background: var(--panelGlass);
-  border-bottom-color: rgba(15,23,42,.10);
-  box-shadow: 0 14px 42px rgba(15,23,42,.14);
+  border-bottom-color: rgba(255,255,255,.14);
+  box-shadow: 0 16px 48px rgba(0,0,0,.32);
 }
 body.fp-theme-pro .rightbar{
-  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(247,249,255,.92));
-  border-left-color: rgba(15,23,42,.10);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border-left-color: rgba(255,255,255,.14);
 }
 body.fp-theme-pro .rbBtn{
-  background: rgba(15,23,42,.04);
-  border-color: rgba(15,23,42,.12);
-  color: rgba(15,23,42,.88);
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.14);
+  color: rgba(255,255,255,.88);
 }
-body.fp-theme-pro .rbBtn:hover{ background: rgba(15,23,42,.06); }
+body.fp-theme-pro .rbBtn:hover{ background: rgba(255,255,255,.08); }
 
 /* Typography scale (net difference Standard vs Pro) */
 body.fp-theme-standard{ font-size: 16px; line-height: 1.45; }
@@ -101,82 +101,47 @@ body.fp-theme-pro label,
 body.fp-theme-pro button,
 body.fp-theme-pro input{ font-size: 18px; }
 
-/* Settings modals in Pro: light */
+/* Settings modals in Pro: dark */
 body.fp-theme-pro .fp-set-panel{
-  background: rgba(255,255,255,.96);
-  color: rgba(15,23,42,.92);
-  border-color: rgba(15,23,42,.12);
+  background: rgba(16,28,51,.96);
+  color: rgba(255,255,255,.92);
+  border-color: rgba(255,255,255,.16);
 }
 body.fp-theme-pro .fp-set-head{
-  background: linear-gradient(180deg, rgba(15,23,42,.04), rgba(15,23,42,.01));
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
 }
-body.fp-theme-pro .fp-set-row .sub{ color: rgba(15,23,42,.60); }
+body.fp-theme-pro .fp-set-row .sub{ color: rgba(255,255,255,.70); }
 body.fp-theme-pro .switch .slider{
-  background: rgba(15,23,42,.12);
-  border-color: rgba(15,23,42,.14);
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.18);
 }
 body.fp-theme-pro .switch input:checked + .slider{
-  background: rgba(14,165,233,.22);
-  border-color: rgba(14,165,233,.32);
+  background: rgba(34,230,195,.25);
+  border-color: rgba(34,230,195,.35);
 }
 body.fp-theme-pro .switch input:checked + .slider:before{
-  background: rgba(14,165,233,.95);
+  background: rgba(34,230,195,.95);
 }
 
-/* Availability editor in Pro */
-body.fp-theme-pro .fp-av-toolbar label{ color: rgba(15,23,42,.76); }
+/* Availability editor in Pro (dark) */
+body.fp-theme-pro .fp-av-toolbar label{ color: rgba(255,255,255,.80); }
 body.fp-theme-pro .fp-av-toolbar select{
-  background: rgba(255,255,255,.98);
-  border-color: rgba(15,23,42,.16);
-  color: rgba(15,23,42,.92);
+  background: rgba(0,0,0,.18);
+  border-color: rgba(255,255,255,.18);
+  color: rgba(255,255,255,.92);
 }
-body.fp-theme-pro .fp-av-wrap{ border-color: rgba(15,23,42,.10); background: rgba(15,23,42,.02); }
-body.fp-theme-pro .fp-av-dayhead{ background: rgba(15,23,42,.03); border-color: rgba(15,23,42,.10); }
-body.fp-theme-pro .fp-av-timecol{ background: rgba(15,23,42,.02); border-right-color: rgba(15,23,42,.10); }
-body.fp-theme-pro .fp-av-time{ color: rgba(15,23,42,.60); border-bottom-color: rgba(15,23,42,.08); }
-body.fp-theme-pro .fp-av-cell{ border-color: rgba(15,23,42,.08); background: rgba(255,255,255,.70); }
-body.fp-theme-pro .fp-av-cell.sel{ outline-color: rgba(14,165,233,.95); box-shadow: 0 0 0 2px rgba(14,165,233,.14) inset; }
+body.fp-theme-pro .fp-av-wrap{ border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+body.fp-theme-pro .fp-av-dayhead{ background: rgba(0,0,0,.10); border-color: rgba(255,255,255,.10); }
+body.fp-theme-pro .fp-av-timecol{ background: rgba(0,0,0,.10); border-right-color: rgba(255,255,255,.10); }
+body.fp-theme-pro .fp-av-time{ color: rgba(255,255,255,.70); border-bottom-color: rgba(255,255,255,.08); }
+body.fp-theme-pro .fp-av-cell{ border-color: rgba(255,255,255,.08); background: rgba(255,255,255,.02); }
+body.fp-theme-pro .fp-av-cell.sel{ outline-color: rgba(74,163,255,.95); box-shadow: 0 0 0 2px rgba(74,163,255,.16) inset; }
 
-/* Agenda (diary) Pro overrides: replace white-on-dark inline choices */
-body.fp-theme-pro .calWrap{ background: rgba(255,255,255,.92) !important; border-color: rgba(15,23,42,.12) !important; }
-body.fp-theme-pro .calTop{ background: linear-gradient(180deg, rgba(15,23,42,.04), rgba(15,23,42,.01)) !important; }
-body.fp-theme-pro .opsBar{ background: rgba(15,23,42,.04) !important; border-color: rgba(15,23,42,.12) !important; }
-body.fp-theme-pro .opsText{ color: rgba(15,23,42,.72) !important; }
-body.fp-theme-pro .opsDot{ color: rgba(15,23,42,.88) !important; border-color: rgba(15,23,42,.12) !important; }
-body.fp-theme-pro .calHead .corner,
-body.fp-theme-pro .calHead .dayHead,
-body.fp-theme-pro .cancelHead{ background: rgba(255,255,255,.96) !important; }
-body.fp-theme-pro .dayHead .d1{ color: rgba(15,23,42,.55) !important; }
-body.fp-theme-pro .dayHead .d2{ color: rgba(15,23,42,.92) !important; }
-body.fp-theme-pro .timeCol{ background: rgba(255,255,255,.96) !important; }
-body.fp-theme-pro .timeTick{ color: rgba(15,23,42,.72) !important; text-shadow: none !important; }
-body.fp-theme-pro .dayCol{
-  background: linear-gradient(180deg, rgba(15,23,42,.01), rgba(15,23,42,.00)) !important;
-  border-right-color: rgba(15,23,42,.10) !important;
-}
-body.fp-theme-pro .gridLine{ border-top-color: rgba(15,23,42,.06) !important; }
-body.fp-theme-pro .gridLine.hour{ border-top-color: rgba(15,23,42,.10) !important; }
-body.fp-theme-pro .event{
-  border-color: rgba(15,23,42,.12) !important;
-  color: rgba(15,23,42,.92) !important;
-}
-body.fp-theme-pro .event .m,
-body.fp-theme-pro .event .b{ color: rgba(15,23,42,.62) !important; }
-body.fp-theme-pro .dot{ box-shadow: 0 10px 22px rgba(14,165,233,.16) !important; }
-body.fp-theme-pro .fp-modal{ background: rgba(255,255,255,.96) !important; color-scheme: light !important; }
-body.fp-theme-pro .fp-modalBody{ color: rgba(15,23,42,.86) !important; }
-body.fp-theme-pro .fp-modalBody .input,
-body.fp-theme-pro .fp-modalBody .select,
-body.fp-theme-pro .fp-modalBody .textarea{
-  background: rgba(15,23,42,.03) !important;
-  border-color: rgba(15,23,42,.12) !important;
-  color: rgba(15,23,42,.92) !important;
-}
-body.fp-theme-pro .fpHover{ background: rgba(255,255,255,.96) !important; border-color: rgba(15,23,42,.12) !important; }
-body.fp-theme-pro .fpHover .t{ color: rgba(15,23,42,.95) !important; }
-body.fp-theme-pro .fpHover .r{ color: rgba(15,23,42,.78) !important; }
-body.fp-theme-pro .fpHover .k{ color: rgba(15,23,42,.55) !important; }
-body.fp-theme-pro .fpHover .note{ border-top-color: rgba(15,23,42,.10) !important; color: rgba(15,23,42,.72) !important; }
+/* Pro should NOT force Agenda to light; keep dark but with stronger readability */
+body.fp-theme-pro .timeTick{ color: rgba(255,255,255,.86) !important; }
+body.fp-theme-pro .gridLine{ border-top-color: rgba(255,255,255,.07) !important; }
+body.fp-theme-pro .gridLine.hour{ border-top-color: rgba(255,255,255,.12) !important; }
+body.fp-theme-pro .event{ border-color: rgba(255,255,255,.18) !important; }
 
 *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial}
 html,body{height:100%}
