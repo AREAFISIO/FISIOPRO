@@ -129,8 +129,9 @@ body.fp-has-topbar .app{
 .topbar{
   /* non deve rimanere fissa */
   position:relative;top:auto;z-index:1;padding:10px 10px 14px;
-  background:linear-gradient(180deg, rgba(26,45,76,.82), rgba(21,36,61,.55), transparent);
-  backdrop-filter: blur(10px);
+  /* remove horizontal blue band behind headings */
+  background: transparent;
+  backdrop-filter: none;
 }
 .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .h1{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}
