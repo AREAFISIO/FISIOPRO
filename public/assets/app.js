@@ -1041,21 +1041,54 @@ function buildAvailabilityUI() {
   const startDefault = ["07:00","07:00","07:00","07:00","07:00","07:00","07:00"];
   const endDefault = ["21:00","21:00","21:00","21:00","21:00","20:00","20:00"];
 
-  // 30-min slots 07:00-21:00
+  // 30-min slots 07:00-21:00 (last start: 20:30)
   const startMin = 7 * 60;
   const endMin = 21 * 60;
   const step = 30;
   const times = [];
-  for (let m = startMin; m <= endMin; m += 60) {
-    const hh = String(Math.floor(m/60)).padStart(2,"0");
-    times.push(`${hh}:00`);
+  for (let m = startMin; m < endMin; m += step) {
+    const hh = String(Math.floor(m / 60)).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    times.push(`${hh}:${mm}`);
   }
 
   const stateKey = fpSettingsKey("availability");
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(stateKey) || "null"); } catch {}
-  const ranges = saved?.ranges || days.map((_,i)=>({ start: startDefault[i], end: endDefault[i] }));
-  const onMap = new Set((saved?.on || []).map(String));
+
+  const ranges = saved?.ranges || days.map((_, i) => ({ start: startDefault[i], end: endDefault[i] }));
+
+  // slot state model:
+  // - saved.slots: { [key]: { status: "work"|"off", locationId?: string } }
+  // - legacy saved.on: ["d:r", ...] => work
+  const slotState = (() => {
+    const out = {};
+    const s = saved && typeof saved === "object" ? saved : null;
+    const slots = s?.slots && typeof s.slots === "object" ? s.slots : null;
+    if (slots) {
+      Object.keys(slots).forEach((k) => {
+        const v = slots[k];
+        if (!v || typeof v !== "object") return;
+        const st = String(v.status || "").toLowerCase();
+        if (st !== "work" && st !== "off") return;
+        out[String(k)] = { status: st, locationId: String(v.locationId || "") };
+      });
+    } else {
+      const on = Array.isArray(s?.on) ? s.on : [];
+      on.forEach((k) => { out[String(k)] = { status: "work", locationId: "" }; });
+    }
+    return out;
+  })();
+
+  const last = (() => {
+    const s = saved && typeof saved === "object" ? saved : null;
+    const l = s?.last && typeof s.last === "object" ? s.last : null;
+    const st = String(l?.status || "work").toLowerCase();
+    return {
+      status: st === "off" ? "off" : "work",
+      locationId: String(l?.locationId || ""),
+    };
+  })();
 
   // header row
   const headCells = days
@@ -1072,7 +1105,7 @@ function buildAvailabilityUI() {
     <div class="fp-av-dayhead" style="background:rgba(0,0,0,.10); border-right:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08);"></div>
     ${headCells}
     <div class="fp-av-timecol">
-      ${times.map((t)=>`<div class="fp-av-time">${t}</div>`).join("")}
+      ${times.map((t) => `<div class="fp-av-time">${t}</div>`).join("")}
     </div>
     ${days
       .map((_, dIdx) => {
@@ -1080,8 +1113,9 @@ function buildAvailabilityUI() {
           <div style="display:grid; grid-template-rows: repeat(${times.length}, 34px);">
             ${times.map((t, rIdx) => {
               const key = `${dIdx}:${rIdx}`;
-              const on = onMap.has(key) ? "on" : "";
-              return `<div class="fp-av-cell ${on}" data-av-cell="${key}"></div>`;
+              const st = slotState[key]?.status || "";
+              const cls = st === "work" ? "work" : (st === "off" ? "off" : "");
+              return `<div class="fp-av-cell ${cls}" data-av-cell="${key}"></div>`;
             }).join("")}
           </div>
         `;
@@ -1089,34 +1123,238 @@ function buildAvailabilityUI() {
       .join("")}
   `;
 
-  // drag selection
-  let dragging = false;
-  let dragSetOn = true;
-  const setCell = (el, on) => {
-    if (!el) return;
-    el.classList.toggle("on", on);
+  // --- Editor overlay (OsteoEasy-like) ---
+  const back = document.querySelector("[data-fp-av-back]");
+  const panelBody = back?.querySelector(".fp-set-body");
+  if (!back || !panelBody) return;
+
+  // Clean previous editor (rebuilds)
+  panelBody.querySelectorAll(".fp-av-editor").forEach((el) => el.remove());
+
+  const editor = document.createElement("div");
+  editor.className = "fp-av-editor";
+  editor.style.display = "none";
+  editor.innerHTML = `
+    <div class="fp-av-editor__head">
+      <div class="fp-av-editor__title"><span style="font-size:22px;">🕒</span> <span data-av-ed-title>0 slot selezionati</span></div>
+      <button type="button" class="fp-av-editor__x" data-av-ed-x aria-label="Chiudi">×</button>
+    </div>
+    <div class="fp-av-editor__body">
+      <div class="fp-av-editor__row">
+        <div class="fp-av-editor__radio">
+          <label><input type="radio" name="avStatus" value="off" data-av-ed-status /> Non lavorativo</label>
+          <label><input type="radio" name="avStatus" value="work" data-av-ed-status /> Lavorativo</label>
+        </div>
+      </div>
+      <div class="fp-av-editor__locs" data-av-ed-locs>
+        <div class="fp-av-editor__label">Luogo di lavoro:</div>
+        <div data-av-ed-loclist style="margin-top:10px;"></div>
+      </div>
+    </div>
+    <div class="fp-av-editor__foot">
+      <button type="button" class="btn" data-av-ed-cancel>Annulla</button>
+      <button type="button" class="fp-av-ok" data-av-ed-ok>OK</button>
+    </div>
+  `;
+  panelBody.appendChild(editor);
+
+  const selKeys = new Set();
+  const getCellByKey = (key) => grid.querySelector(`[data-av-cell="${String(key).replaceAll('"', '\\"')}"]`);
+  const setCellVisualState = (cellEl, st) => {
+    if (!cellEl) return;
+    cellEl.classList.remove("work", "off", "on");
+    if (st === "work") cellEl.classList.add("work");
+    if (st === "off") cellEl.classList.add("off");
   };
+
+  const clearSelection = () => {
+    selKeys.forEach((k) => {
+      const el = getCellByKey(k);
+      if (el) el.classList.remove("sel");
+    });
+    selKeys.clear();
+  };
+
+  const setSelected = (cellEl, isSelected) => {
+    const key = String(cellEl?.getAttribute("data-av-cell") || "");
+    if (!key) return;
+    cellEl.classList.toggle("sel", isSelected);
+    if (isSelected) selKeys.add(key);
+    else selKeys.delete(key);
+  };
+
+  const titleEl = editor.querySelector("[data-av-ed-title]");
+  const locsWrap = editor.querySelector("[data-av-ed-locs]");
+  const locList = editor.querySelector("[data-av-ed-loclist]");
+  const statusInputs = Array.from(editor.querySelectorAll("[data-av-ed-status]"));
+  const btnX = editor.querySelector("[data-av-ed-x]");
+  const btnCancel = editor.querySelector("[data-av-ed-cancel]");
+  const btnOk = editor.querySelector("[data-av-ed-ok]");
+
+  let editorStatus = last.status;     // "work" | "off"
+  let editorLocId = last.locationId;  // string (optional)
+  let locations = null;              // loaded lazily
+  let locationsLoading = false;
+
+  const renderEditorTitle = () => {
+    const n = selKeys.size;
+    if (titleEl) titleEl.textContent = `${n} slot selezionat${n === 1 ? "o" : "i"}`;
+  };
+
+  const renderLocButtons = () => {
+    if (!locList) return;
+    locList.innerHTML = "";
+
+    const disabled = editorStatus !== "work";
+    const wrapCls = disabled ? "isDisabled" : "";
+
+    if (!locationsLoading && !locations) {
+      // fetch once
+      locationsLoading = true;
+      locList.innerHTML = `<div style="color:rgba(0,0,0,.55); font-weight:800;">Caricamento sedi…</div>`;
+      api("/api/locations")
+        .then((data) => {
+          const items = Array.isArray(data?.items) ? data.items : [];
+          locations = items.map((x) => ({ id: String(x.id || x.ID || x.sedeId || ""), name: String(x.name || x.nome || x.label || x.id || "") }))
+            .filter((x) => x.id && x.name);
+        })
+        .catch(() => { locations = []; })
+        .finally(() => { locationsLoading = false; renderLocButtons(); });
+      return;
+    }
+
+    if (locationsLoading) {
+      locList.innerHTML = `<div style="color:rgba(0,0,0,.55); font-weight:800;">Caricamento sedi…</div>`;
+      return;
+    }
+
+    if (!locations || locations.length === 0) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `fp-av-locbtn isDisabled`;
+      b.textContent = "Sedi non disponibili";
+      locList.appendChild(b);
+      return;
+    }
+
+    // If no location selected yet, preselect first one (only in work mode).
+    if (editorStatus === "work" && !editorLocId) editorLocId = locations[0].id;
+
+    locations.forEach((loc) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `fp-av-locbtn ${wrapCls} ${editorLocId === loc.id ? "isSelected" : ""}`.trim();
+      btn.innerHTML = `
+        <span>${loc.name}</span>
+        <span style="font-weight:900; opacity:${editorLocId === loc.id ? "1" : ".0"};">✓</span>
+      `;
+      btn.onclick = () => {
+        if (editorStatus !== "work") return;
+        editorLocId = loc.id;
+        renderLocButtons();
+      };
+      locList.appendChild(btn);
+    });
+  };
+
+  const syncEditorControls = () => {
+    statusInputs.forEach((inp) => {
+      inp.checked = String(inp.value) === editorStatus;
+    });
+    if (locsWrap) locsWrap.style.display = editorStatus === "work" ? "" : "none";
+    renderLocButtons();
+  };
+
+  const openEditor = () => {
+    renderEditorTitle();
+    syncEditorControls();
+    editor.style.display = "block";
+  };
+  const closeEditor = () => {
+    editor.style.display = "none";
+  };
+
+  btnX && (btnX.onclick = () => { closeEditor(); });
+  btnCancel && (btnCancel.onclick = () => { clearSelection(); closeEditor(); });
+  statusInputs.forEach((inp) => {
+    inp.addEventListener("change", () => {
+      editorStatus = String(inp.value) === "off" ? "off" : "work";
+      syncEditorControls();
+    });
+  });
+
+  btnOk && (btnOk.onclick = () => {
+    // Apply to all selected slots
+    selKeys.forEach((key) => {
+      if (editorStatus === "off") slotState[key] = { status: "off", locationId: "" };
+      else slotState[key] = { status: "work", locationId: String(editorLocId || "") };
+      setCellVisualState(getCellByKey(key), editorStatus);
+    });
+    // persist last choices for next selection
+    last.status = editorStatus;
+    last.locationId = String(editorLocId || "");
+    clearSelection();
+    closeEditor();
+  });
+
+  // --- Selection interactions (drag selects, does not toggle state) ---
+  let dragging = false;
+  let dragMode = "add"; // "add" | "remove"
+
+  const onMouseUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (selKeys.size > 0) openEditor();
+    else closeEditor();
+  };
+
+  // avoid stacking listeners on rebuild
+  if (window.__FP_AV_MOUSEUP) {
+    try { window.removeEventListener("mouseup", window.__FP_AV_MOUSEUP); } catch {}
+  }
+  window.__FP_AV_MOUSEUP = onMouseUp;
+  window.addEventListener("mouseup", window.__FP_AV_MOUSEUP);
+
   grid.querySelectorAll("[data-av-cell]").forEach((c) => {
     c.addEventListener("mousedown", (e) => {
       e.preventDefault();
+      // plain drag: replace selection; with modifiers, add to existing selection
+      const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      if (!additive) clearSelection();
       dragging = true;
-      dragSetOn = !c.classList.contains("on");
-      setCell(c, dragSetOn);
+      dragMode = c.classList.contains("sel") ? "remove" : "add";
+      setSelected(c, dragMode === "add");
     });
     c.addEventListener("mouseenter", () => {
       if (!dragging) return;
-      setCell(c, dragSetOn);
+      setSelected(c, dragMode === "add");
     });
   });
-  window.addEventListener("mouseup", () => { dragging = false; }, { once: true });
 
-  // wire buttons
-  const back = document.querySelector("[data-fp-av-back]");
-  const close = back?.querySelector("[data-fp-av-close]");
-  const reset = back?.querySelector("[data-fp-av-reset]");
-  const save = back?.querySelector("[data-fp-av-save]");
-  close && (close.onclick = closeAvailabilityModal);
-  back && (back.onclick = (e) => { if (e.target === back) closeAvailabilityModal(); });
+  // Escape closes editor + clears selection
+  const onKeyDown = (e) => {
+    if (e.key !== "Escape") return;
+    clearSelection();
+    closeEditor();
+  };
+  if (window.__FP_AV_KEYDOWN) {
+    try { window.removeEventListener("keydown", window.__FP_AV_KEYDOWN); } catch {}
+  }
+  window.__FP_AV_KEYDOWN = onKeyDown;
+  window.addEventListener("keydown", window.__FP_AV_KEYDOWN);
+
+  // wire modal controls
+  const close = back.querySelector("[data-fp-av-close]");
+  const reset = back.querySelector("[data-fp-av-reset]");
+  const save = back.querySelector("[data-fp-av-save]");
+
+  close && (close.onclick = () => { clearSelection(); closeEditor(); closeAvailabilityModal(); });
+  back.onclick = (e) => {
+    if (e.target !== back) return;
+    clearSelection();
+    closeEditor();
+    closeAvailabilityModal();
+  };
   reset && (reset.onclick = () => {
     localStorage.removeItem(stateKey);
     buildAvailabilityUI();
@@ -1126,8 +1364,11 @@ function buildAvailabilityUI() {
       start: String(grid.querySelector(`[data-av-start="${i}"]`)?.value || startDefault[i]).trim(),
       end: String(grid.querySelector(`[data-av-end="${i}"]`)?.value || endDefault[i]).trim(),
     }));
-    const nextOn = Array.from(grid.querySelectorAll(".fp-av-cell.on")).map((el) => String(el.getAttribute("data-av-cell") || ""));
-    try { localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, on: nextOn })); } catch {}
+    try {
+      localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, slots: slotState, last }));
+    } catch {}
+    clearSelection();
+    closeEditor();
     closeAvailabilityModal();
     toast("Salvato");
   });
