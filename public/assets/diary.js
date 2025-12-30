@@ -436,11 +436,17 @@
   }
 
   function ensureMeInSelection(set) {
-    // CEO/Manager: don't force a "personal agenda" column.
-    // Physio: keep "me" visible to avoid accidentally hiding own agenda.
+    // For CEO/Manager: don't force a "CEO agenda" column, but if the same email
+    // is also a physiotherapist, include that *physio operator* name so they can
+    // still see their clinical agenda.
     if (!set) return;
     const role = getUserRoleNorm();
-    if (role === "manager") return;
+    if (role === "manager") {
+      const email = getUserEmail();
+      const physioName = email ? String(knownByEmail.get(email) || "").trim() : "";
+      if (physioName) set.add(physioName);
+      return;
+    }
     const me = String(getUserName() || "").trim();
     if (me) set.add(me);
   }
