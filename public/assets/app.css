@@ -1,10 +1,15 @@
 :root{
   /* Tema dark "più chiaro" (soft lighten) */
-  --bg:#101a2b; --panel:#14233a; --panel-2:#172a45; --border:rgba(255,255,255,.14);
+  --bg:#15243d; --panel:#1a2d4c; --panel-2:#1e355a; --border:rgba(255,255,255,.18);
   --text:rgba(255,255,255,.94); --muted:rgba(255,255,255,.70);
   --accent:#22e6c3; --accent-2:#4aa3ff; --warn:#ff4d6d; --ok:#29d39a;
   --shadow:0 14px 40px rgba(0,0,0,.28); --radius:16px;
   --fpTopbarH: 56px;
+
+  /* superfici più chiare (usate dove prima c'erano rgba hard-coded) */
+  --panelGlass: rgba(26,45,76,.78);
+  --panelSolid: rgba(26,45,76,.96);
+  --panelSolid2: rgba(30,53,90,.96);
 }
 
 *{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -12,8 +17,8 @@ html,body{height:100%}
 body{
   margin:0; overflow:hidden; color:var(--text);
   background:
-    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.16), transparent 60%),
-    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.14), transparent 55%),
+    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.20), transparent 60%),
+    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.18), transparent 55%),
     var(--bg);
 }
 a{color:inherit;text-decoration:none}
@@ -47,7 +52,7 @@ body.fp-has-topbar .app{
   justify-content:space-between;
   gap: 12px;
   padding: 0 14px;
-  background: rgba(20,34,56,.88);
+  background: var(--panelGlass);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 10px 26px rgba(0,0,0,.22);
@@ -106,7 +111,7 @@ body.fp-has-topbar .app{
 .topbar{
   /* non deve rimanere fissa */
   position:relative;top:auto;z-index:1;padding:10px 10px 14px;
-  background:linear-gradient(180deg, rgba(11,18,32,.90), rgba(11,18,32,.62), transparent);
+  background:linear-gradient(180deg, rgba(26,45,76,.82), rgba(21,36,61,.55), transparent);
   backdrop-filter: blur(10px);
 }
 .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
