@@ -10,6 +10,9 @@
   --panelGlass: rgba(26,45,76,.78);
   --panelSolid: rgba(26,45,76,.96);
   --panelSolid2: rgba(30,53,90,.96);
+
+  /* Optional brand logo (set to url("/assets/area-fisio-logo.svg")) */
+  --brandLogo: none;
 }
 
 /* Theme presets (toggle via body class) */
@@ -224,8 +227,14 @@ body.fp-has-topbar .app{
 }
 .brand{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
   background:rgba(255,255,255,.06);border:1px solid var(--border);box-shadow:var(--shadow)}
-.brand .dot{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));
-  box-shadow:0 10px 24px rgba(34,230,195,.18)}
+.brand .dot{
+  width:34px;height:34px;border-radius:12px;
+  background-image: var(--brandLogo), linear-gradient(135deg,var(--accent),var(--accent-2));
+  background-size: 72% 72%, cover;
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  box-shadow:0 10px 24px rgba(34,230,195,.18)
+}
 .brand .title{font-weight:800;letter-spacing:.2px}
 .brand .sub{color:var(--muted);font-size:12px;margin-top:2px}
 

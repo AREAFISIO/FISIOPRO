@@ -723,7 +723,7 @@ function ensureGlobalTopbar() {
 
   const tEl = bar.querySelector("[data-fp-top-title]");
   const sEl = bar.querySelector("[data-fp-top-sub]");
-  if (tEl) tEl.textContent = brandTitle || "FISIOCLINIK SRL STP";
+  if (tEl) tEl.textContent = brandTitle || "AreA FISIO";
   if (sEl) sEl.textContent = brandSub || "";
 
   document.body.classList.add("fp-has-topbar");
