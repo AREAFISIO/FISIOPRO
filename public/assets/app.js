@@ -1058,12 +1058,37 @@ function buildAvailabilityUI() {
   // ranges kept for backwards compatibility, but not shown in UI (user requested).
   const ranges = saved?.ranges || [];
 
-  // slot state model:
-  // - saved.slots: { [key]: { status: "work"|"off", locationId?: string } }
-  // - legacy saved.on: ["d:r", ...] => work
-  const slotState = (() => {
-    const out = {};
+  // Operators (collaborators) list for per-therapist availability.
+  // Cache in window to avoid repeated API calls as user opens/closes the modal.
+  window.__FP_AV_OPERATORS = window.__FP_AV_OPERATORS || null;
+  window.__FP_AV_OPERATORS_LOADING = window.__FP_AV_OPERATORS_LOADING || false;
+  const ensureOperators = async () => {
+    if (Array.isArray(window.__FP_AV_OPERATORS)) return window.__FP_AV_OPERATORS;
+    if (window.__FP_AV_OPERATORS_LOADING) return [];
+    window.__FP_AV_OPERATORS_LOADING = true;
+    try {
+      const data = await api("/api/operators");
+      const names = (data.items || []).map((x) => String(x.name || "").trim()).filter(Boolean);
+      window.__FP_AV_OPERATORS = names;
+      return names;
+    } catch {
+      window.__FP_AV_OPERATORS = [];
+      return [];
+    } finally {
+      window.__FP_AV_OPERATORS_LOADING = false;
+    }
+  };
+
+  // slot state model (new):
+  // - saved.byTherapist: { [therapistName|DEFAULT]: { [key:"d:r"]: {status:"work"|"off", locationId?:string} } }
+  // Back-compat:
+  // - saved.slots => treated as DEFAULT
+  // - legacy saved.on => treated as DEFAULT work
+  const slotsByTherapist = (() => {
     const s = saved && typeof saved === "object" ? saved : null;
+    const by = s?.byTherapist && typeof s.byTherapist === "object" ? s.byTherapist : null;
+    if (by) return JSON.parse(JSON.stringify(by));
+    const out = { DEFAULT: {} };
     const slots = s?.slots && typeof s.slots === "object" ? s.slots : null;
     if (slots) {
       Object.keys(slots).forEach((k) => {
@@ -1071,11 +1096,11 @@ function buildAvailabilityUI() {
         if (!v || typeof v !== "object") return;
         const st = String(v.status || "").toLowerCase();
         if (st !== "work" && st !== "off") return;
-        out[String(k)] = { status: st, locationId: String(v.locationId || "") };
+        out.DEFAULT[String(k)] = { status: st, locationId: String(v.locationId || "") };
       });
     } else {
       const on = Array.isArray(s?.on) ? s.on : [];
-      on.forEach((k) => { out[String(k)] = { status: "work", locationId: "" }; });
+      on.forEach((k) => { out.DEFAULT[String(k)] = { status: "work", locationId: "" }; });
     }
     return out;
   })();
@@ -1087,8 +1112,33 @@ function buildAvailabilityUI() {
     return {
       status: st === "off" ? "off" : "work",
       locationId: String(l?.locationId || ""),
+      applyAll: Boolean(l?.applyAll ?? false),
     };
   })();
+
+  // current therapist selection (default to lastTherapist if present)
+  let currentTherapist = String(saved?.lastTherapist || window.__FP_AV_LAST_THER || "DEFAULT").trim() || "DEFAULT";
+  window.__FP_AV_LAST_THER = currentTherapist;
+
+  const ensureTherBucket = (ther) => {
+    const k = String(ther || "").trim() || "DEFAULT";
+    if (!slotsByTherapist[k] || typeof slotsByTherapist[k] !== "object") slotsByTherapist[k] = {};
+    return slotsByTherapist[k];
+  };
+  const getSlotRec = (ther, key) => {
+    const t = String(ther || "").trim() || "DEFAULT";
+    const k = String(key || "");
+    const specific = slotsByTherapist?.[t]?.[k] || null;
+    if (specific) return specific;
+    return slotsByTherapist?.DEFAULT?.[k] || null;
+  };
+  const setSlotRec = (ther, key, rec) => {
+    const t = String(ther || "").trim() || "DEFAULT";
+    const k = String(key || "");
+    ensureTherBucket(t);
+    if (!rec) delete slotsByTherapist[t][k];
+    else slotsByTherapist[t][k] = rec;
+  };
 
   // header row
   const headCells = days
@@ -1099,6 +1149,24 @@ function buildAvailabilityUI() {
     `)
     .join("");
 
+  // Top toolbar (collaborator picker)
+  const top = document.querySelector(".fp-av-top");
+  if (top) {
+    top.innerHTML = `
+      <div class="fp-av-toolbar">
+        <div class="left">
+          <div style="font-weight:1000;">Puoi selezionare più slot cliccando e trascinando la selezione</div>
+          <div style="opacity:.75;">•</div>
+          <label>Collaboratore:
+            <select data-av-ther>
+              <option value="DEFAULT">Tutti (default)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
   grid.innerHTML = `
     <div class="fp-av-dayhead" style="background:rgba(0,0,0,.10); border-right:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08);"></div>
     ${headCells}
@@ -1108,10 +1176,10 @@ function buildAvailabilityUI() {
     ${days
       .map((_, dIdx) => {
         return `
-          <div style="display:grid; grid-template-rows: repeat(${times.length}, 34px);">
+          <div style="display:grid; grid-template-rows: repeat(${times.length}, 18px);">
             ${times.map((t, rIdx) => {
               const key = `${dIdx}:${rIdx}`;
-              const st = slotState[key]?.status || "";
+              const st = getSlotRec(currentTherapist, key)?.status || "";
               const cls = st === "work" ? "work" : (st === "off" ? "off" : "");
               return `<div class="fp-av-cell ${cls}" data-av-cell="${key}"></div>`;
             }).join("")}
@@ -1143,6 +1211,12 @@ function buildAvailabilityUI() {
           <label><input type="radio" name="avStatus" value="off" data-av-ed-status /> Non lavorativo</label>
           <label><input type="radio" name="avStatus" value="work" data-av-ed-status /> Lavorativo</label>
         </div>
+      </div>
+      <div class="fp-av-editor__row">
+        <label style="display:flex; gap:10px; align-items:center; font-weight:900;">
+          <input type="checkbox" data-av-ed-all />
+          <span>Applica a tutti i collaboratori</span>
+        </label>
       </div>
       <div class="fp-av-editor__locs" data-av-ed-locs>
         <div class="fp-av-editor__label">Luogo di lavoro:</div>
@@ -1188,9 +1262,11 @@ function buildAvailabilityUI() {
   const btnX = editor.querySelector("[data-av-ed-x]");
   const btnCancel = editor.querySelector("[data-av-ed-cancel]");
   const btnOk = editor.querySelector("[data-av-ed-ok]");
+  const chkAll = editor.querySelector("[data-av-ed-all]");
 
   let editorStatus = last.status;     // "work" | "off"
   let editorLocId = last.locationId;  // string (optional)
+  let editorApplyAll = Boolean(last.applyAll);
   let locations = null;              // loaded lazily
   let locationsLoading = false;
 
@@ -1259,6 +1335,7 @@ function buildAvailabilityUI() {
     statusInputs.forEach((inp) => {
       inp.checked = String(inp.value) === editorStatus;
     });
+    if (chkAll) chkAll.checked = editorApplyAll;
     if (locsWrap) locsWrap.style.display = editorStatus === "work" ? "" : "none";
     renderLocButtons();
   };
@@ -1280,17 +1357,33 @@ function buildAvailabilityUI() {
       syncEditorControls();
     });
   });
+  chkAll && chkAll.addEventListener("change", () => {
+    editorApplyAll = Boolean(chkAll.checked);
+  });
 
   btnOk && (btnOk.onclick = () => {
     // Apply to all selected slots
-    selKeys.forEach((key) => {
-      if (editorStatus === "off") slotState[key] = { status: "off", locationId: "" };
-      else slotState[key] = { status: "work", locationId: String(editorLocId || "") };
-      setCellVisualState(getCellByKey(key), editorStatus);
-    });
+    const applyTo = (therList) => {
+      selKeys.forEach((key) => {
+        therList.forEach((ther) => {
+          if (editorStatus === "off") setSlotRec(ther, key, { status: "off", locationId: "" });
+          else setSlotRec(ther, key, { status: "work", locationId: String(editorLocId || "") });
+        });
+        // update visuals for current therapist only
+        setCellVisualState(getCellByKey(key), editorStatus);
+      });
+    };
+    if (editorApplyAll) {
+      const ops = Array.isArray(window.__FP_AV_OPERATORS) ? window.__FP_AV_OPERATORS : [];
+      const all = ["DEFAULT", ...ops];
+      applyTo(all);
+    } else {
+      applyTo([currentTherapist]);
+    }
     // persist last choices for next selection
     last.status = editorStatus;
     last.locationId = String(editorLocId || "");
+    last.applyAll = Boolean(editorApplyAll);
     clearSelection();
     closeEditor();
   });
@@ -1361,7 +1454,7 @@ function buildAvailabilityUI() {
   save && (save.onclick = () => {
     const nextRanges = Array.isArray(ranges) ? ranges : [];
     try {
-      localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, slots: slotState, last }));
+      localStorage.setItem(stateKey, JSON.stringify({ ranges: nextRanges, byTherapist: slotsByTherapist, last, lastTherapist: currentTherapist }));
     } catch {}
     clearSelection();
     closeEditor();
@@ -1369,6 +1462,37 @@ function buildAvailabilityUI() {
     toast("Salvato");
     try { window.dispatchEvent(new CustomEvent("fpAvailabilityChanged")); } catch {}
   });
+
+  // Fill collaborator selector once operators load (async)
+  (async () => {
+    const sel = top?.querySelector?.("[data-av-ther]");
+    if (!sel) return;
+    sel.value = currentTherapist;
+    const ops = await ensureOperators();
+    // rebuild options (keep current selection)
+    const cur = String(sel.value || currentTherapist || "DEFAULT");
+    sel.innerHTML = `<option value="DEFAULT">Tutti (default)</option>` + ops.map((n) => `<option value="${String(n).replaceAll('"', "&quot;")}">${String(n).replaceAll("<", "&lt;")}</option>`).join("");
+    sel.value = cur;
+    currentTherapist = String(sel.value || "DEFAULT");
+    window.__FP_AV_LAST_THER = currentTherapist;
+    // refresh cell classes for current therapist
+    grid.querySelectorAll("[data-av-cell]").forEach((c) => {
+      const key = String(c.getAttribute("data-av-cell") || "");
+      const st = getSlotRec(currentTherapist, key)?.status || "";
+      setCellVisualState(c, st === "work" ? "work" : (st === "off" ? "off" : ""));
+    });
+    sel.onchange = () => {
+      currentTherapist = String(sel.value || "DEFAULT");
+      window.__FP_AV_LAST_THER = currentTherapist;
+      clearSelection();
+      closeEditor();
+      grid.querySelectorAll("[data-av-cell]").forEach((c) => {
+        const key = String(c.getAttribute("data-av-cell") || "");
+        const st = getSlotRec(currentTherapist, key)?.status || "";
+        setCellVisualState(c, st === "work" ? "work" : (st === "off" ? "off" : ""));
+      });
+    };
+  })();
 }
 
 function loadAppointmentsSettings() {
