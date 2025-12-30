@@ -31,10 +31,21 @@ export function ensureRes(res) {
 
 export function normalizeRole(roleRaw) {
   const r = String(roleRaw || "").trim().toLowerCase();
+  if (!r) return "";
+
+  // Support combined/multi-role labels, e.g.:
+  // - "CEO e Fisioterapista"
+  // - "CEO, Fisioterapista"
+  // - "Front office / Fisioterapista"
+  // Choose the MOST privileged role found.
+  if (r.includes("ceo")) return "manager";
+  if (r.includes("manager") || r.includes("admin") || r.includes("amministr")) return "manager";
+  if (r.includes("front")) return "front";
+  if (r.includes("physio") || r.includes("fisioterap")) return "physio";
+
+  // Exact fallbacks
   if (r === "fisioterapista" || r === "physio") return "physio";
   if (r === "front office" || r === "front-office" || r === "front") return "front";
-  // "CEO" is treated as manager-level access in the app.
-  if (r === "ceo") return "manager";
   if (r === "manager" || r === "admin" || r === "amministratore") return "manager";
   return "";
 }
