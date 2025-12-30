@@ -6,6 +6,41 @@ function isUnknownFieldError(msg) {
   return s.includes("unknown field name") || s.includes("unknown field names");
 }
 
+function norm(v) {
+  const s = String(v ?? "").trim();
+  return s ? s : "";
+}
+
+function normalizeKeyLoose(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function resolveFieldKeyFromRecord(fieldsObj, candidates) {
+  const f = fieldsObj || {};
+  const keys = Object.keys(f);
+  if (!keys.length) return "";
+
+  const byLower = new Map(keys.map((k) => [k.toLowerCase(), k]));
+  for (const c of candidates || []) {
+    const want = norm(c);
+    if (!want) continue;
+    const hit = byLower.get(want.toLowerCase());
+    if (hit) return hit;
+  }
+
+  const keysLoose = new Map(keys.map((k) => [normalizeKeyLoose(k), k]));
+  for (const c of candidates || []) {
+    const wantLoose = normalizeKeyLoose(c);
+    if (!wantLoose) continue;
+    const hit = keysLoose.get(wantLoose);
+    if (hit) return hit;
+  }
+
+  return "";
+}
+
 async function airtableListAll({ tableEnc, qs, max = 500 }) {
   let out = [];
   let offset = null;
@@ -61,9 +96,21 @@ export default async function handler(req, res) {
             const apptRecords = await airtableListAll({ tableEnc: apptTable, qs: qs3, max: 500 });
 
             const uniq = new Map(); // id -> name
+            let resolvedKey = "";
+            const candidates = [
+              apptField,
+              "Sede",
+              "Sedi",
+              "Sede appuntamento",
+              "Nome sede",
+              "Nome sede appuntamento",
+              "Location",
+              "Luogo",
+            ].filter(Boolean);
             for (const r of apptRecords || []) {
               const f = r.fields || {};
-              const v = f[apptField];
+              if (!resolvedKey) resolvedKey = resolveFieldKeyFromRecord(f, candidates);
+              const v = f[resolvedKey || apptField];
               if (!v) continue;
               if (typeof v === "string") {
                 const s = v.trim();
