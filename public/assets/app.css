@@ -11,8 +11,8 @@
   --panelSolid: rgba(26,45,76,.96);
   --panelSolid2: rgba(30,53,90,.96);
 
-  /* Optional brand logo (set to url("/assets/area-fisio-logo.svg")) */
-  --brandLogo: none;
+  /* Brand logo shown inside the gradient square */
+  --brandLogo: url("/assets/brand.svg");
 }
 
 /* Theme presets (toggle via body class) */
