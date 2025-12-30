@@ -730,6 +730,17 @@
             </div>
           </div>
 
+          <div class="prefsRow" data-pref-double-section style="align-items:flex-start;">
+            <div style="min-width:0;">
+              <div class="prefsLabel">Agende doppie (colonna extra)</div>
+              <div class="prefsSub">Compare solo se attivi la vista multi utente. Seleziona gli operatori per cui vuoi una colonna aggiuntiva.</div>
+            </div>
+            <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:8px;">
+              <div class="opsDots" data-pref-double-dots></div>
+              <button class="btn" data-pref-double-pick type="button">Seleziona</button>
+            </div>
+          </div>
+
           <div class="prefPicker" data-pref-default-picker>
             <div class="prefPickerTop">
               <div class="mini">Agende</div>
@@ -737,6 +748,15 @@
               <button class="btn" data-pref-default-close type="button">Chiudi</button>
             </div>
             <div class="prefPickerBody" data-pref-default-list></div>
+          </div>
+
+          <div class="prefPicker" data-pref-double-picker>
+            <div class="prefPickerTop">
+              <div class="mini">Agende doppie</div>
+              <input class="prefPickerSearch" data-pref-double-search placeholder="Cerca operatore..." />
+              <button class="btn" data-pref-double-close type="button">Chiudi</button>
+            </div>
+            <div class="prefPickerBody" data-pref-double-list></div>
           </div>
         </div>
 
@@ -778,7 +798,7 @@
 
 <!-- cache-bust -->
 <script src="../assets/app.js?v=fpui-20251225"></script>
-<script src="../assets/diary.js?v=fpui-20251226"></script>
+<script src="../assets/diary.js?v=fpui-20251230"></script>
 </body>
 </html>
 

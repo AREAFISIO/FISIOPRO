@@ -199,6 +199,13 @@
   const prefDefaultList = document.querySelector("[data-pref-default-list]");
   const prefDefaultSearch = document.querySelector("[data-pref-default-search]");
   const prefDefaultClose = document.querySelector("[data-pref-default-close]");
+  const prefDoubleSection = document.querySelector("[data-pref-double-section]");
+  const prefDoubleDots = document.querySelector("[data-pref-double-dots]");
+  const prefDoublePick = document.querySelector("[data-pref-double-pick]");
+  const prefDoublePicker = document.querySelector("[data-pref-double-picker]");
+  const prefDoubleList = document.querySelector("[data-pref-double-list]");
+  const prefDoubleSearch = document.querySelector("[data-pref-double-search]");
+  const prefDoubleClose = document.querySelector("[data-pref-double-close]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
 
@@ -206,6 +213,7 @@
     slotMin: 30,
     multiUser: false,
     defaultOperators: [],
+    doubleOperators: [],
     showService: true,
     dayNav: false,
     userColor: "",
@@ -486,7 +494,7 @@
     try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
   }
   function resetPrefs() {
-    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], showService: true, dayNav: false, userColor: "" };
+    prefs = { slotMin: 30, multiUser: false, defaultOperators: [], doubleOperators: [], showService: true, dayNav: false, userColor: "" };
     SLOT_MIN = 30;
     multiUser = false;
     savePrefs();
@@ -500,7 +508,10 @@
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
     if (prefDefaultSection) prefDefaultSection.style.display = prefMulti?.checked ? "" : "none";
     if (prefDefaultPicker && !prefMulti?.checked) prefDefaultPicker.style.display = "none";
+    if (prefDoubleSection) prefDoubleSection.style.display = prefMulti?.checked ? "" : "none";
+    if (prefDoublePicker && !prefMulti?.checked) prefDoublePicker.style.display = "none";
     renderDefaultDots();
+    renderDoubleDots();
   }
   function openPrefs() {
     if (!prefsBack) return;
@@ -527,6 +538,25 @@
       t.className = "opsMini";
       t.textContent = "—";
       prefDefaultDots.appendChild(t);
+    }
+  }
+
+  function renderDoubleDots() {
+    if (!prefDoubleDots) return;
+    prefDoubleDots.innerHTML = "";
+    const names = (prefs.doubleOperators || []).slice(0, 10);
+    names.forEach((n) => {
+      const dot = document.createElement("div");
+      dot.className = "opsDot";
+      dot.style.background = solidForTherapist(n);
+      dot.textContent = therapistKey(n);
+      prefDoubleDots.appendChild(dot);
+    });
+    if (!names.length) {
+      const t = document.createElement("div");
+      t.className = "opsMini";
+      t.textContent = "—";
+      prefDoubleDots.appendChild(t);
     }
   }
 
@@ -574,6 +604,53 @@
         renderDefaultPickerList();
       });
       prefDefaultList.appendChild(row);
+    });
+  }
+
+  function renderDoublePickerList() {
+    if (!prefDoubleList) return;
+    const q = String(prefDoubleSearch?.value || "").trim().toLowerCase();
+    const names = (knownTherapists || []).slice();
+    const filtered = q ? names.filter((n) => String(n).toLowerCase().includes(q)) : names;
+
+    prefDoubleList.innerHTML = "";
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "prefPickRow";
+      empty.style.cursor = "default";
+      empty.innerHTML = `<div class="prefPickLeft"><div class="prefPickMini">Nessun operatore trovato.</div></div>`;
+      prefDoubleList.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "prefPickRow";
+      const on = (prefs.doubleOperators || []).includes(name);
+      const check = `<div class="prefPickCheck ${on ? "on" : ""}">${on ? "✓" : ""}</div>`;
+      const role = roleForOperatorName(name);
+      row.innerHTML = `
+        <div class="prefPickLeft">
+          ${check}
+          <div style="min-width:0;">
+            <div class="prefPickName" style="display:flex; align-items:center; gap:10px; min-width:0;">
+              <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+              ${role ? `<span class="opsRole">${role}</span>` : ""}
+            </div>
+            <div class="prefPickMini">${therapistKey(name) || ""}</div>
+          </div>
+        </div>
+        <div class="opsDot" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name) || ""}</div>
+      `;
+      row.addEventListener("click", () => {
+        const set = new Set(prefs.doubleOperators || []);
+        if (set.has(name)) set.delete(name);
+        else set.add(name);
+        prefs.doubleOperators = Array.from(set);
+        renderDoubleDots();
+        renderDoublePickerList();
+      });
+      prefDoubleList.appendChild(row);
     });
   }
 
@@ -778,6 +855,7 @@
 
     syncLoginName();
     if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
+    if (prefDoublePicker && prefDoublePicker.style.display !== "none") renderDoublePickerList();
 
     rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
@@ -833,7 +911,20 @@
     const bodyHeightPx = totalSlots * SLOT_PX;
     const heightPx = bodyHeightPx + GRID_PAD_TOP + GRID_PAD_BOTTOM;
 
-    const colsPerDay = multiUser ? Math.max(1, ops.length) : 1;
+    const doubleSet = new Set((prefs.doubleOperators || []).filter(Boolean));
+    const opSlots = [];
+    if (multiUser) {
+      (ops || []).forEach((nameRaw) => {
+        const name = String(nameRaw || "").trim();
+        if (!name) return;
+        const laneCount = doubleSet.has(name) ? 2 : 1;
+        for (let laneIndex = 0; laneIndex < laneCount; laneIndex++) {
+          opSlots.push({ therapist: name, laneIndex, laneCount });
+        }
+      });
+    }
+
+    const colsPerDay = multiUser ? Math.max(1, opSlots.length || 0) : 1;
     const totalDayCols = days * colsPerDay;
 
     // Colonne sempre visibili: si stringono (no orizzontale) quando aggiungo operatori
@@ -895,7 +986,8 @@
 
         for (let dIdx = 0; dIdx < days; dIdx++) {
           for (let oIdx = 0; oIdx < colsPerDay; oIdx++) {
-            const name = ops[oIdx] || "";
+            const slot = opSlots[oIdx] || { therapist: "", laneIndex: 0, laneCount: 1 };
+            const name = slot.therapist || "";
             const cell = document.createElement("div");
             cell.className = "dayHead";
             cell.classList.add("opHead");
@@ -905,8 +997,13 @@
             cell.style.gridRow = "3";
             cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
             // Requested: keep the colored dot, but remove name/surname next to it (still keep tooltip).
+            const laneBadge =
+              slot.laneCount > 1
+                ? `<span title="Colonna ${slot.laneIndex + 1}" style="font-size:11px; font-weight:1000; opacity:.85;">${slot.laneIndex + 1}</span>`
+                : "";
             cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
               <span class="opsDot" title="${name}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
+              ${laneBadge}
             </div>`;
             gridEl.appendChild(cell);
           }
@@ -943,7 +1040,16 @@
         col.className = "dayCol";
         if (dIdx > 0 && oIdx === 0) col.classList.add("daySep");
         col.dataset.dayIndex = String(dIdx);
-        col.dataset.therapist = multiUser ? String(ops[oIdx] || "") : "";
+        if (multiUser) {
+          const slot = opSlots[oIdx] || { therapist: "", laneIndex: 0, laneCount: 1 };
+          col.dataset.therapist = String(slot.therapist || "");
+          col.dataset.lane = String(slot.laneIndex || 0);
+          col.dataset.lanes = String(slot.laneCount || 1);
+        } else {
+          col.dataset.therapist = "";
+          col.dataset.lane = "0";
+          col.dataset.lanes = "1";
+        }
         col.style.height = heightPx + "px";
         col.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
         col.style.gridRow = multiUser ? "4" : (showCancelBand ? "3" : "2");
@@ -1541,6 +1647,61 @@
         return { ...x, _dayIndex: idx };
       });
 
+    // Assign a "lane" for each appointment in multi-user view when some operators have double columns.
+    if (multiUser) {
+      const doubleSet = new Set((prefs.doubleOperators || []).filter(Boolean));
+      const groups = new Map(); // key -> list
+      items.forEach((it) => {
+        const key = `${it._dayIndex}|${String(it.therapist || "")}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      });
+
+      for (const [key, list] of groups.entries()) {
+        // key = "dayIndex|therapist"
+        const therapist = String(key.split("|").slice(1).join("|") || "");
+        const laneCount = doubleSet.has(therapist) ? 2 : 1;
+        const laneEnds = new Array(laneCount).fill(-1e9);
+
+        list
+          .slice()
+          .sort((a, b) => (a.startAt || 0) - (b.startAt || 0))
+          .forEach((it) => {
+            const stMin = it.startAt ? minutesOfDay(it.startAt) : 0;
+            let enMin = stMin + 30;
+            if (it.endAt) {
+              const x = minutesOfDay(it.endAt);
+              if (x > stMin) enMin = x;
+            }
+
+            let chosen = -1;
+            for (let i = 0; i < laneCount; i++) {
+              if (stMin >= laneEnds[i]) {
+                chosen = i;
+                break;
+              }
+            }
+            if (chosen < 0) {
+              // All lanes overlap; pick the one that frees up first (best-effort).
+              let bestI = 0;
+              let bestEnd = laneEnds[0] ?? 0;
+              for (let i = 1; i < laneCount; i++) {
+                if (laneEnds[i] < bestEnd) {
+                  bestEnd = laneEnds[i];
+                  bestI = i;
+                }
+              }
+              chosen = bestI;
+            }
+
+            it._lane = chosen;
+            laneEnds[chosen] = Math.max(laneEnds[chosen], enMin);
+          });
+      }
+    } else {
+      items.forEach((it) => { it._lane = 0; });
+    }
+
     buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1));
 
     // Render cancelled appointments into the band (also when single-operator view).
@@ -1612,7 +1773,16 @@
     items.forEach((it) => {
       let col = null;
       if (multiUser) {
-        col = cols.find((c) => c.dataset.dayIndex === String(it._dayIndex) && c.dataset.therapist === String(it.therapist || ""));
+        const lane = String(it._lane ?? 0);
+        col =
+          cols.find(
+            (c) =>
+              c.dataset.dayIndex === String(it._dayIndex) &&
+              c.dataset.therapist === String(it.therapist || "") &&
+              String(c.dataset.lane || "0") === lane,
+          ) ||
+          // fallback: first column for that therapist/day
+          cols.find((c) => c.dataset.dayIndex === String(it._dayIndex) && c.dataset.therapist === String(it.therapist || ""));
       } else {
         // first column for that day
         col = cols.find((c) => c.dataset.dayIndex === String(it._dayIndex));
@@ -1738,6 +1908,7 @@
     if (prefMulti && !prefMulti.checked) {
       prefMulti.checked = true;
       if (prefDefaultSection) prefDefaultSection.style.display = "";
+      if (prefDoubleSection) prefDoubleSection.style.display = "";
     }
     // Apri la lista direttamente sotto (inline, scrollabile)
     if (prefDefaultPicker) {
@@ -1748,15 +1919,34 @@
       try { prefDefaultSearch?.focus?.(); } catch {}
     }
   });
+  prefDoublePick?.addEventListener("click", () => {
+    // Se l'utente non ha ancora attivato la vista multi utente, la attiviamo.
+    if (prefMulti && !prefMulti.checked) {
+      prefMulti.checked = true;
+      if (prefDefaultSection) prefDefaultSection.style.display = "";
+      if (prefDoubleSection) prefDoubleSection.style.display = "";
+    }
+    if (prefDoublePicker) {
+      prefDoublePicker.style.display = "block";
+      renderDoublePickerList();
+      try { prefDoubleSearch?.focus?.(); } catch {}
+    }
+  });
   prefsReset?.addEventListener("click", () => { resetPrefs(); syncPrefsUI(); toast?.("Reset"); render(); });
   prefMulti?.addEventListener("change", () => {
     if (prefDefaultSection) prefDefaultSection.style.display = prefMulti.checked ? "" : "none";
     if (prefDefaultPicker && !prefMulti.checked) prefDefaultPicker.style.display = "none";
+    if (prefDoubleSection) prefDoubleSection.style.display = prefMulti.checked ? "" : "none";
+    if (prefDoublePicker && !prefMulti.checked) prefDoublePicker.style.display = "none";
   });
   prefDefaultClose?.addEventListener("click", () => {
     if (prefDefaultPicker) prefDefaultPicker.style.display = "none";
   });
   prefDefaultSearch?.addEventListener("input", () => renderDefaultPickerList());
+  prefDoubleClose?.addEventListener("click", () => {
+    if (prefDoublePicker) prefDoublePicker.style.display = "none";
+  });
+  prefDoubleSearch?.addEventListener("input", () => renderDoublePickerList());
   prefsSave?.addEventListener("click", () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
