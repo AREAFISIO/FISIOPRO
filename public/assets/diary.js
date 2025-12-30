@@ -425,8 +425,22 @@
     return [nome, cognome].filter(Boolean).join(" ").trim();
   }
 
+  function getUserRoleNorm() {
+    const u = window.FP_USER || window.FP_SESSION || null;
+    const raw = String(u?.role || u?.roleLabel || "").trim().toLowerCase();
+    if (!raw) return "";
+    if (raw === "ceo" || raw.includes("manager") || raw.includes("admin") || raw.includes("amministr")) return "manager";
+    if (raw.includes("front")) return "front";
+    if (raw.includes("physio") || raw.includes("fisioterap")) return "physio";
+    return raw;
+  }
+
   function ensureMeInSelection(set) {
+    // CEO/Manager: don't force a "personal agenda" column.
+    // Physio: keep "me" visible to avoid accidentally hiding own agenda.
     if (!set) return;
+    const role = getUserRoleNorm();
+    if (role === "manager") return;
     const me = String(getUserName() || "").trim();
     if (me) set.add(me);
   }
@@ -480,10 +494,12 @@
     if (multiUser) {
       const base = (prefs.defaultOperators || []).filter(Boolean);
       selectedTherapists = new Set(base);
-      // Always keep the current user's agenda visible in multi-user mode.
+      // Keep the current user's agenda visible only for non-manager roles.
       ensureMeInSelection(selectedTherapists);
-      // If nothing selected, fallback to self (or first known later).
-      if (!selectedTherapists.size && me) selectedTherapists.add(me);
+      // If nothing selected, fallback:
+      // - physio/front: self
+      // - manager: wait for load() to auto-select all operators once we know them
+      if (!selectedTherapists.size && me && getUserRoleNorm() !== "manager") selectedTherapists.add(me);
     } else {
       selectedTherapists = new Set();
       if (me) selectedTherapists.add(me);
@@ -869,6 +885,10 @@
       if (multiUser && (prefs.defaultOperators || []).length) {
         selectedTherapists = new Set(prefs.defaultOperators);
         ensureMeInSelection(selectedTherapists);
+      }
+      else if (multiUser && getUserRoleNorm() === "manager") {
+        // Manager/CEO: default to "see everything" (no forced personal column).
+        selectedTherapists = new Set(knownTherapists);
       }
       else if (!multiUser && me) selectedTherapists = new Set([me]);
       else if (me) selectedTherapists = new Set([me]);
