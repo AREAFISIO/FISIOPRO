@@ -1047,7 +1047,8 @@ function buildAvailabilityUI() {
   for (let m = startMin; m < endMin; m += step) {
     const hh = String(Math.floor(m / 60)).padStart(2, "0");
     const mm = String(m % 60).padStart(2, "0");
-    times.push(`${hh}:${mm}`);
+    // show label only on the hour to keep the grid compact/clean
+    times.push(mm === "00" ? `${hh}:00` : "");
   }
 
   const stateKey = fpSettingsKey("availability");
@@ -1415,6 +1416,7 @@ function loadAppointmentsSettings() {
   reset && (reset.onclick = () => {
     localStorage.removeItem(key);
     loadAppointmentsSettings();
+    try { window.dispatchEvent(new CustomEvent("fpAppointmentsSettingsChanged")); } catch {}
   });
   save && (save.onclick = () => {
     const next = {
@@ -1429,6 +1431,7 @@ function loadAppointmentsSettings() {
     try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
     closeAppointmentsModal();
     toast("Salvato");
+    try { window.dispatchEvent(new CustomEvent("fpAppointmentsSettingsChanged")); } catch {}
   });
 }
 
