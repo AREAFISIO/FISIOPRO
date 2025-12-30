@@ -30,8 +30,11 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(tableName);
 
     // Only active physiotherapists (operators) by default.
+    // Support both:
+    // - single-select text: "Fisioterapista"
+    // - multi-select / combined text: "CEO, Fisioterapista" / "CEO e Fisioterapista"
     // Fields are aligned with auth-login.js: Attivo, Ruolo, Nome, Email
-    const formula = `AND({Attivo}=1, OR({Ruolo}="Fisioterapista", {Ruolo}="Fisioterapista "))`;
+    const formula = `AND({Attivo}=1, FIND("Fisioterapista", {Ruolo}&""))`;
 
     // Avoid sort-by-field errors if base differs; we sort in JS.
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
