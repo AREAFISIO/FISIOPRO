@@ -116,7 +116,15 @@ body.fp-has-topbar .app{
 }
 .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .h1{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}
-.pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:12px}
+.pill{
+  padding:6px 10px;
+  border-radius:999px;
+  /* remove “blue box” background */
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.16);
+  color: rgba(255,255,255,.82);
+  font-size:12px
+}
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 
 .btn{
