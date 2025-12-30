@@ -51,7 +51,40 @@ export default async function handler(req, res) {
           const qs2 = new URLSearchParams({ pageSize: "100" }); // no fields[] -> get whatever Airtable returns
           records = await airtableListAll({ tableEnc: table, qs: qs2, max: 500 });
         } else {
-          throw e;
+          // Fallback: many bases don't have a "SEDI" table (Sede is a single-select/text on APPUNTAMENTI).
+          // In that case, derive location options by sampling the appointment table.
+          try {
+            const apptTableName = process.env.AGENDA_TABLE || "APPUNTAMENTI";
+            const apptField = process.env.AGENDA_LOCATION_FIELD || "Sede";
+            const apptTable = encodeURIComponent(apptTableName);
+            const qs3 = new URLSearchParams({ pageSize: "100" }); // no fields[] to maximize chance to get the field
+            const apptRecords = await airtableListAll({ tableEnc: apptTable, qs: qs3, max: 500 });
+
+            const uniq = new Map(); // id -> name
+            for (const r of apptRecords || []) {
+              const f = r.fields || {};
+              const v = f[apptField];
+              if (!v) continue;
+              if (typeof v === "string") {
+                const s = v.trim();
+                if (s) uniq.set(s, s);
+              } else if (Array.isArray(v)) {
+                // could be linked record ids or text arrays; keep whatever we can.
+                for (const x of v) {
+                  if (typeof x !== "string") continue;
+                  const s = x.trim();
+                  if (!s) continue;
+                  uniq.set(s, s);
+                }
+              }
+            }
+
+            return Array.from(uniq.entries())
+              .map(([id, name]) => ({ id, name }))
+              .sort((a, b) => a.name.localeCompare(b.name, "it"));
+          } catch {
+            throw e;
+          }
         }
       }
 
