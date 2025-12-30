@@ -1249,6 +1249,11 @@
 
     let startMin = minOn === null ? (8 * 60) : minOn;
     let endMin = maxOn === null ? (20 * 60) : maxOn;
+
+    // Requested UX: always show full day range up to 21:00 (and from 07:00),
+    // even if there are no working slots at the edges.
+    startMin = Math.min(startMin, 7 * 60);
+    endMin = Math.max(endMin, 21 * 60);
     startMin = clamp(startMin, 0, 23 * 60);
     endMin = clamp(endMin, startMin + 60, 24 * 60);
     startMin = Math.floor(startMin / 60) * 60;
