@@ -13,11 +13,60 @@
 
   /* Brand logo shown inside the gradient square */
   --brandLogo: url("/assets/brand.svg");
+
+  /* ===== Theme tokens (so Standard vs Pro is VERY visible) ===== */
+  --bodyBg:
+    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.20), transparent 60%),
+    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.18), transparent 55%),
+    var(--bg);
+  --sidebarBg: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  --cardBg: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+  --rightbarBg: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  --btnBg: rgba(255,255,255,.08);
+  --btnBgHover: rgba(255,255,255,.11);
+  --topbarBg: var(--panelGlass);
+  --topbarBorder: var(--border);
+  --topbarShadow: 0 10px 26px rgba(0,0,0,.22);
+  --navActiveBg: rgba(34,230,195,.10);
+  --navActiveBorder: rgba(34,230,195,.28);
+  --tabActiveBg: rgba(34,230,195,.12);
+  --tabActiveBorder: rgba(34,230,195,.28);
+  --focusRing: rgba(74,163,255,.55);
 }
 
 /* Theme presets (toggle via body class) */
 body.fp-theme-standard{
-  /* no overrides: uses :root */
+  /* Standard: flatter + calmer (more "standard") */
+  --bg:#15243d;
+  --panel:#1a2d4c;
+  --panel-2:#1e355a;
+  --border:rgba(255,255,255,.16);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.68);
+  --shadow:0 10px 26px rgba(0,0,0,.18);
+  --radius:14px;
+
+  /* Remove the strong colorful glow; keep a clean dark surface */
+  --bodyBg:
+    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)),
+    var(--bg);
+  --sidebarBg: rgba(255,255,255,.04);
+  --cardBg: rgba(255,255,255,.045);
+  --rightbarBg: rgba(255,255,255,.03);
+  --btnBg: rgba(255,255,255,.06);
+  --btnBgHover: rgba(255,255,255,.09);
+  --topbarBg: rgba(255,255,255,.05);
+  --topbarBorder: rgba(255,255,255,.14);
+  --topbarShadow: 0 10px 20px rgba(0,0,0,.16);
+
+  /* Standard highlight: blue-ish (distinct from Pro teal) */
+  --accent:#4aa3ff;
+  --accent-2:#71c4d9;
+  --navActiveBg: rgba(74,163,255,.14);
+  --navActiveBorder: rgba(74,163,255,.30);
+  --tabActiveBg: rgba(74,163,255,.16);
+  --tabActiveBorder: rgba(74,163,255,.32);
+  --focusRing: rgba(74,163,255,.70);
 }
 body.fp-theme-pro{
   /* Pro: darker, higher contrast (NOT light) */
@@ -35,6 +84,26 @@ body.fp-theme-pro{
   --panelGlass: rgba(16,28,51,.82);
   --panelSolid: rgba(16,28,51,.96);
   --panelSolid2: rgba(19,34,65,.96);
+
+  /* Pro: more “premium/glass” + more colorful depth */
+  --bodyBg:
+    radial-gradient(1200px 650px at 18% -12%, rgba(34,230,195,.28), transparent 60%),
+    radial-gradient(980px 560px at 96% 12%, rgba(74,163,255,.22), transparent 55%),
+    radial-gradient(700px 520px at 48% 120%, rgba(255,122,0,.10), transparent 60%),
+    var(--bg);
+  --sidebarBg: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
+  --cardBg: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+  --rightbarBg: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  --btnBg: rgba(255,255,255,.10);
+  --btnBgHover: rgba(255,255,255,.14);
+  --topbarBg: var(--panelGlass);
+  --topbarBorder: rgba(255,255,255,.14);
+  --topbarShadow: 0 16px 48px rgba(0,0,0,.32);
+  --navActiveBg: rgba(34,230,195,.18);
+  --navActiveBorder: rgba(34,230,195,.42);
+  --tabActiveBg: rgba(34,230,195,.20);
+  --tabActiveBorder: rgba(34,230,195,.44);
+  --focusRing: rgba(34,230,195,.55);
 }
 
 /* Pro theme: clear, readable, “premium” */
@@ -59,8 +128,8 @@ body.fp-theme-pro .nav a{
 }
 body.fp-theme-pro .nav a:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.20); }
 body.fp-theme-pro .nav a.active{
-  background: rgba(34,230,195,.12);
-  border-color: rgba(34,230,195,.28);
+  background: var(--navActiveBg);
+  border-color: var(--navActiveBorder);
   color: rgba(255,255,255,.96);
 }
 body.fp-theme-pro .h1{ font-size: 24px; font-weight: 950; letter-spacing: -.3px; }
@@ -69,23 +138,20 @@ body.fp-theme-pro .pill{ border-color: rgba(255,255,255,.18); color: rgba(255,25
 
 /* Global surfaces */
 body.fp-theme-pro{
-  background:
-    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.18), transparent 60%),
-    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.16), transparent 55%),
-    var(--bg);
+  /* background now comes from --bodyBg token */
 }
 body.fp-theme-pro .fp-topbar{
-  background: var(--panelGlass);
-  border-bottom-color: rgba(255,255,255,.14);
-  box-shadow: 0 16px 48px rgba(0,0,0,.32);
+  background: var(--topbarBg);
+  border-bottom-color: var(--topbarBorder);
+  box-shadow: var(--topbarShadow);
 }
 body.fp-theme-pro .rightbar{
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-  border-left-color: rgba(255,255,255,.14);
+  background: var(--rightbarBg);
+  border-left-color: var(--topbarBorder);
 }
 body.fp-theme-pro .rbBtn{
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.14);
+  background: var(--btnBg);
+  border-color: var(--topbarBorder);
   color: rgba(255,255,255,.88);
 }
 body.fp-theme-pro .rbBtn:hover{ background: rgba(255,255,255,.08); }
@@ -150,10 +216,7 @@ body.fp-theme-pro .event{ border-color: rgba(255,255,255,.18) !important; }
 html,body{height:100%}
 body{
   margin:0; overflow:hidden; color:var(--text);
-  background:
-    radial-gradient(1200px 600px at 30% -10%, rgba(34,230,195,.20), transparent 60%),
-    radial-gradient(900px 500px at 95% 20%, rgba(74,163,255,.18), transparent 55%),
-    var(--bg);
+  background: var(--bodyBg);
 }
 a{color:inherit;text-decoration:none}
 small{color:var(--muted)}
@@ -186,10 +249,10 @@ body.fp-has-topbar .app{
   justify-content:space-between;
   gap: 12px;
   padding: 0 14px;
-  background: var(--panelGlass);
+  background: var(--topbarBg);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 10px 26px rgba(0,0,0,.22);
+  border-bottom: 1px solid var(--topbarBorder);
+  box-shadow: var(--topbarShadow);
 }
 
 .fp-topbar__left,
@@ -222,7 +285,7 @@ body.fp-has-topbar .app{
 }
 
 .sidebar{
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  background: var(--sidebarBg);
   border-right:1px solid var(--border); padding:18px 14px;
 }
 .brand{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
@@ -242,7 +305,7 @@ body.fp-has-topbar .app{
 .nav .section{margin:14px 8px 8px;font-size:12px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 .nav a{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:rgba(255,255,255,.78);border:1px solid transparent}
 .nav a:hover{background:rgba(255,255,255,.05);border-color:var(--border)}
-.nav a.active{background:rgba(34,230,195,.10);border-color:rgba(34,230,195,.28);color:var(--text)}
+.nav a.active{background:var(--navActiveBg);border-color:var(--navActiveBorder);color:var(--text)}
 .badge{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);
   border:1px solid var(--border);color:rgba(255,255,255,.85)}
 
@@ -270,9 +333,9 @@ body.fp-has-topbar .app{
 
 .btn{
   display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);
-  background:rgba(255,255,255,.08);color:var(--text);cursor:pointer;transition:.15s
+  background:var(--btnBg);color:var(--text);cursor:pointer;transition:.15s
 }
-.btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.11)}
+.btn:hover{transform:translateY(-1px);background:var(--btnBgHover)}
 .btn.primary{
   /* Requested: remove gradient, keep a single light grey */
   border-color: rgba(255,255,255,.18);
@@ -284,7 +347,7 @@ body.fp-has-topbar .app{
 .grid{display:grid;grid-template-columns:1fr;gap:14px}
 
 .card{
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+  background:var(--cardBg);
   border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)
 }
 .card .head{padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -305,7 +368,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .subcell{color:var(--muted);font-size:12px;margin-top:2px}
 
 .rightbar{
-  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  background:var(--rightbarBg);
   border-left:1px solid var(--border); padding:14px 10px; overflow:auto;
 }
 .righttitle{font-size:12px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin:2px 10px 10px}
@@ -358,12 +421,12 @@ body.fp-right-expanded .rbLabel{ display:block; }
   width: 44px; height: 44px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,.04);
+  background: var(--btnBg);
   color: rgba(255,255,255,.85);
   display:grid; place-items:center;
   cursor:pointer;
 }
-.rbBtn:hover{ background: rgba(255,255,255,.06); }
+.rbBtn:hover{ background: var(--btnBgHover); }
 .rbIcon{ font-size: 18px; }
 
 /* (drawer removed) */
@@ -681,7 +744,22 @@ body.fp-right-expanded .rbLabel{ display:block; }
 
 .tabs{display:flex;gap:10px;padding:12px 10px 0;flex-wrap:wrap}
 .tab{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:rgba(255,255,255,.72);font-size:13px;cursor:pointer}
-.tab.active{background:rgba(34,230,195,.12);border-color:rgba(34,230,195,.28);color:var(--text)}
+.tab.active{background:var(--tabActiveBg);border-color:var(--tabActiveBorder);color:var(--text)}
+
+/* Focus ring: theme-dependent (helps the difference feel “real”) */
+.btn:focus-visible,
+.rbBtn:focus-visible,
+.fp-iconbtn:focus-visible,
+.nav a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible{
+  outline: 2px solid var(--focusRing);
+  outline-offset: 2px;
+}
 
 .profile{display:grid;grid-template-columns:84px 1fr;gap:14px;padding:16px}
 .avatar{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg, rgba(34,230,195,.22), rgba(74,163,255,.16));
