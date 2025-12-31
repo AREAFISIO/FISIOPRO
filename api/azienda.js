@@ -7,10 +7,19 @@ function normalizeKeyLoose(s) {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
-async function discoverFieldNamesViaMeta(tableName) {
+function escAirtableString(s) {
+  return String(s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, " ")
+    .replace(/\n/g, " ")
+    .trim();
+}
+
+async function discoverTableMeta(tableName) {
   // Lists all fields (even if empty) via Airtable Meta API.
   const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
-  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return [];
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return { fieldNames: [], primaryFieldName: "" };
 
   const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
   try {
@@ -18,7 +27,7 @@ async function discoverFieldNamesViaMeta(tableName) {
     const text = await res.text();
     let json = {};
     try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
-    if (!res.ok) return [];
+    if (!res.ok) return { fieldNames: [], primaryFieldName: "" };
 
     const wanted = String(tableName || "").trim();
     const tables = Array.isArray(json.tables) ? json.tables : [];
@@ -27,9 +36,15 @@ async function discoverFieldNamesViaMeta(tableName) {
       tables.find((x) => normalizeKeyLoose(x?.name) === normalizeKeyLoose(wanted)) ||
       null;
     const fields = Array.isArray(t?.fields) ? t.fields : [];
-    return fields.map((f) => String(f?.name || "")).filter(Boolean);
+    const byId = new Map(fields.map((f) => [String(f?.id || ""), String(f?.name || "")]));
+    const primaryFieldId = String(t?.primaryFieldId || "");
+    const primaryFieldName = primaryFieldId ? (byId.get(primaryFieldId) || "") : "";
+    return {
+      fieldNames: fields.map((f) => String(f?.name || "")).filter(Boolean),
+      primaryFieldName: String(primaryFieldName || "").trim(),
+    };
   } catch {
-    return [];
+    return { fieldNames: [], primaryFieldName: "" };
   }
 }
 
@@ -88,11 +103,14 @@ export default async function handler(req, res) {
     const TABLE = process.env.AIRTABLE_COMPANY_TABLE || process.env.AIRTABLE_AZIENDA_TABLE || "AZIENDA";
     const tableEnc = encodeURIComponent(TABLE);
 
-    const cacheKey = `azienda:${TABLE}`;
+    const sedeRaw = String(req.query?.sede || process.env.AIRTABLE_AZIENDA_SEDE || "BOLOGNA").trim();
+    const sede = sedeRaw || "BOLOGNA";
+    const cacheKey = `azienda:${TABLE}:${sede.toLowerCase()}`;
     const out = await memGetOrSet(cacheKey, 60_000, async () => {
       // Prefer Meta API so we can see fields even when empty in records.
-      const metaKeys = await discoverFieldNamesViaMeta(TABLE);
-      const keys = metaKeys.length ? metaKeys : [];
+      const meta = await discoverTableMeta(TABLE);
+      const keys = meta.fieldNames.length ? meta.fieldNames : [];
+      const PRIMARY = meta.primaryFieldName || "";
 
       const FIELD_LOGO = resolveFieldKeyFromKeys(keys, [
         process.env.AIRTABLE_AZIENDA_LOGO_FIELD,
@@ -109,27 +127,57 @@ export default async function handler(req, res) {
         "Name",
       ].filter(Boolean));
 
+      // Identify the "row" (BOLOGNA): try primary field first, then common candidates.
+      const FIELD_SEDE = resolveFieldKeyFromKeys(keys, [
+        process.env.AIRTABLE_AZIENDA_SEDE_FIELD,
+        PRIMARY,
+        "Sede",
+        "Città",
+        "Citta",
+        "Città sede",
+        "Nome",
+        "Name",
+      ].filter(Boolean));
+
       // Fetch records (if Meta API isn't available or table has no meta access, we still try records).
       const qs = new URLSearchParams({ pageSize: "50" });
       if (FIELD_LOGO) qs.append("fields[]", FIELD_LOGO);
       if (FIELD_NAME) qs.append("fields[]", FIELD_NAME);
+      if (FIELD_SEDE) qs.append("fields[]", FIELD_SEDE);
+
+      // If we can, filter to the requested sede to avoid scanning unrelated rows.
+      if (FIELD_SEDE) {
+        const q = escAirtableString(String(sede).toLowerCase());
+        // Exact match on LOWER({field})
+        qs.set("filterByFormula", `LOWER({${FIELD_SEDE}})="${q}"`);
+      }
       const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
       const records = Array.isArray(data?.records) ? data.records : [];
 
       let chosen = null;
+      // Prefer the requested sede row (BOLOGNA) that has a logo.
       for (const r of records) {
         const f = r?.fields || {};
+        const sedeVal = FIELD_SEDE ? String(f[FIELD_SEDE] ?? "").trim() : "";
+        const isMatch = sedeVal && sedeVal.toLowerCase() === sede.toLowerCase();
+        if (!isMatch) continue;
         const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : "";
-        if (logoUrl) {
-          chosen = { record: r, logoUrl };
-          break;
+        if (logoUrl) { chosen = { record: r, logoUrl }; break; }
+      }
+      // Otherwise: first record with a logo (from filtered list, or unfiltered if filter not applied).
+      if (!chosen) {
+        for (const r of records) {
+          const f = r?.fields || {};
+          const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : "";
+          if (logoUrl) { chosen = { record: r, logoUrl }; break; }
         }
       }
-      // fallback: just take first record if any
+      // fallback: just take first record if any (even without logo)
       if (!chosen && records[0]) chosen = { record: records[0], logoUrl: "" };
 
       const fields = chosen?.record?.fields || {};
       return {
+        sede,
         name: FIELD_NAME ? (fields[FIELD_NAME] ?? "") : "",
         logoUrl: chosen?.logoUrl || "",
       };

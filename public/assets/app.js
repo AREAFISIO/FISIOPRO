@@ -103,7 +103,7 @@ async function initBrandLogo() {
   if (!document.querySelector(".sidebar .brand .dot")) return;
 
   try {
-    const data = await api("/api/azienda");
+    const data = await api("/api/azienda?sede=BOLOGNA");
     const url = String(data?.logoUrl || "").trim();
     if (!data?.ok || !url) return;
 

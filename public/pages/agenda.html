@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro • Agenda</title>
   <!-- cache-bust -->
-  <link rel="stylesheet" href="../assets/app.css?v=fpui-20251231b" />
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20251231c" />
   <style>
     /* Agenda shell (keeps your management system look) */
     body { overflow: hidden; }
@@ -24,8 +24,9 @@
       --fp-grid-line: color-mix(in srgb, var(--text) 10%, transparent);
       --fp-grid-line-strong: color-mix(in srgb, var(--text) 16%, transparent);
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, var(--fp-grid-line-strong));
-      /* Strong vertical day separators: make them clearly BLUE */
-      --fp-day-sep: color-mix(in srgb, var(--accent-2) 82%, var(--border));
+      /* Vertical lines (thin) + stronger day separators (dark blue, like before) */
+      --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 28%, rgba(13,23,44,.34));
+      --fp-day-sep: color-mix(in srgb, rgba(45,108,255,.96) 44%, rgba(13,23,44,.38));
       --fp-col-bg: linear-gradient(
         180deg,
         color-mix(in srgb, var(--panel) 96%, transparent),
@@ -46,8 +47,9 @@
       --fp-grid-line: color-mix(in srgb, var(--accent-2) 10%, rgba(13,23,44,.12));
       --fp-grid-line-strong: color-mix(in srgb, var(--accent-2) 14%, rgba(13,23,44,.18));
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, rgba(13,23,44,.22));
-      /* Pro (light): keep separators blue but not washed out */
-      --fp-day-sep: color-mix(in srgb, var(--accent-2) 82%, rgba(13,23,44,.22));
+      /* Pro (light): slightly stronger contrast, dark-blue separators */
+      --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 26%, rgba(13,23,44,.28));
+      --fp-day-sep: color-mix(in srgb, rgba(45,108,255,.96) 42%, rgba(13,23,44,.32));
       --fp-event-bg: color-mix(in srgb, var(--accent-2) 14%, rgba(45,108,255,.06));
       --fp-event-border: color-mix(in srgb, var(--accent-2) 42%, rgba(13,23,44,.18));
     }
@@ -209,7 +211,7 @@
       z-index: 7;
       background: var(--panelSolid);
       border-bottom: 1px solid var(--border);
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
       height: var(--fpDayHeadH);
     }
     .calHead .dayHead{
@@ -220,7 +222,7 @@
       gap:4px; padding: 8px 10px;
       background: var(--panelSolid);
       border-bottom: 1px solid var(--border);
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
     }
     /* Operator header row needs different sticky top in multi-user */
     .dayHead.opHead{
@@ -240,7 +242,7 @@
         color-mix(in srgb, var(--accent-2) 4%, var(--panelSolid))
       );
       border-bottom: 1px solid var(--fp-grid-line-strong);
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
       display:flex;
       align-items:center;
       overflow:hidden;
@@ -304,7 +306,7 @@
 
     .timeCol{
       position: relative;
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
       background: var(--fp-timecol-bg);
     }
     .timeTick{
@@ -321,18 +323,18 @@
 
     .dayCol{
       position: relative;
-      border-right: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
       background: var(--fp-col-bg);
     }
 
     /* Stronger day separators (between days) */
     .daySep{
-      border-left: 3px solid var(--fp-day-sep);
-      box-shadow: -2px 0 0 color-mix(in srgb, rgba(0,0,0,.22) 70%, transparent);
+      border-left: 2px solid var(--fp-day-sep);
+      box-shadow: -1px 0 0 color-mix(in srgb, rgba(13,23,44,.35) 70%, transparent);
     }
     .daySepHead{
-      border-left: 3px solid var(--fp-day-sep) !important;
-      box-shadow: -2px 0 0 color-mix(in srgb, rgba(0,0,0,.22) 70%, transparent);
+      border-left: 2px solid var(--fp-day-sep) !important;
+      box-shadow: -1px 0 0 color-mix(in srgb, rgba(13,23,44,.35) 70%, transparent);
     }
     .gridLine{
       position:absolute; left:0; right:0;
@@ -905,8 +907,8 @@
 </div>
 
 <!-- cache-bust -->
-  <script src="../assets/app.js?v=fpui-20251231b"></script>
-<script src="../assets/diary.js?v=fpui-20251231b"></script>
+  <script src="../assets/app.js?v=fpui-20251231c"></script>
+<script src="../assets/diary.js?v=fpui-20251231c"></script>
 </body>
 </html>
 
