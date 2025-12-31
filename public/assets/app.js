@@ -103,9 +103,9 @@ async function initBrandLogo() {
   if (!document.querySelector(".sidebar .brand .dot")) return;
 
   try {
-    const data = await api("/api/azienda?sede=BOLOGNA");
+    const data = await api("/api/azienda");
     const url = String(data?.logoUrl || "").trim();
-    if (!data?.ok || !url) return;
+    if (!url) return;
 
     // Set CSS var used by .brand .dot background-image
     const safe = url.replace(/"/g, "%22");
@@ -743,7 +743,7 @@ function ensureGlobalTopbar() {
 
   const tEl = bar.querySelector("[data-fp-top-title]");
   const sEl = bar.querySelector("[data-fp-top-sub]");
-  if (tEl) tEl.textContent = brandTitle || "AreA FISIO";
+  if (tEl) tEl.textContent = "FISIOPRO";
   if (sEl) sEl.textContent = brandSub || "";
 
   document.body.classList.add("fp-has-topbar");
