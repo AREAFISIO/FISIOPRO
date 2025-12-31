@@ -26,7 +26,9 @@
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, var(--fp-grid-line-strong));
       /* Vertical lines (thin) + stronger day separators (dark blue, like before) */
       --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 28%, rgba(13,23,44,.34));
-      --fp-day-sep: color-mix(in srgb, rgba(45,108,255,.96) 44%, rgba(13,23,44,.38));
+      /* Requested: very dark separators between days */
+      --fp-day-sep: rgba(0,0,0,.62);
+      --fp-day-sep-shadow: color-mix(in srgb, rgba(0,0,0,.70) 80%, transparent);
       --fp-col-bg: linear-gradient(
         180deg,
         color-mix(in srgb, var(--panel) 96%, transparent),
@@ -49,7 +51,9 @@
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, rgba(13,23,44,.22));
       /* Pro (light): slightly stronger contrast, dark-blue separators */
       --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 26%, rgba(13,23,44,.28));
-      --fp-day-sep: color-mix(in srgb, rgba(45,108,255,.96) 42%, rgba(13,23,44,.32));
+      /* Requested: very dark separators between days */
+      --fp-day-sep: rgba(13,23,44,.72);
+      --fp-day-sep-shadow: color-mix(in srgb, rgba(13,23,44,.78) 85%, transparent);
       --fp-event-bg: color-mix(in srgb, var(--accent-2) 14%, rgba(45,108,255,.06));
       --fp-event-border: color-mix(in srgb, var(--accent-2) 42%, rgba(13,23,44,.18));
     }
@@ -329,12 +333,12 @@
 
     /* Stronger day separators (between days) */
     .daySep{
-      border-left: 2px solid var(--fp-day-sep);
-      box-shadow: -1px 0 0 color-mix(in srgb, rgba(13,23,44,.35) 70%, transparent);
+      border-left: 3px solid var(--fp-day-sep);
+      box-shadow: -1px 0 0 var(--fp-day-sep-shadow);
     }
     .daySepHead{
-      border-left: 2px solid var(--fp-day-sep) !important;
-      box-shadow: -1px 0 0 color-mix(in srgb, rgba(13,23,44,.35) 70%, transparent);
+      border-left: 3px solid var(--fp-day-sep) !important;
+      box-shadow: -1px 0 0 var(--fp-day-sep-shadow);
     }
     .gridLine{
       position:absolute; left:0; right:0;
