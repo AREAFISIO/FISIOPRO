@@ -288,6 +288,196 @@
     });
   }
 
+  // Confirm dialog for appointment MOVE (replaces native window.confirm so it can be styled).
+  let __fpMoveConfirmEl = null;
+  let __fpMoveConfirmResolve = null;
+  function ensureMoveConfirmUi() {
+    if (__fpMoveConfirmEl) return __fpMoveConfirmEl;
+
+    if (!document.getElementById("fp-move-confirm-style")) {
+      const st = document.createElement("style");
+      st.id = "fp-move-confirm-style";
+      st.textContent = `
+        .fp-move-confirm-back{
+          position: fixed;
+          inset: 0;
+          z-index: 90;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: rgba(0,0,0,.72);
+          backdrop-filter: blur(6px);
+        }
+        .fp-move-confirm{
+          width: min(720px, 96vw);
+          border-radius: 20px;
+          background: var(--panelSolid);
+          border: 2px solid color-mix(in srgb, var(--accent-2) 42%, rgba(255,255,255,.10));
+          box-shadow: 0 28px 90px rgba(0,0,0,.55);
+          overflow: hidden;
+          color: var(--text);
+        }
+        .fp-move-confirm__head{
+          padding: 16px 18px;
+          border-bottom: 1px solid var(--border);
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--accent-2) 18%, transparent),
+            color-mix(in srgb, var(--text) 2%, transparent)
+          );
+        }
+        .fp-move-confirm__title{
+          font-weight: 1000;
+          font-size: 20px;
+          letter-spacing: -.2px;
+        }
+        .fp-move-confirm__body{
+          padding: 16px 18px 18px;
+          font-size: 16px;
+          line-height: 1.55;
+        }
+        .fp-move-confirm__box{
+          margin-top: 12px;
+          padding: 12px 12px;
+          border-radius: 16px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--btnBg) 80%, transparent);
+        }
+        .fp-move-confirm__row{
+          display:flex;
+          gap:10px;
+          align-items:flex-start;
+          margin: 10px 0;
+        }
+        .fp-move-confirm__k{
+          width: 34px;
+          flex: 0 0 34px;
+          display:grid;
+          place-items:center;
+          font-weight: 1000;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--text) 6%, transparent);
+          color: var(--text);
+        }
+        .fp-move-confirm__v{
+          min-width: 0;
+          font-weight: 950;
+          color: var(--text);
+          word-break: break-word;
+        }
+        .fp-move-confirm__hint{
+          margin-top: 10px;
+          color: var(--muted);
+          font-size: 13px;
+          font-weight: 800;
+        }
+        .fp-move-confirm__foot{
+          padding: 16px 18px;
+          border-top: 1px solid var(--border);
+          display:flex;
+          justify-content:flex-end;
+          gap:12px;
+          flex-wrap:wrap;
+        }
+        .fp-move-confirm__btn{
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:10px;
+          padding: 12px 18px;
+          border-radius: 14px;
+          border: 1px solid var(--border);
+          background: var(--btnBg);
+          color: var(--text);
+          cursor: pointer;
+          font-weight: 1000;
+          min-width: 140px;
+        }
+        .fp-move-confirm__btn:hover{ transform: translateY(-1px); background: var(--btnBgHover); }
+        .fp-move-confirm__btn:active{ transform: translateY(0); }
+        .fp-move-confirm__btn.ok{
+          border-color: color-mix(in srgb, var(--accent-2) 55%, var(--border));
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--accent-2) 26%, transparent),
+            color-mix(in srgb, var(--accent) 14%, transparent)
+          );
+        }
+      `;
+      document.head.appendChild(st);
+    }
+
+    const back = document.createElement("div");
+    back.className = "fp-move-confirm-back";
+    back.setAttribute("data-fp-move-confirm", "1");
+    back.innerHTML = `
+      <div class="fp-move-confirm" role="dialog" aria-modal="true" aria-labelledby="fp-move-confirm-title">
+        <div class="fp-move-confirm__head">
+          <div class="fp-move-confirm__title" id="fp-move-confirm-title">Confermi lo spostamento dell’appuntamento?</div>
+          <button class="btn" type="button" data-fp-move-cancel aria-label="Chiudi">×</button>
+        </div>
+        <div class="fp-move-confirm__body">
+          <div class="fp-move-confirm__box">
+            <div class="fp-move-confirm__row">
+              <div class="fp-move-confirm__k">DA</div>
+              <div class="fp-move-confirm__v" data-fp-move-from>—</div>
+            </div>
+            <div class="fp-move-confirm__row">
+              <div class="fp-move-confirm__k">A</div>
+              <div class="fp-move-confirm__v" data-fp-move-to>—</div>
+            </div>
+          </div>
+          <div class="fp-move-confirm__hint">Suggerimento: se non sei sicuro, premi “Annulla”.</div>
+        </div>
+        <div class="fp-move-confirm__foot">
+          <button class="fp-move-confirm__btn" type="button" data-fp-move-no>Annulla</button>
+          <button class="fp-move-confirm__btn ok" type="button" data-fp-move-yes>OK</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+
+    const close = (ok) => {
+      back.style.display = "none";
+      if (typeof __fpMoveConfirmResolve === "function") __fpMoveConfirmResolve(Boolean(ok));
+      __fpMoveConfirmResolve = null;
+    };
+    back.addEventListener("click", (e) => {
+      if (e.target === back) close(false);
+    });
+    back.querySelector("[data-fp-move-cancel]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-fp-move-no]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-fp-move-yes]")?.addEventListener("click", () => close(true));
+
+    const onKey = (e) => {
+      if (back.style.display === "none") return;
+      if (e.key === "Escape") close(false);
+    };
+    window.addEventListener("keydown", onKey);
+
+    __fpMoveConfirmEl = back;
+    return back;
+  }
+
+  function confirmMoveAppointment({ fromLabel = "", toLabel = "" } = {}) {
+    const back = ensureMoveConfirmUi();
+    const fromEl = back.querySelector("[data-fp-move-from]");
+    const toEl = back.querySelector("[data-fp-move-to]");
+    if (fromEl) fromEl.textContent = String(fromLabel || "").trim() || "—";
+    if (toEl) toEl.textContent = String(toLabel || "").trim() || "—";
+    back.style.display = "flex";
+    return new Promise((resolve) => {
+      __fpMoveConfirmResolve = resolve;
+      try { back.querySelector("[data-fp-move-no]")?.focus?.(); } catch {}
+    });
+  }
+
   function showSlotHover(ctx, x, y) {
     if (!ctx) return;
     if (modalBack && modalBack.style.display !== "none") return;
@@ -2911,7 +3101,7 @@
 
         const fromLabel = `${fmtDT(it.startAt)} • ${String(it.therapist || "").trim() || "—"}`;
         const toLabel = `${fmtDT(newStart)} • ${String(targetTherapist || it.therapist || "").trim() || "—"}`;
-        const ok = window.confirm(`Confermi lo spostamento dell'appuntamento?\n\nDa: ${fromLabel}\nA:  ${toLabel}`);
+        const ok = await confirmMoveAppointment({ fromLabel, toLabel });
         if (!ok) return;
 
         const payload = {
