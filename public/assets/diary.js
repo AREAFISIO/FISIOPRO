@@ -2001,9 +2001,9 @@
               slot.laneCount > 1
                 ? `<span title="Colonna ${slot.laneIndex + 1}" style="font-size:11px; font-weight:1000; opacity:.85;">${slot.laneIndex + 1}</span>`
                 : "";
+            // Multi-user header: show only the "logo" (initials), no name next to it.
             cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px; min-width:0;">
               <span class="opsDot" title="${escapeHtml(name)}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
-              <span class="opName" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
               ${laneBadge}
             </div>`;
             gridEl.appendChild(cell);
