@@ -3121,14 +3121,38 @@
         }
 
         try {
-          const res = await fetch(`/api/appointments?id=${encodeURIComponent(it.id)}`, {
-            method: "PATCH",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+          const patchOnce = async () => {
+            const res = await fetch(`/api/appointments?id=${encodeURIComponent(it.id)}`, {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json().catch(() => ({}));
+            return { res, data };
+          };
+
+          let { res, data } = await patchOnce();
+
+          // Rare but observed: session cookie can be missing/intermittent.
+          // If we get 401, re-check auth and retry once.
+          if (res.status === 401) {
+            try {
+              const authRes = await fetch("/api/auth-me", { credentials: "include" });
+              const authJson = await authRes.json().catch(() => ({}));
+              if (authRes.ok && authJson?.ok) {
+                ({ res, data } = await patchOnce());
+              }
+            } catch {}
+          }
+
+          if (!res.ok || !data?.ok) {
+            const errCode = String(data?.error || "").trim();
+            if (res.status === 401 || errCode === "unauthorized") {
+              throw new Error("Sessione scaduta. Ricarica la pagina ed effettua nuovamente l’accesso.");
+            }
+            throw new Error(errCode || ("HTTP " + res.status));
+          }
 
           // Optimistic local update for immediate UI response.
           it.startAt = newStart;
