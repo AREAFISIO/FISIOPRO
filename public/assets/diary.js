@@ -158,16 +158,20 @@
           border: 1px solid var(--border);
           box-shadow: var(--shadow);
           overflow: hidden;
-          color: rgba(255,255,255,.92);
+          color: var(--text);
         }
         .fp-hours-confirm__head{
           padding: 14px 16px;
-          border-bottom: 1px solid rgba(255,255,255,.10);
+          border-bottom: 1px solid var(--border);
           display:flex;
           align-items:center;
           justify-content:space-between;
           gap:12px;
-          background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--text) 6%, transparent),
+            color-mix(in srgb, var(--text) 2%, transparent)
+          );
         }
         .fp-hours-confirm__title{
           font-weight: 1000;
@@ -178,11 +182,11 @@
           padding: 14px 16px 16px;
           font-size: 15px;
           line-height: 1.55;
-          color: rgba(255,255,255,.84);
+          color: var(--muted);
         }
         .fp-hours-confirm__foot{
           padding: 14px 16px;
-          border-top: 1px solid rgba(255,255,255,.10);
+          border-top: 1px solid var(--border);
           display:flex;
           justify-content:flex-end;
           gap:10px;
@@ -196,7 +200,7 @@
           border-radius: 14px;
           border: 1px solid rgba(255, 122, 0, .22);
           background: rgba(255, 122, 0, .10);
-          color: rgba(255,255,255,.90);
+          color: var(--text);
         }
         .fp-hours-confirm__warn .ic{ font-size: 18px; line-height: 1; margin-top: 1px; }
       `;

@@ -324,8 +324,9 @@
       background: var(--panelSolid);
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
-      /* Hint browsers to render native controls in dark mode */
-      color-scheme: dark;
+      /* Let native controls follow the active theme */
+      color: var(--text);
+      color-scheme: light dark;
       overflow:hidden;
       max-height: calc(100vh - 32px);
       display:flex;
@@ -335,21 +336,21 @@
     .fp-modalTitle{ font-weight:900; font-size: 19px; }
     .fp-modalBody{
       padding: 16px;
-      color: rgba(255,255,255,.84);
+      color: var(--text);
       font-size: 16px;
       line-height:1.55;
       overflow:auto;
       min-height:0; /* allow flex child to scroll */
     }
-    .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed rgba(255,255,255,.10); }
+    .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed var(--border); }
     .fp-kv:last-child{ border-bottom:none; }
-    .fp-kv .k{ color: rgba(255,255,255,.55); }
+    .fp-kv .k{ color: var(--muted); }
 
-    .fp-kv .v{ color: rgba(255,255,255,.90); }
+    .fp-kv .v{ color: var(--text); }
 
     /* Make create/edit form more readable */
     .fpFormLabel{
-      color: rgba(255,255,255,.62);
+      color: var(--muted);
       font-size: 13px;
       letter-spacing: .08em;
       text-transform: uppercase;
@@ -361,27 +362,27 @@
       padding: 12px 14px;
       border-radius: 14px;
       font-size: 16px;
-      /* Dark fields aligned with the app template */
-      background: rgba(255,255,255,.06);
-      border-color: rgba(255,255,255,.14);
-      color: rgba(255,255,255,.92);
+      /* Theme-aware fields */
+      background: var(--btnBg);
+      border-color: var(--border);
+      color: var(--text);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
     }
     .fp-modalBody .btn{ padding: 12px 16px; border-radius: 14px; font-size: 16px; }
     .fp-modalBody .input::placeholder,
-    .fp-modalBody .textarea::placeholder{ color: rgba(255,255,255,.55); }
+    .fp-modalBody .textarea::placeholder{ color: var(--muted); }
     .fp-modalBody .input:focus,
     .fp-modalBody .select:focus,
     .fp-modalBody .textarea:focus{
       outline: none;
-      border-color: rgba(34,230,195,.55);
-      box-shadow: 0 0 0 3px rgba(34,230,195,.18);
-      background: rgba(255,255,255,.08);
+      border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+      background: var(--btnBgHover);
     }
     /* Keep dropdown options readable on dark UI */
     .fp-modalBody select.select option{
-      background: rgba(15,26,44,.98);
-      color: rgba(255,255,255,.92);
+      background: var(--panel);
+      color: var(--text);
     }
 
     /* Hover card appuntamento */
@@ -391,17 +392,17 @@
       width: 320px;
       max-width: calc(100vw - 24px);
       background: var(--panelSolid);
-      border: 1px solid rgba(255,255,255,.14);
+      border: 1px solid var(--border);
       border-radius: 14px;
       box-shadow: 0 18px 60px rgba(0,0,0,.35);
       padding: 12px 12px 10px;
       pointer-events: none;
       display:none;
     }
-    .fpHover .t{ font-weight: 900; font-size: 16px; color: rgba(255,255,255,.95); }
-    .fpHover .r{ margin-top:6px; color: rgba(255,255,255,.78); font-size: 13px; display:flex; gap:8px; align-items:center; }
-    .fpHover .k{ color: rgba(255,255,255,.55); min-width: 92px; }
-    .fpHover .note{ margin-top:10px; border-top:1px dashed rgba(255,255,255,.12); padding-top:10px; color: rgba(255,255,255,.75); font-size: 12px; }
+    .fpHover .t{ font-weight: 900; font-size: 16px; color: var(--text); }
+    .fpHover .r{ margin-top:6px; color: var(--text); font-size: 13px; display:flex; gap:8px; align-items:center; }
+    .fpHover .k{ color: var(--muted); min-width: 92px; }
+    .fpHover .note{ margin-top:10px; border-top:1px dashed var(--border); padding-top:10px; color: var(--muted); font-size: 12px; }
 
     /* Right slim bar styles moved to app.css */
 
