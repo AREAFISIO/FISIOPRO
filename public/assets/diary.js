@@ -129,6 +129,161 @@
     slotHoverCard.setAttribute("aria-hidden", "true");
   }
 
+  // Confirm dialog (centered) for out-of-hours actions.
+  // Requirement: do NOT block creation/move, but warn + ask confirmation first.
+  let __fpHoursConfirmEl = null;
+  let __fpHoursConfirmResolve = null;
+  function ensureHoursConfirmUi() {
+    if (__fpHoursConfirmEl) return __fpHoursConfirmEl;
+
+    // One-time style (kept inside diary.js to avoid touching page HTML)
+    if (!document.getElementById("fp-hours-confirm-style")) {
+      const st = document.createElement("style");
+      st.id = "fp-hours-confirm-style";
+      st.textContent = `
+        .fp-hours-confirm-back{
+          position: fixed;
+          inset: 0;
+          z-index: 85;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: rgba(0,0,0,.55);
+        }
+        .fp-hours-confirm{
+          width: min(560px, 96vw);
+          border-radius: 18px;
+          background: var(--panelSolid);
+          border: 1px solid var(--border);
+          box-shadow: var(--shadow);
+          overflow: hidden;
+          color: rgba(255,255,255,.92);
+        }
+        .fp-hours-confirm__head{
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(255,255,255,.10);
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+        }
+        .fp-hours-confirm__title{
+          font-weight: 1000;
+          font-size: 18px;
+          letter-spacing: -.1px;
+        }
+        .fp-hours-confirm__body{
+          padding: 14px 16px 16px;
+          font-size: 15px;
+          line-height: 1.55;
+          color: rgba(255,255,255,.84);
+        }
+        .fp-hours-confirm__foot{
+          padding: 14px 16px;
+          border-top: 1px solid rgba(255,255,255,.10);
+          display:flex;
+          justify-content:flex-end;
+          gap:10px;
+          flex-wrap:wrap;
+        }
+        .fp-hours-confirm__warn{
+          display:flex;
+          gap:10px;
+          align-items:flex-start;
+          padding: 12px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 122, 0, .22);
+          background: rgba(255, 122, 0, .10);
+          color: rgba(255,255,255,.90);
+        }
+        .fp-hours-confirm__warn .ic{ font-size: 18px; line-height: 1; margin-top: 1px; }
+      `;
+      document.head.appendChild(st);
+    }
+
+    const back = document.createElement("div");
+    back.className = "fp-hours-confirm-back";
+    back.setAttribute("data-fp-hours-confirm", "1");
+    back.innerHTML = `
+      <div class="fp-hours-confirm" role="dialog" aria-modal="true" aria-labelledby="fp-hours-confirm-title">
+        <div class="fp-hours-confirm__head">
+          <div class="fp-hours-confirm__title" id="fp-hours-confirm-title">Fuori orario di lavoro</div>
+          <button class="btn" type="button" data-fp-hours-cancel>Chiudi</button>
+        </div>
+        <div class="fp-hours-confirm__body">
+          <div class="fp-hours-confirm__warn">
+            <div class="ic">⚠️</div>
+            <div style="min-width:0;">
+              <div style="font-weight:1000;">Questo slot risulta non lavorativo.</div>
+              <div style="margin-top:6px; opacity:.88;" data-fp-hours-msg></div>
+            </div>
+          </div>
+          <div style="margin-top:12px; opacity:.80;">
+            Vuoi comunque proseguire e creare/spostare l’appuntamento?
+          </div>
+        </div>
+        <div class="fp-hours-confirm__foot">
+          <button class="btn" type="button" data-fp-hours-no>Annulla</button>
+          <button class="btn primary" type="button" data-fp-hours-yes>Sì, prosegui</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+
+    const close = (val) => {
+      back.style.display = "none";
+      const r = __fpHoursConfirmResolve;
+      __fpHoursConfirmResolve = null;
+      if (typeof r === "function") r(Boolean(val));
+    };
+
+    back.addEventListener("click", (e) => {
+      if (e.target === back) close(false);
+    });
+    back.querySelector("[data-fp-hours-cancel]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-fp-hours-no]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-fp-hours-yes]")?.addEventListener("click", () => close(true));
+
+    // Esc to cancel
+    const onKey = (e) => {
+      if (back.style.display === "none") return;
+      if (e.key === "Escape") close(false);
+    };
+    window.addEventListener("keydown", onKey);
+
+    __fpHoursConfirmEl = back;
+    return back;
+  }
+
+  function confirmOutsideWorkingHours({ whenLabel = "", therapistName = "", mode = "proseguire" } = {}) {
+    const back = ensureHoursConfirmUi();
+    const msgEl = back.querySelector("[data-fp-hours-msg]");
+    const when = String(whenLabel || "").trim();
+    const ther = String(therapistName || "").trim();
+    const parts = [];
+    if (when) parts.push(when);
+    if (ther) parts.push(ther);
+    if (msgEl) msgEl.textContent = parts.length ? parts.join(" • ") : "—";
+
+    // tweak verb (create vs move)
+    const bodyLine = back.querySelector(".fp-hours-confirm__body > div:last-child");
+    if (bodyLine) {
+      const v = String(mode || "proseguire").toLowerCase().includes("spost")
+        ? "Vuoi comunque proseguire e spostare l’appuntamento?"
+        : "Vuoi comunque proseguire e creare l’appuntamento?";
+      bodyLine.textContent = v;
+    }
+
+    back.style.display = "flex";
+    return new Promise((resolve) => {
+      __fpHoursConfirmResolve = resolve;
+      // focus default action (safe: cancel first)
+      try { back.querySelector("[data-fp-hours-no]")?.focus?.(); } catch {}
+    });
+  }
+
   function showSlotHover(ctx, x, y) {
     if (!ctx) return;
     if (modalBack && modalBack.style.display !== "none") return;
@@ -1659,7 +1814,7 @@
           try { finishDrag(e); } catch {}
         });
 
-        col.addEventListener("click", (e) => {
+        col.addEventListener("click", async (e) => {
           if (e.target && e.target.closest && e.target.closest(".event")) return;
           if (editHoursMode) return; // in edit mode, click is handled by drag selection
           hideSlotHover();
@@ -1674,8 +1829,14 @@
           const therapistNameForRule = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
           const rule = getSlotRule(therapistNameForRule, day, slotStartMin);
           if (!rule.on) {
-            toast?.("Fuori orario di lavoro");
-            return;
+            const hhmm = minToTime(slotStartMin);
+            const whenLabel = `${hhmm} • ${WEEKDAY_LABELS[weekdayIdxMon0(day)]} ${day.getDate()}/${day.getMonth() + 1}`;
+            const ok = await confirmOutsideWorkingHours({
+              whenLabel,
+              therapistName: therapistNameForRule,
+              mode: "creare",
+            });
+            if (!ok) return;
           }
 
           const therapistName = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
@@ -2463,8 +2624,14 @@
         const dayObj = addDays(start, targetDayIndex);
         const rule = getSlotRule(targetTherapist || it.therapist, dayObj, targetStartMin);
         if (!rule?.on) {
-          toast?.("Fuori orario di lavoro");
-          return;
+          const hhmm = minToTime(targetStartMin);
+          const whenLabel = `${hhmm} • ${WEEKDAY_LABELS[weekdayIdxMon0(dayObj)]} ${dayObj.getDate()}/${dayObj.getMonth() + 1}`;
+          const ok = await confirmOutsideWorkingHours({
+            whenLabel,
+            therapistName: String(targetTherapist || it.therapist || "").trim(),
+            mode: "spostare",
+          });
+          if (!ok) return;
         }
 
         const durMin = (() => {
