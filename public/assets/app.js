@@ -486,7 +486,7 @@ async function ensureModalStaticOptions(modal) {
       api("/api/operators"),
       api("/api/services"),
       // Positions are stored in Airtable table "AZIENDA" (requested).
-      api("/api/locations?table=AZIENDA"),
+      api("/api/locations?table=AZIENDA&nameField=Sede"),
       api("/api/treatments?activeOnly=1"),
     ]);
     setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
@@ -1334,8 +1334,9 @@ function buildAvailabilityUI() {
         <div class="left">
           <div style="font-weight:1000;">Puoi selezionare più slot cliccando e trascinando la selezione</div>
           <div style="opacity:.75;">•</div>
-          <label>Collaboratore:
-            <select data-av-ther>
+          <label style="display:flex; align-items:center; gap:12px; margin-left:12px;">
+            <span>Collaboratore:</span>
+            <select data-av-ther style="font-size:14px;">
               <option value="DEFAULT">Tutti (default)</option>
             </select>
           </label>
@@ -1470,7 +1471,8 @@ function buildAvailabilityUI() {
       // fetch once
       locationsLoading = true;
       locList.innerHTML = `<div style="color:rgba(0,0,0,.55); font-weight:800;">Caricamento sedi…</div>`;
-      api("/api/locations")
+      // Requested: availability "Luogo di lavoro" must come from AZIENDA primary field "Sede".
+      api("/api/locations?table=AZIENDA&nameField=Sede")
         .then((data) => {
           const items = Array.isArray(data?.items) ? data.items : [];
           locations = items.map((x) => ({ id: String(x.id || x.ID || x.sedeId || ""), name: String(x.name || x.nome || x.label || x.id || "") }))

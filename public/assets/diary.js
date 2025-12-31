@@ -1503,7 +1503,7 @@
   async function loadLocations() {
     if (Array.isArray(locationsCache)) return locationsCache;
     // Positions are stored in Airtable table "AZIENDA" (requested).
-    const data = await apiGet("/api/locations?table=AZIENDA");
+    const data = await apiGet("/api/locations?table=AZIENDA&nameField=Sede");
     locationsCache = data.items || [];
     return locationsCache;
   }
