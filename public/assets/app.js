@@ -95,6 +95,26 @@ function initLogoutLinks() {
   });
 }
 
+// =====================
+// BRAND LOGO (from Airtable AZIENDA.Logo)
+// =====================
+async function initBrandLogo() {
+  // Only run if the sidebar brand exists
+  if (!document.querySelector(".sidebar .brand .dot")) return;
+
+  try {
+    const data = await api("/api/azienda");
+    const url = String(data?.logoUrl || "").trim();
+    if (!data?.ok || !url) return;
+
+    // Set CSS var used by .brand .dot background-image
+    const safe = url.replace(/"/g, "%22");
+    document.documentElement.style.setProperty("--brandLogo", `url("${safe}")`);
+  } catch {
+    // keep default logo
+  }
+}
+
 function setUserBadges(user) {
   const fullName = user
     ? [user.nome || "", user.cognome || ""].map(s => String(s || "").trim()).filter(Boolean).join(" ")
@@ -2224,6 +2244,8 @@ async function initAgenda() {
   try { applyTheme(loadTheme()); } catch {}
 
   initLogoutLinks();
+  // Non-blocking: load logo from Airtable if configured.
+  initBrandLogo();
   setUserBadges(user);
   roleGuard(user.role);
   activeNav();
