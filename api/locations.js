@@ -65,8 +65,9 @@ export default async function handler(req, res) {
 
     setPrivateCache(res, 60);
 
-    const tableName = process.env.AIRTABLE_LOCATIONS_TABLE || "SEDI";
-    const nameField = process.env.AIRTABLE_LOCATIONS_NAME_FIELD || "Nome";
+    // Allow overriding via querystring to support different bases (e.g. positions stored in AZIENDA).
+    const tableName = norm(req.query?.table) || process.env.AIRTABLE_LOCATIONS_TABLE || "SEDI";
+    const nameField = norm(req.query?.nameField) || process.env.AIRTABLE_LOCATIONS_NAME_FIELD || "Nome";
     const table = encodeURIComponent(tableName);
 
     const debug = String(req.query?.debug || "").trim() === "1";

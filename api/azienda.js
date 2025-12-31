@@ -146,13 +146,25 @@ export default async function handler(req, res) {
       if (FIELD_SEDE) qs.append("fields[]", FIELD_SEDE);
 
       // If we can, filter to the requested sede to avoid scanning unrelated rows.
+      const shouldFilterBySede = Boolean(FIELD_SEDE && String(sede || "").trim());
       if (FIELD_SEDE) {
         const q = escAirtableString(String(sede).toLowerCase());
         // Exact match on LOWER({field})
         qs.set("filterByFormula", `LOWER({${FIELD_SEDE}})="${q}"`);
       }
-      const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
-      const records = Array.isArray(data?.records) ? data.records : [];
+      let data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+      let records = Array.isArray(data?.records) ? data.records : [];
+
+      // If the requested sede yields no records (common when env/frontend uses a default like "BOLOGNA"),
+      // fall back to an unfiltered fetch so we can still pick "first record with a logo".
+      if (shouldFilterBySede && records.length === 0) {
+        const qs2 = new URLSearchParams({ pageSize: "50" });
+        if (FIELD_LOGO) qs2.append("fields[]", FIELD_LOGO);
+        if (FIELD_NAME) qs2.append("fields[]", FIELD_NAME);
+        if (FIELD_SEDE) qs2.append("fields[]", FIELD_SEDE);
+        data = await airtableFetch(`${tableEnc}?${qs2.toString()}`);
+        records = Array.isArray(data?.records) ? data.records : [];
+      }
 
       let chosen = null;
       // Prefer the requested sede row (BOLOGNA) that has a logo.

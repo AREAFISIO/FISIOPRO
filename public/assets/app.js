@@ -103,9 +103,9 @@ async function initBrandLogo() {
   if (!document.querySelector(".sidebar .brand .dot")) return;
 
   try {
-    const data = await api("/api/azienda?sede=BOLOGNA");
+    const data = await api("/api/azienda");
     const url = String(data?.logoUrl || "").trim();
-    if (!data?.ok || !url) return;
+    if (!url) return;
 
     // Set CSS var used by .brand .dot background-image
     const safe = url.replace(/"/g, "%22");
@@ -396,7 +396,7 @@ function buildModal() {
           <label class="oe-field"><span>Prestazione</span><select data-f-service></select></label>
           <label class="oe-field"><span>Collaboratore</span><select data-f-operator></select></label>
 
-          <label class="oe-field"><span>Sede</span><select data-f-location></select></label>
+          <label class="oe-field"><span>Posizione</span><select data-f-location></select></label>
           <label class="oe-field"><span>Durata (min)</span><input type="number" min="0" step="1" data-f-duration /></label>
 
           <label class="oe-field"><span>Tipi Erogati (separati da virgola)</span><input data-f-tipi placeholder="Es. FKT, MASSO" /></label>
@@ -485,7 +485,8 @@ async function ensureModalStaticOptions(modal) {
     const [ops, serv, loc, tr] = await Promise.all([
       api("/api/operators"),
       api("/api/services"),
-      api("/api/locations"),
+      // Positions are stored in Airtable table "AZIENDA" (requested).
+      api("/api/locations?table=AZIENDA&nameField=Sede"),
       api("/api/treatments?activeOnly=1"),
     ]);
     setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
@@ -743,7 +744,7 @@ function ensureGlobalTopbar() {
 
   const tEl = bar.querySelector("[data-fp-top-title]");
   const sEl = bar.querySelector("[data-fp-top-sub]");
-  if (tEl) tEl.textContent = brandTitle || "AreA FISIO";
+  if (tEl) tEl.textContent = "FISIOPRO";
   if (sEl) sEl.textContent = brandSub || "";
 
   document.body.classList.add("fp-has-topbar");
@@ -1333,8 +1334,9 @@ function buildAvailabilityUI() {
         <div class="left">
           <div style="font-weight:1000;">Puoi selezionare più slot cliccando e trascinando la selezione</div>
           <div style="opacity:.75;">•</div>
-          <label>Collaboratore:
-            <select data-av-ther>
+          <label style="display:flex; align-items:center; gap:12px; margin-left:12px;">
+            <span>Collaboratore:</span>
+            <select data-av-ther style="font-size:14px;">
               <option value="DEFAULT">Tutti (default)</option>
             </select>
           </label>
@@ -1469,7 +1471,8 @@ function buildAvailabilityUI() {
       // fetch once
       locationsLoading = true;
       locList.innerHTML = `<div style="color:rgba(0,0,0,.55); font-weight:800;">Caricamento sedi…</div>`;
-      api("/api/locations")
+      // Requested: availability "Luogo di lavoro" must come from AZIENDA primary field "Sede".
+      api("/api/locations?table=AZIENDA&nameField=Sede")
         .then((data) => {
           const items = Array.isArray(data?.items) ? data.items : [];
           locations = items.map((x) => ({ id: String(x.id || x.ID || x.sedeId || ""), name: String(x.name || x.nome || x.label || x.id || "") }))

@@ -227,7 +227,7 @@ async function resolveSchema(tableEnc, tableName) {
   const FIELD_LOCATION = await resolveFieldName(
     tableEnc,
     `appts:field:location:${tableName}`,
-    [process.env.AGENDA_LOCATION_FIELD, "Sede", "Sedi", "Location"].filter(Boolean),
+    [process.env.AGENDA_LOCATION_FIELD, "Posizione", "Posizione appuntamento", "Sede", "Sedi", "Location", "Luogo"].filter(Boolean),
   );
   const FIELD_DURATION = await resolveFieldName(
     tableEnc,
@@ -469,8 +469,9 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
   const collaboratorsTable = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
   const servicesTable = process.env.AIRTABLE_SERVICES_TABLE || process.env.AIRTABLE_PRESTAZIONI_TABLE || "PRESTAZIONI";
   const locationsTable = process.env.AIRTABLE_LOCATIONS_TABLE || "SEDI";
+  const aziendaTable = process.env.AIRTABLE_COMPANY_TABLE || process.env.AIRTABLE_AZIENDA_TABLE || "AZIENDA";
 
-  const [patientNamesById, collaboratorNamesById, serviceNamesById, locationNamesById] = await Promise.all([
+  const [patientNamesById, collaboratorNamesById, serviceNamesById, locationNamesByIdInitial] = await Promise.all([
     fetchRecordNamesByIds({
       tableName: patientsTable,
       ids: Array.from(patientIds),
@@ -493,9 +494,26 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
       tableName: locationsTable,
       ids: Array.from(locationIds),
       pickName: pickLocationName,
-      fields: ["Nome", "Nome sede", "Sede", "Name"],
+      fields: ["Nome", "Nome sede", "Sede", "Name", "Ragione Sociale", "Azienda"],
     }),
   ]);
+
+  // If location IDs don't belong to the default locations table (e.g. linked to AZIENDA),
+  // fall back to AZIENDA to resolve display names (so UI doesn't show rec...).
+  let locationNamesById = locationNamesByIdInitial || {};
+  if (locationIds.size && Object.keys(locationNamesById).length === 0) {
+    try {
+      const fromAzienda = await fetchRecordNamesByIds({
+        tableName: aziendaTable,
+        ids: Array.from(locationIds),
+        pickName: pickLocationName,
+        fields: ["Nome", "Nome sede", "Sede", "Name", "Ragione Sociale", "Azienda"],
+      });
+      locationNamesById = { ...locationNamesById, ...(fromAzienda || {}) };
+    } catch {
+      // ignore: keep empty mapping
+    }
+  }
 
   const appointments = (data.records || []).map((r) =>
     mapAppointmentFromRecord({
