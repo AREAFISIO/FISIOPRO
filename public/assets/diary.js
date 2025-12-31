@@ -11,7 +11,7 @@
     window.__FP_DIARY_CLEANUP = null;
 
     // build marker (helps verify cache busting)
-    console.log("FISIOPRO diary build", "2b3c1d2");
+    console.log("FISIOPRO diary build", "2b3c1d2-20251231b");
     const root = document.querySelector("[data-diary]");
     if (!root) return;
 
@@ -2796,6 +2796,25 @@
         <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
+      // Highlight on hover (slot-like) + keep existing preview behavior
+      {
+        const solid = solidForTherapist(it.therapist);
+        const applyHover = (on) => {
+          if (ev.classList.contains("isDragging")) return;
+          ev.classList.toggle("isHover", Boolean(on));
+          if (on) {
+            ev.style.outline = `2px solid ${rgbaFromColor(solid, 0.55)}`;
+            ev.style.outlineOffset = "-2px";
+            ev.style.boxShadow = `0 18px 60px ${rgbaFromColor(solid, 0.18)}`;
+          } else {
+            ev.style.outline = "";
+            ev.style.outlineOffset = "";
+            ev.style.boxShadow = "";
+          }
+        };
+        ev.addEventListener("mouseenter", () => applyHover(true));
+        ev.addEventListener("mouseleave", () => applyHover(false));
+      }
       // Click vs drag: if drag is enabled, click only fires when user didn't move.
       let dragStart = null;
       let dragMoved = false;
