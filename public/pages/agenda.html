@@ -289,12 +289,16 @@
       position:absolute;
       left: 10px;
       right: 10px;
-      border-radius: 12px;
+      border-radius: 8px; /* più simile allo slotHover */
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
       padding: 8px 10px;
       cursor:pointer;
       overflow:hidden;
+    }
+    .event.isHover{
+      transform: translateY(-1px);
+      filter: brightness(1.08);
     }
     .event.isDragging{
       cursor: grabbing;
