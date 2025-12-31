@@ -7,6 +7,32 @@ function normalizeKeyLoose(s) {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+async function discoverFieldNamesViaMeta(tableName) {
+  // Lists all fields (even if empty) via Airtable Meta API.
+  const { AIRTABLE_TOKEN, AIRTABLE_BASE_ID } = process.env;
+  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) return [];
+
+  const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    const text = await res.text();
+    let json = {};
+    try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
+    if (!res.ok) return [];
+
+    const wanted = String(tableName || "").trim();
+    const tables = Array.isArray(json.tables) ? json.tables : [];
+    const t =
+      tables.find((x) => String(x?.name || "").trim().toLowerCase() === wanted.toLowerCase()) ||
+      tables.find((x) => normalizeKeyLoose(x?.name) === normalizeKeyLoose(wanted)) ||
+      null;
+    const fields = Array.isArray(t?.fields) ? t.fields : [];
+    return fields.map((f) => String(f?.name || "")).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 function resolveFieldKeyFromKeys(keys, candidates) {
   const list = Array.isArray(keys) ? keys : [];
   if (!list.length) return "";
@@ -64,16 +90,9 @@ export default async function handler(req, res) {
 
     const cacheKey = `azienda:${TABLE}`;
     const out = await memGetOrSet(cacheKey, 60_000, async () => {
-      // Fetch a few records and merge keys so we can find "Logo" even if the first record is sparse.
-      const data = await airtableFetch(`${tableEnc}?pageSize=10`);
-      const records = Array.isArray(data?.records) ? data.records : [];
-
-      const allKeys = new Set();
-      for (const r of records) {
-        const f = r?.fields || {};
-        Object.keys(f).forEach((k) => allKeys.add(k));
-      }
-      const keys = Array.from(allKeys);
+      // Prefer Meta API so we can see fields even when empty in records.
+      const metaKeys = await discoverFieldNamesViaMeta(TABLE);
+      const keys = metaKeys.length ? metaKeys : [];
 
       const FIELD_LOGO = resolveFieldKeyFromKeys(keys, [
         process.env.AIRTABLE_AZIENDA_LOGO_FIELD,
@@ -89,6 +108,13 @@ export default async function handler(req, res) {
         "Ragione Sociale",
         "Name",
       ].filter(Boolean));
+
+      // Fetch records (if Meta API isn't available or table has no meta access, we still try records).
+      const qs = new URLSearchParams({ pageSize: "50" });
+      if (FIELD_LOGO) qs.append("fields[]", FIELD_LOGO);
+      if (FIELD_NAME) qs.append("fields[]", FIELD_NAME);
+      const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+      const records = Array.isArray(data?.records) ? data.records : [];
 
       let chosen = null;
       for (const r of records) {
