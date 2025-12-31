@@ -232,8 +232,12 @@
       z-index: 6;
       height: var(--fpCancelH);
       padding: 6px 10px;
-      background: var(--panelSolid);
-      border-bottom: 1px solid rgba(255,255,255,.10);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent-2) 10%, var(--panelSolid)),
+        color-mix(in srgb, var(--accent-2) 4%, var(--panelSolid))
+      );
+      border-bottom: 1px solid var(--fp-grid-line-strong);
       border-right: 1px solid var(--border);
       display:flex;
       align-items:center;
@@ -252,9 +256,9 @@
       gap:6px;
       padding: 5px 8px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.16);
-      background: rgba(170,120,255,.20);
-      color: rgba(255,255,255,.92);
+      border: 1px solid color-mix(in srgb, var(--accent-2) 26%, var(--border));
+      background: var(--btnBg);
+      color: var(--text);
       font-weight: 900;
       font-size: 12px;
       max-width: 220px;
@@ -277,6 +281,21 @@
       min-width:0;
       overflow:hidden;
       text-overflow:ellipsis;
+    }
+
+    /* Operator label inside the operator header row */
+    .opName{
+      color: var(--fp-ink);
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      max-width: 140px;
+      opacity: .92;
+    }
+    @media (max-width: 1060px){
+      .opName{ max-width: 96px; }
     }
     .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: var(--fp-ink-muted); }
     .dayHead .d2{ font-weight:900; font-size: 15px; }
