@@ -17,13 +17,44 @@
       --fpDayHeadH: 58px;
       --fpCancelH: 42px;
       --fpOpHeadH: 34px;
+
+      /* Theme-aware inks/lines for Agenda grid */
+      --fp-ink: var(--text);
+      --fp-ink-muted: var(--muted);
+      --fp-grid-line: color-mix(in srgb, var(--text) 10%, transparent);
+      --fp-grid-line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+      --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, var(--fp-grid-line-strong));
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 28%, var(--border));
+      --fp-col-bg: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panel) 96%, transparent),
+        color-mix(in srgb, var(--panel-2) 96%, transparent)
+      );
+      --fp-timecol-bg: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panelSolid) 98%, transparent),
+        color-mix(in srgb, var(--panelSolid2) 98%, transparent)
+      );
+      --fp-event-bg: color-mix(in srgb, var(--accent-2) 10%, var(--btnBg));
+      --fp-event-border: color-mix(in srgb, var(--accent-2) 34%, var(--border));
+      --fp-event-shadow: 0 18px 60px rgba(0,0,0,.35);
+    }
+
+    /* Pro = light: make grid/lines slightly more visible + a touch more blue */
+    body.fp-theme-pro{
+      --fp-grid-line: color-mix(in srgb, var(--accent-2) 10%, rgba(13,23,44,.12));
+      --fp-grid-line-strong: color-mix(in srgb, var(--accent-2) 14%, rgba(13,23,44,.18));
+      --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, rgba(13,23,44,.22));
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 34%, rgba(13,23,44,.22));
+      --fp-event-bg: color-mix(in srgb, var(--accent-2) 14%, rgba(45,108,255,.06));
+      --fp-event-border: color-mix(in srgb, var(--accent-2) 42%, rgba(13,23,44,.18));
     }
 
     .calWrap{
       height: calc(100vh - 120px);
       border:1px solid var(--border);
       border-radius: 18px;
-      background: rgba(255,255,255,.03);
+      background: color-mix(in srgb, var(--cardBg) 92%, transparent);
       overflow:hidden;
       box-shadow: var(--shadow);
     }
@@ -32,7 +63,11 @@
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       padding: 12px 14px;
       border-bottom: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent-2) 10%, transparent),
+        color-mix(in srgb, var(--accent-2) 4%, transparent)
+      );
     }
     .calTop .left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .calTitle{ font-weight:900; letter-spacing:-.2px; }
@@ -40,7 +75,11 @@
 
     .calChips{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .chip.btnlike{ cursor:pointer; user-select:none; }
-    .chip.btnlike.active{ background: rgba(34,230,195,.12); border-color: rgba(34,230,195,.25); color: var(--text); }
+    .chip.btnlike.active{
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+      color: var(--text);
+    }
 
     /* Operator selector bar (like screenshot) */
     .opsBar{
@@ -63,7 +102,7 @@
       color: rgba(10,18,32,.90);
       border: 1px solid rgba(255,255,255,.25);
     }
-    .opsText{ color: rgba(255,255,255,.75); font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .opsText{ color: var(--fp-ink-muted); font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .opsCaret{ opacity: .8; }
 
     /* Operator dropdown */
@@ -87,7 +126,11 @@
       padding: 12px 14px;
       border-bottom: 1px solid var(--border);
       display:flex; align-items:center; justify-content:space-between; gap:12px;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--text) 6%, transparent),
+        color-mix(in srgb, var(--text) 2%, transparent)
+      );
     }
     .opsToggle{ display:flex; align-items:center; gap:10px; }
     .opsToggleLabel{ font-weight: 800; }
@@ -95,20 +138,23 @@
     .opsRow{
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       padding: 12px 14px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.02);
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--btnBg) 72%, transparent);
     }
     .opsRow:last-child{ border-bottom:none; }
     .opsRowLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
     .opsCheck{
       width: 20px; height: 20px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(0,0,0,.15);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
       display:grid; place-items:center;
       flex: 0 0 auto;
     }
-    .opsCheck.on{ background: rgba(34,230,195,.20); border-color: rgba(34,230,195,.35); }
+    .opsCheck.on{
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    }
     .opsName{ font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .opsMini{ color: var(--muted); font-size: 13px; }
     .opsMenuFoot{ padding: 12px 14px; display:flex; justify-content:flex-end; gap:10px; border-top: 1px solid var(--border); }
@@ -119,8 +165,8 @@
     .slider{
       position:absolute; inset:0;
       cursor:pointer;
-      background: rgba(255,255,255,.14);
-      border: 1px solid rgba(255,255,255,.18);
+      background: color-mix(in srgb, var(--text) 10%, transparent);
+      border: 1px solid var(--border);
       transition: .2s;
       border-radius: 999px;
     }
@@ -129,17 +175,17 @@
       position:absolute;
       height: 20px; width: 20px;
       left: 3px; top: 2px;
-      background: rgba(255,255,255,.92);
+      background: color-mix(in srgb, var(--text) 92%, transparent);
       transition: .2s;
       border-radius: 999px;
     }
     .switch input:checked + .slider{
-      background: rgba(34,230,195,.25);
-      border-color: rgba(34,230,195,.35);
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
     }
     .switch input:checked + .slider:before{
       transform: translateX(20px);
-      background: rgba(34,230,195,.95);
+      background: color-mix(in srgb, var(--accent) 92%, transparent);
     }
 
     .calGridOuter{ height: 100%; overflow:auto; }
@@ -232,54 +278,59 @@
       overflow:hidden;
       text-overflow:ellipsis;
     }
-    .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: rgba(255,255,255,.72); }
+    .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: var(--fp-ink-muted); }
     .dayHead .d2{ font-weight:900; font-size: 15px; }
 
     .timeCol{
       position: relative;
       border-right: 1px solid var(--border);
+      background: var(--fp-timecol-bg);
     }
     .timeTick{
       position:absolute; left:0; right:0;
       transform: translateY(-7px);
-      color: rgba(255,255,255,.82);
+      color: var(--fp-ink);
       font-size: 13px;
       font-weight: 900;
       padding-left: 10px;
       pointer-events:none;
-      text-shadow: 0 2px 10px rgba(0,0,0,.45);
+      text-shadow: 0 2px 12px rgba(0,0,0,.35);
     }
+    body.fp-theme-pro .timeTick{ text-shadow: none; }
 
     .dayCol{
       position: relative;
       border-right: 1px solid var(--border);
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      background: var(--fp-col-bg);
     }
 
     /* Stronger day separators (between days) */
     .daySep{
-      border-left: 3px solid rgba(255,255,255,.16);
-      box-shadow: -2px 0 0 rgba(0,0,0,.22);
+      border-left: 3px solid var(--fp-day-sep);
+      box-shadow: -2px 0 0 color-mix(in srgb, rgba(0,0,0,.22) 70%, transparent);
     }
     .daySepHead{
-      border-left: 3px solid rgba(255,255,255,.16) !important;
-      box-shadow: -2px 0 0 rgba(0,0,0,.22);
+      border-left: 3px solid var(--fp-day-sep) !important;
+      box-shadow: -2px 0 0 color-mix(in srgb, rgba(0,0,0,.22) 70%, transparent);
     }
     .gridLine{
       position:absolute; left:0; right:0;
-      border-top: 1px solid rgba(255,255,255,.06);
+      border-top: 1px solid var(--fp-grid-line);
       pointer-events:none;
     }
-    .gridLine.hour{ border-top-color: rgba(255,255,255,.10); }
+    .gridLine.hour{ border-top-color: var(--fp-grid-line-hour); }
 
     .slotHover{
       position:absolute;
       left:0; right:0;
       height: 18px; /* SLOT_PX (sincronizzato in diary.js) */
-      background: linear-gradient(90deg, rgba(34,230,195,.22), rgba(74,163,255,.14));
-      outline: 2px solid rgba(34,230,195,.35);
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 26px rgba(34,230,195,.10);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 22%, transparent),
+        color-mix(in srgb, var(--accent-2) 16%, transparent)
+      );
+      outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
+      box-shadow: inset 0 0 0 1px var(--fp-grid-line), 0 10px 26px color-mix(in srgb, var(--accent) 14%, transparent);
       pointer-events:none;
       display:none;
       border-radius: 8px;
@@ -290,8 +341,10 @@
       left: 10px;
       right: 10px;
       border-radius: 8px; /* più simile allo slotHover */
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
+      border: 1px solid var(--fp-event-border);
+      border-left-width: 4px;
+      border-left-color: color-mix(in srgb, var(--accent-2) 65%, var(--fp-event-border));
+      background: var(--fp-event-bg);
       padding: 8px 10px;
       cursor:pointer;
       overflow:hidden;
@@ -303,12 +356,12 @@
     .event.isDragging{
       cursor: grabbing;
       opacity: .78;
-      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      box-shadow: var(--fp-event-shadow);
     }
     .event .t{ font-weight:900; font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .event .m{ margin-top:4px; font-size: 12px; color: rgba(255,255,255,.70); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .event .b{ margin-top:6px; display:flex; gap:8px; align-items:center; color: rgba(255,255,255,.70); font-size: 12px; }
-    .dot{ width:10px; height:10px; border-radius:999px; background: var(--accent); box-shadow: 0 10px 22px rgba(34,230,195,.16); }
+    .event .m{ margin-top:4px; font-size: 12px; color: var(--fp-ink-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .event .b{ margin-top:6px; display:flex; gap:8px; align-items:center; color: var(--fp-ink-muted); font-size: 12px; }
+    .dot{ width:10px; height:10px; border-radius:999px; background: var(--accent); box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent); }
 
     /* Modal */
     .fp-modalBack{
@@ -421,6 +474,8 @@
       background: var(--panelSolid);
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
+      color: var(--text);
+      color-scheme: light dark;
       overflow:hidden;
       max-height: calc(100vh - 12vh);
       display:flex;
@@ -430,7 +485,11 @@
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
       display:flex; align-items:center; justify-content:space-between; gap:12px;
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--text) 6%, transparent),
+        color-mix(in srgb, var(--text) 2%, transparent)
+      );
     }
     .prefsTitle{ display:flex; align-items:center; gap:10px; font-weight: 900; font-size: 18px; }
     .prefsBody{
@@ -446,15 +505,15 @@
     }
     @media (max-width: 980px){ .prefsGrid{ grid-template-columns: 1fr; } }
     .prefsCard{
-      border: 1px solid rgba(255,255,255,.10);
+      border: 1px solid var(--border);
       border-radius: 16px;
-      background: rgba(255,255,255,.03);
+      background: color-mix(in srgb, var(--btnBg) 85%, transparent);
       padding: 14px;
     }
     .prefsRow{
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       padding: 10px 0;
-      border-bottom: 1px dashed rgba(255,255,255,.10);
+      border-bottom: 1px dashed var(--border);
     }
     .prefsRow:last-child{ border-bottom:none; }
     .prefsLabel{ font-weight: 800; }
@@ -463,8 +522,8 @@
     .colorSwatch{
       width: 46px; height: 34px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
       overflow:hidden;
     }
     .colorSwatch input{
@@ -476,9 +535,9 @@
     .selectSmall{
       height: 34px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.18);
-      color: rgba(255,255,255,.90);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
       padding: 0 10px;
     }
     .prefsFoot{
@@ -496,31 +555,31 @@
       text-transform: uppercase;
       padding: 3px 8px;
       border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      color: rgba(255,255,255,.78);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--muted);
       flex: 0 0 auto;
     }
 
     /* Inline picker for default agendas */
     .prefPicker{
       margin-top: 10px;
-      border: 1px solid rgba(255,255,255,.10);
+      border: 1px solid var(--border);
       border-radius: 14px;
-      background: rgba(255,255,255,.03);
+      background: color-mix(in srgb, var(--btnBg) 80%, transparent);
       overflow:hidden;
       display:none;
     }
     .prefPickerTop{
       padding: 10px 12px;
-      border-bottom: 1px solid rgba(255,255,255,.10);
+      border-bottom: 1px solid var(--border);
       display:flex;
       gap:10px;
       align-items:center;
       justify-content:space-between;
     }
     .prefPickerTop .mini{
-      color: rgba(255,255,255,.60);
+      color: var(--muted);
       font-size: 12px;
       font-weight: 800;
       letter-spacing:.06em;
@@ -531,9 +590,9 @@
       min-width: 0;
       height: 34px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.18);
-      color: rgba(255,255,255,.90);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
       padding: 0 10px;
     }
     .prefPickerBody{
@@ -546,31 +605,34 @@
       justify-content:space-between;
       gap:12px;
       padding: 10px 12px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
+      border-bottom: 1px solid var(--border);
       cursor:pointer;
-      background: rgba(255,255,255,.02);
+      background: color-mix(in srgb, var(--btnBg) 72%, transparent);
     }
-    .prefPickRow:hover{ background: rgba(255,255,255,.04); }
+    .prefPickRow:hover{ background: color-mix(in srgb, var(--btnBgHover) 85%, transparent); }
     .prefPickRow:last-child{ border-bottom:none; }
     .prefPickLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
     .prefPickCheck{
       width: 20px; height: 20px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(0,0,0,.15);
+      border: 1px solid var(--border);
+      background: var(--btnBg);
       display:grid; place-items:center;
       flex: 0 0 auto;
-      color: rgba(255,255,255,.95);
+      color: var(--text);
       font-weight: 900;
     }
-    .prefPickCheck.on{ background: rgba(34,230,195,.20); border-color: rgba(34,230,195,.35); }
+    .prefPickCheck.on{
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    }
     .prefPickName{
       font-weight: 900;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
     }
-    .prefPickMini{ color: rgba(255,255,255,.55); font-size: 12px; }
+    .prefPickMini{ color: var(--muted); font-size: 12px; }
   </style>
 </head>
 <body>
