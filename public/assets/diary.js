@@ -323,7 +323,7 @@
 
     hoverCard.dataset.patientId = String(item.patientId || "");
     hoverCard.innerHTML = `
-      <div class="t">${item.patient || "Appuntamento"}</div>
+      <div class="t">${item.patient || "Paziente"}</div>
       <div class="r"><span class="k">Orario</span><span>${when || "—"}</span></div>
       <div class="r"><span class="k">Stato</span><span>${item.status || "—"}</span></div>
       ${canSeeInsurance ? `<div class="r"><span class="k">Assicurazione</span><span>${insurance || "—"}</span></div>` : ""}
@@ -391,6 +391,9 @@
   const prefDoubleClose = document.querySelector("[data-pref-double-close]");
   const prefShowService = document.querySelector("[data-pref-show-service]");
   const prefDayNav = document.querySelector("[data-pref-day-nav]");
+  const prefOpColorsSection = document.querySelector("[data-pref-opcolors-section]");
+  const prefOpColorsWrap = document.querySelector("[data-pref-opcolors]");
+  const prefOpColorsHint = document.querySelector("[data-pref-opcolors-hint]");
 
   let prefs = {
     slotMin: 30,
@@ -407,7 +410,81 @@
     showService: true,
     dayNav: false,
     userColor: "",
+    operatorColors: {}, // { [operatorId]: "#RRGGBB" }
   };
+
+  function normalizeHexColor(s) {
+    const x = String(s || "").trim();
+    if (!x) return "";
+    const m = x.match(/^#([0-9a-fA-F]{6})$/);
+    return m ? ("#" + m[1].toUpperCase()) : "";
+  }
+
+  function hslToRgb(h, s, l) {
+    const hh = ((Number(h) % 360) + 360) % 360;
+    const ss = Math.max(0, Math.min(1, Number(s)));
+    const ll = Math.max(0, Math.min(1, Number(l)));
+    const c = (1 - Math.abs(2 * ll - 1)) * ss;
+    const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+    const m = ll - c / 2;
+    let r1 = 0, g1 = 0, b1 = 0;
+    if (hh < 60) { r1 = c; g1 = x; b1 = 0; }
+    else if (hh < 120) { r1 = x; g1 = c; b1 = 0; }
+    else if (hh < 180) { r1 = 0; g1 = c; b1 = x; }
+    else if (hh < 240) { r1 = 0; g1 = x; b1 = c; }
+    else if (hh < 300) { r1 = x; g1 = 0; b1 = c; }
+    else { r1 = c; g1 = 0; b1 = x; }
+    const r = Math.round((r1 + m) * 255);
+    const g = Math.round((g1 + m) * 255);
+    const b = Math.round((b1 + m) * 255);
+    return { r, g, b };
+  }
+
+  function rgbToHex({ r, g, b }) {
+    const to2 = (n) => String(Math.max(0, Math.min(255, Number(n) || 0)).toString(16)).padStart(2, "0").toUpperCase();
+    return `#${to2(r)}${to2(g)}${to2(b)}`;
+  }
+
+  function defaultHexForName(name) {
+    const s = String(name || "");
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    const hue = h % 360;
+    return rgbToHex(hslToRgb(hue, 0.78, 0.55));
+  }
+
+  function hexToRgb(hex) {
+    const h = String(hex || "").trim();
+    const m = h.match(/^#([0-9a-fA-F]{6})$/);
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  function rgbaFromColor(color, alpha) {
+    const a = Math.max(0, Math.min(1, Number(alpha)));
+    const c = String(color || "").trim();
+    if (!c) return "";
+    if (c.startsWith("#")) {
+      const rgb = hexToRgb(c);
+      if (!rgb) return c;
+      return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+    }
+    if (c.startsWith("hsl(") || c.startsWith("hsla(")) {
+      if (c.includes("/")) return c.replace(/\/\s*[\d.]+\s*\)/, `/ ${a})`);
+      return c;
+    }
+    return c;
+  }
+
+  function escapeHtml(x) {
+    return String(x ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function timeToMin(s) {
@@ -770,6 +847,22 @@
     return "";
   }
 
+  function pickTextField(fields, keys) {
+    for (const k of keys) {
+      if (!fields) continue;
+      const v = fields[k];
+      if (v == null) continue;
+      // Avoid linked-record arrays (Airtable IDs)
+      if (Array.isArray(v)) continue;
+      const s = String(v).trim();
+      if (!s) continue;
+      // Avoid showing Airtable record ids as "names"
+      if (s.startsWith("rec") && s.length >= 12 && !s.includes(" ")) continue;
+      return v;
+    }
+    return "";
+  }
+
   // --- Sede / Location inference (per tooltip sugli slot) ---
   // Non abbiamo (ancora) una select Sede nel modal di creazione; perciò, per lo slot
   // stimiamo la sede più probabile guardando gli appuntamenti nel range corrente.
@@ -857,8 +950,17 @@
 
     // patient can be link-array; attempt text variants, then fallback.
     const patient =
-      pickField(f, ["Paziente (testo)", "Paziente", "Patient", "patient_name", "Nome Paziente", "Cognome e Nome"]) ||
-      (Array.isArray(f.Paziente) ? `Paziente (${f.Paziente[0] || ""})` : "");
+      String(pickTextField(f, [
+        "Paziente (testo)",
+        "Nome Paziente",
+        "Cognome e Nome",
+        "Paziente testo",
+        "Patient name",
+        "patient_name",
+        "Patient",
+        // keep last: sometimes it's already a text field; if it's a linked-record id, pickTextField will ignore it
+        "Paziente",
+      ]) || "").trim();
 
     let patientId = "";
     if (Array.isArray(f.Paziente) && f.Paziente.length && typeof f.Paziente[0] === "string") {
@@ -896,23 +998,23 @@
   }
 
   function colorForTherapist(name) {
-    // deterministic pastel based on string hash
-    const s = String(name || "");
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    return `hsl(${hue} 80% 60% / 0.18)`;
+    const solid = solidForTherapist(name);
+    return rgbaFromColor(solid, 0.18) || "rgba(34,230,195,.14)";
   }
 
   function solidForTherapist(name) {
-    const s = String(name || "");
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    const hue = h % 360;
-    // user override
-    const me = String(getUserName() || "");
-    if (prefs.userColor && me && name === me) return prefs.userColor;
-    return `hsl(${hue} 85% 62% / 0.95)`;
+    const n = String(name || "").trim();
+    const oc = prefs?.operatorColors && typeof prefs.operatorColors === "object" ? prefs.operatorColors : {};
+    const opId = operatorNameToId.get(n) || "";
+    const byId = opId ? normalizeHexColor(oc[opId]) : "";
+    if (byId) return byId;
+
+    // Back-compat: userColor (applies to "me" only)
+    const me = String(getUserName() || "").trim();
+    const my = normalizeHexColor(prefs.userColor);
+    if (my && me && n === me) return my;
+
+    return defaultHexForName(n) || "#22E6C3";
   }
 
   function getUserEmail() {
@@ -938,6 +1040,11 @@
     if (raw.includes("front")) return "front";
     if (raw.includes("physio") || raw.includes("fisioterap")) return "physio";
     return raw;
+  }
+
+  function canEditOperatorColors() {
+    const r = getUserRoleNorm();
+    return r === "front" || r === "manager";
   }
 
   function ensureMeInSelection(set) {
@@ -991,7 +1098,11 @@
       const raw = localStorage.getItem(prefsKey());
       if (!raw) return;
       const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
+      if (obj && typeof obj === "object") {
+        // Never restore operatorColors from local storage (shared server-side)
+        const { operatorColors: _ignore, ...rest } = obj;
+        prefs = { ...prefs, ...rest };
+      }
     } catch {}
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
@@ -1018,7 +1129,12 @@
     if (selectedTherapists.size) didApplyDefaultSelectionOnce = true;
   }
   function savePrefs() {
-    try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
+    // operatorColors are shared (server-side) and must not be stored per-user in localStorage
+    try {
+      const toSave = { ...(prefs || {}) };
+      delete toSave.operatorColors;
+      localStorage.setItem(prefsKey(), JSON.stringify(toSave));
+    } catch {}
   }
   function resetPrefs() {
     prefs = {
@@ -1030,10 +1146,102 @@
       showService: true,
       dayNav: false,
       userColor: "",
+      operatorColors: {},
     };
     SLOT_MIN = 30;
     multiUser = false;
     savePrefs();
+  }
+
+  function ensureOperatorColorsObject() {
+    if (!prefs || typeof prefs !== "object") return;
+    if (!prefs.operatorColors || typeof prefs.operatorColors !== "object") prefs.operatorColors = {};
+  }
+
+  function migrateUserColorToOperatorColorIfNeeded() {
+    // Back-compat: older configs had only prefs.userColor.
+    // If we can map "me" to an operator id, copy it into operatorColors once.
+    ensureOperatorColorsObject();
+    const my = normalizeHexColor(prefs.userColor);
+    if (!my) return;
+    const me = String(getUserName() || "").trim();
+    if (!me) return;
+    const myOpId = operatorNameToId.get(me) || "";
+    if (!myOpId) return;
+    if (!normalizeHexColor(prefs.operatorColors[myOpId])) {
+      prefs.operatorColors[myOpId] = my;
+    }
+  }
+
+  function renderOperatorColorsUI() {
+    if (!prefOpColorsSection || !prefOpColorsWrap) return;
+    ensureOperatorColorsObject();
+    migrateUserColorToOperatorColorIfNeeded();
+
+    const roleCanEditAll = canEditOperatorColors();
+    const me = String(getUserName() || "").trim();
+    const myOpId = me ? (operatorNameToId.get(me) || "") : "";
+
+    // If we don't have operators yet, show placeholder.
+    if (!Array.isArray(knownOperators) || knownOperators.length === 0) {
+      prefOpColorsWrap.innerHTML = `<div style="padding:12px 12px; opacity:.75; font-weight:800;">Carico collaboratori…</div>`;
+      // hide section only if user can't edit and no data; otherwise keep it visible
+      prefOpColorsSection.style.display = "";
+      if (prefOpColorsHint) prefOpColorsHint.style.display = roleCanEditAll ? "" : "none";
+      return;
+    }
+
+    // Visibility: show for everyone, but edit rules differ
+    prefOpColorsSection.style.display = "";
+    if (prefOpColorsHint) prefOpColorsHint.style.display = roleCanEditAll ? "" : "none";
+
+    const ops = (knownOperators || [])
+      .map((o) => ({ id: String(o.id || "").trim(), name: String(o.name || "").trim(), role: normalizeRoleLabel(o.role || "") }))
+      .filter((o) => o.id && o.name)
+      .sort((a, b) => a.name.localeCompare(b.name, "it"));
+
+    // Build rows
+    prefOpColorsWrap.innerHTML = ops.map((o) => {
+      const saved = normalizeHexColor(prefs.operatorColors[o.id]);
+      const fallback = defaultHexForName(o.name);
+      const val = saved || fallback || "#22E6C3";
+      const canEditThis = roleCanEditAll || (myOpId && o.id === myOpId);
+      const roleTxt = o.role ? ` • ${escapeHtml(o.role)}` : "";
+      return `
+        <div data-opcolor-row="${escapeHtml(o.id)}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.08);">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+            <div class="opsDot" data-opcolor-dot style="width:22px;height:22px;background:${escapeHtml(val)}; border:1px solid rgba(255,255,255,.22);"></div>
+            <div style="min-width:0;">
+              <div style="font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(o.name)}${roleTxt}</div>
+              <div style="opacity:.65; font-size:12px; margin-top:2px;">${escapeHtml(o.id)}</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="colorSwatch" style="width:56px; height:34px;">
+              <input type="color" data-opcolor-input value="${escapeHtml(val)}" ${canEditThis ? "" : "disabled"} />
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    // Remove last border
+    try {
+      const rows = Array.from(prefOpColorsWrap.querySelectorAll("[data-opcolor-row]"));
+      if (rows.length) rows[rows.length - 1].style.borderBottom = "none";
+    } catch {}
+
+    // Live preview in the list (without saving yet)
+    prefOpColorsWrap.querySelectorAll("[data-opcolor-row]").forEach((row) => {
+      const id = String(row.getAttribute("data-opcolor-row") || "");
+      const inp = row.querySelector("[data-opcolor-input]");
+      const dot = row.querySelector("[data-opcolor-dot]");
+      if (!inp || !dot) return;
+      inp.addEventListener("input", () => {
+        const v = normalizeHexColor(inp.value) || "#22E6C3";
+        dot.style.background = v;
+      });
+    });
   }
 
   function syncPrefsUI() {
@@ -1042,6 +1250,7 @@
     if (prefShowService) prefShowService.checked = Boolean(prefs.showService);
     if (prefDayNav) prefDayNav.checked = Boolean(prefs.dayNav);
     if (prefColor) prefColor.value = String(prefs.userColor || "#22e6c3");
+    renderOperatorColorsUI();
     if (prefDefaultSection) prefDefaultSection.style.display = prefMulti?.checked ? "" : "none";
     if (prefDefaultPicker && !prefMulti?.checked) prefDefaultPicker.style.display = "none";
     if (prefDoubleSection) prefDoubleSection.style.display = prefMulti?.checked ? "" : "none";
@@ -1388,6 +1597,16 @@
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
+
+      // Shared colors (from Airtable via /api/operators)
+      ensureOperatorColorsObject();
+      const nextColors = {};
+      items.forEach((x) => {
+        const id = String(x.id || "").trim();
+        const c = normalizeHexColor(x.color);
+        if (id && c) nextColors[id] = c;
+      });
+      prefs.operatorColors = nextColors;
     }
 
     syncLoginName();
@@ -1674,7 +1893,7 @@
               block.style.right = "0";
               block.style.top = segStart + "px";
               block.style.height = Math.max(2, segEnd - segStart) + "px";
-              block.style.background = "rgba(34,230,195,.14)";
+              block.style.background = colorForTherapist(therapistForCol);
               block.style.pointerEvents = "none";
               block.style.zIndex = "2";
               col.appendChild(block);
@@ -1702,6 +1921,12 @@
         const hover = document.createElement("div");
         hover.className = "slotHover";
         hover.style.height = SLOT_PX + "px";
+        {
+          const therForHover = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
+          const solid = solidForTherapist(therForHover);
+          hover.style.background = rgbaFromColor(solid, 0.20);
+          hover.style.outlineColor = rgbaFromColor(solid, 0.45);
+        }
         col.appendChild(hover);
 
         const updateHover = (clientY) => {
@@ -2554,15 +2779,20 @@
       ev.className = "event";
       ev.style.top = top + "px";
       ev.style.height = height + "px";
-      ev.style.background = colorForTherapist(it.therapist);
+      {
+        const solid = solidForTherapist(it.therapist);
+        ev.style.background = rgbaFromColor(solid, 0.18);
+        ev.style.borderColor = rgbaFromColor(solid, 0.42);
+      }
 
-      const dot = `<span class="dot" style="background:${colorForTherapist(it.therapist).replace("/ 0.18", "/ 1")}"></span>`;
+      const dotSolid = solidForTherapist(it.therapist);
+      const dot = `<span class="dot" style="background:${dotSolid}; box-shadow:0 10px 22px ${rgbaFromColor(dotSolid, 0.22)};"></span>`;
       const line = prefs.showService
         ? [it.service, it.status].filter(Boolean).join(" • ")
         : [it.status].filter(Boolean).join(" • ");
 
       ev.innerHTML = `
-        <div class="t">${it.patient || "Appuntamento"}</div>
+        <div class="t">${it.patient || "Paziente"}</div>
         <div class="m">${line}</div>
         <div class="b">${dot}<span>${therapistKey(it.therapist) || it.therapist || ""}</span><span style="margin-left:auto; opacity:.8;">${pad2(it.startAt.getHours())}:${pad2(it.startAt.getMinutes())}</span></div>
       `;
@@ -2918,13 +3148,57 @@
     if (prefDoublePicker) prefDoublePicker.style.display = "none";
   });
   prefDoubleSearch?.addEventListener("input", () => renderDoublePickerList());
-  prefsSave?.addEventListener("click", () => {
+  prefsSave?.addEventListener("click", async () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
     prefs.showService = Boolean(prefShowService?.checked);
     prefs.dayNav = Boolean(prefDayNav?.checked);
     prefs.userColor = String(prefColor?.value || "").trim();
+
+    // Per-collaborator colors (saved by operator id)
+    ensureOperatorColorsObject();
+    const nextColors = {};
+    try {
+      prefOpColorsWrap?.querySelectorAll?.("[data-opcolor-row]")?.forEach?.((row) => {
+        const id = String(row.getAttribute("data-opcolor-row") || "").trim();
+        const inp = row.querySelector?.("[data-opcolor-input]");
+        const v = normalizeHexColor(inp?.value);
+        if (id && v) nextColors[id] = v;
+      });
+    } catch {}
+
+    // Also apply "Colore utente" to current operator (back-compat)
+    const me = String(getUserName() || "").trim();
+    const myOpId = me ? (operatorNameToId.get(me) || "") : "";
+    const myHex = normalizeHexColor(prefs.userColor);
+    if (myOpId && myHex) nextColors[myOpId] = myHex;
+
+    prefs.operatorColors = nextColors;
     savePrefs();
+
+    // Persist shared collaborator colors server-side (Airtable) when allowed.
+    // This makes colors identical across devices/browsers and for both Manager + Front office.
+    if (canEditOperatorColors()) {
+      try {
+        const res = await fetch("/api/operators", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ colors: nextColors }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+        toast?.("Colori salvati");
+        try { window.dispatchEvent(new CustomEvent("fpAgendaPrefsChanged")); } catch {}
+        // Reload operators so we reflect Airtable truth immediately
+        try { await load({ nocache: true }); } catch {}
+      } catch (e) {
+        console.error(e);
+        toast?.("Errore salvataggio colori (Airtable)");
+      }
+    } else {
+      try { window.dispatchEvent(new CustomEvent("fpAgendaPrefsChanged")); } catch {}
+    }
 
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
