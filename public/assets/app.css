@@ -304,7 +304,8 @@ body.fp-has-topbar .app{
 .brand{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
   background:rgba(255,255,255,.06);border:1px solid var(--border);box-shadow:var(--shadow)}
 .brand .dot{
-  width:34px;height:34px;border-radius:12px;
+  /* Slightly larger logo box */
+  width:40px;height:40px;border-radius:14px;
   background-image: var(--brandLogo), linear-gradient(135deg,var(--accent),var(--accent-2));
   background-size: 72% 72%, cover;
   background-repeat: no-repeat, no-repeat;
