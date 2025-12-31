@@ -1164,19 +1164,23 @@ function buildAvailabilityUI() {
     try {
       const data = await api("/api/operators");
       const items = (data.items || [])
-        .map((x) => ({ id: String(x.id || "").trim(), name: String(x.name || "").trim() }))
+        .map((x) => ({ id: String(x.id || "").trim(), name: String(x.name || "").trim(), color: String(x.color || "").trim() }))
         .filter((x) => x.id && x.name);
       const names = items.map((x) => x.name);
       const map = {};
+      const colorByName = {};
       items.forEach((x) => { map[x.name] = x.id; });
+      items.forEach((x) => { if (x.color) colorByName[x.name] = x.color; });
       window.__FP_AV_OPERATOR_ITEMS = items;
       window.__FP_AV_OPNAME_TO_ID = map;
+      window.__FP_AV_OPNAME_TO_COLOR = colorByName;
       window.__FP_AV_OPERATORS = names;
       return names;
     } catch {
       window.__FP_AV_OPERATORS = [];
       window.__FP_AV_OPERATOR_ITEMS = [];
       window.__FP_AV_OPNAME_TO_ID = {};
+      window.__FP_AV_OPNAME_TO_COLOR = {};
       return [];
     } finally {
       window.__FP_AV_OPERATORS_LOADING = false;
@@ -1224,11 +1228,7 @@ function buildAvailabilityUI() {
   let currentTherapist = String(saved?.lastTherapist || window.__FP_AV_LAST_THER || "DEFAULT").trim() || "DEFAULT";
   window.__FP_AV_LAST_THER = currentTherapist;
 
-  // Agenda per-operator colors (shared source with diary.js)
-  function agendaPrefsKey() {
-    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
-    return `fp_agenda_prefs_${email}`;
-  }
+  // Per-operator colors (shared: stored in Airtable via /api/operators.color)
   function normalizeHexColor(s) {
     const x = String(s || "").trim();
     const m = x.match(/^#([0-9a-fA-F]{6})$/);
@@ -1259,20 +1259,11 @@ function buildAvailabilityUI() {
     const hue = hashHue(n);
     return `hsla(${hue} 78% 58% / ${Math.max(0, Math.min(1, Number(alpha)))})`;
   }
-  function loadAgendaOperatorColors() {
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem(agendaPrefsKey()) || "null"); } catch {}
-    const oc = raw && typeof raw === "object" && raw.operatorColors && typeof raw.operatorColors === "object" ? raw.operatorColors : {};
-    return oc;
-  }
   function operatorHexForTherapistName(name) {
     const n = String(name || "").trim();
     if (!n || n === "DEFAULT") return "";
-    const map = window.__FP_AV_OPNAME_TO_ID && typeof window.__FP_AV_OPNAME_TO_ID === "object" ? window.__FP_AV_OPNAME_TO_ID : {};
-    const opId = String(map[n] || "").trim();
-    if (!opId) return "";
-    const oc = loadAgendaOperatorColors();
-    return normalizeHexColor(oc[opId]);
+    const cMap = window.__FP_AV_OPNAME_TO_COLOR && typeof window.__FP_AV_OPNAME_TO_COLOR === "object" ? window.__FP_AV_OPNAME_TO_COLOR : {};
+    return normalizeHexColor(cMap[n]);
   }
   function workBgForTherapist(name) {
     const hex = operatorHexForTherapistName(name);

@@ -1098,7 +1098,11 @@
       const raw = localStorage.getItem(prefsKey());
       if (!raw) return;
       const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") prefs = { ...prefs, ...obj };
+      if (obj && typeof obj === "object") {
+        // Never restore operatorColors from local storage (shared server-side)
+        const { operatorColors: _ignore, ...rest } = obj;
+        prefs = { ...prefs, ...rest };
+      }
     } catch {}
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
@@ -1125,7 +1129,12 @@
     if (selectedTherapists.size) didApplyDefaultSelectionOnce = true;
   }
   function savePrefs() {
-    try { localStorage.setItem(prefsKey(), JSON.stringify(prefs)); } catch {}
+    // operatorColors are shared (server-side) and must not be stored per-user in localStorage
+    try {
+      const toSave = { ...(prefs || {}) };
+      delete toSave.operatorColors;
+      localStorage.setItem(prefsKey(), JSON.stringify(toSave));
+    } catch {}
   }
   function resetPrefs() {
     prefs = {
@@ -1588,6 +1597,16 @@
       knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
       operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
+
+      // Shared colors (from Airtable via /api/operators)
+      ensureOperatorColorsObject();
+      const nextColors = {};
+      items.forEach((x) => {
+        const id = String(x.id || "").trim();
+        const c = normalizeHexColor(x.color);
+        if (id && c) nextColors[id] = c;
+      });
+      prefs.operatorColors = nextColors;
     }
 
     syncLoginName();
@@ -3129,7 +3148,7 @@
     if (prefDoublePicker) prefDoublePicker.style.display = "none";
   });
   prefDoubleSearch?.addEventListener("input", () => renderDoublePickerList());
-  prefsSave?.addEventListener("click", () => {
+  prefsSave?.addEventListener("click", async () => {
     prefs.slotMin = Number(prefSlot?.value || 30);
     prefs.multiUser = Boolean(prefMulti?.checked);
     prefs.showService = Boolean(prefShowService?.checked);
@@ -3156,7 +3175,30 @@
 
     prefs.operatorColors = nextColors;
     savePrefs();
-    try { window.dispatchEvent(new CustomEvent("fpAgendaPrefsChanged")); } catch {}
+
+    // Persist shared collaborator colors server-side (Airtable) when allowed.
+    // This makes colors identical across devices/browsers and for both Manager + Front office.
+    if (canEditOperatorColors()) {
+      try {
+        const res = await fetch("/api/operators", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ colors: nextColors }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+        toast?.("Colori salvati");
+        try { window.dispatchEvent(new CustomEvent("fpAgendaPrefsChanged")); } catch {}
+        // Reload operators so we reflect Airtable truth immediately
+        try { await load({ nocache: true }); } catch {}
+      } catch (e) {
+        console.error(e);
+        toast?.("Errore salvataggio colori (Airtable)");
+      }
+    } else {
+      try { window.dispatchEvent(new CustomEvent("fpAgendaPrefsChanged")); } catch {}
+    }
 
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
