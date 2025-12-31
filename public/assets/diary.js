@@ -1801,13 +1801,13 @@
             cell.style.padding = "6px 10px";
             cell.style.gridRow = "3";
             cell.style.gridColumn = String(2 + dIdx * colsPerDay + oIdx);
-            // Requested: keep the colored dot, but remove name/surname next to it (still keep tooltip).
             const laneBadge =
               slot.laneCount > 1
                 ? `<span title="Colonna ${slot.laneIndex + 1}" style="font-size:11px; font-weight:1000; opacity:.85;">${slot.laneIndex + 1}</span>`
                 : "";
-            cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px;">
-              <span class="opsDot" title="${name}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
+            cell.innerHTML = `<div class="d2" style="display:flex;align-items:center;gap:8px;font-size:13px; min-width:0;">
+              <span class="opsDot" title="${escapeHtml(name)}" style="width:22px;height:22px;background:${solidForTherapist(name)}">${therapistKey(name)}</span>
+              <span class="opName" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
               ${laneBadge}
             </div>`;
             gridEl.appendChild(cell);
@@ -1825,7 +1825,8 @@
     timeCol.style.position = "sticky";
     timeCol.style.left = "0";
     timeCol.style.zIndex = "4";
-    timeCol.style.background = "rgba(15,26,44,.96)";
+    // Theme-aware background (agenda.html defines --fp-timecol-bg).
+    timeCol.style.background = "var(--fp-timecol-bg)";
 
     const startHour = Math.floor(startMinRange / 60);
     const endHour = Math.ceil(endMinRange / 60);
@@ -2726,7 +2727,7 @@
           const label = (it.patient || "Paziente").trim();
           const chip = document.createElement("div");
           chip.className = "cancelChip";
-          chip.style.background = `color-mix(in srgb, ${solidForTherapist(it.therapist)} 22%, rgba(255,255,255,.06))`;
+          chip.style.background = `color-mix(in srgb, ${solidForTherapist(it.therapist)} 22%, var(--btnBg))`;
           chip.title = `${label} • ${hh}:${mm} • ${it.therapist || ""} • ${it.status || "Annullato"}`;
           chip.innerHTML = `<span class="k">DIS</span><span class="t">${hh}:${mm}</span><span class="k">${key}</span><span class="p">${label}</span>`;
           wrap.appendChild(chip);
@@ -2735,8 +2736,8 @@
         if (list.length > shown.length) {
           const more = document.createElement("div");
           more.className = "cancelChip";
-          more.style.background = "rgba(255,255,255,.08)";
-          more.style.borderColor = "rgba(255,255,255,.14)";
+          more.style.background = "var(--btnBg)";
+          more.style.borderColor = "var(--border)";
           more.innerHTML = `<span class="k">+${list.length - shown.length}</span>`;
           more.title = `${list.length - shown.length} annullati in più`;
           wrap.appendChild(more);
