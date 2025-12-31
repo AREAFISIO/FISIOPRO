@@ -1366,3 +1366,41 @@ body.oe-hide-right .rightbar *{ display:none !important; }
 /* (moved to theme-scoped typography above) */
 
 
+
+/* ============================================================
+   Leggibilità: fix contrasti (soprattutto tema Pro / superfici chiare)
+   NOTE: aggiunto in fondo come da design/STYLEGUIDE.md
+   ============================================================ */
+
+/* Utility usata da app.js (empty-state, errori, meta) */
+.muted{ color: var(--muted); }
+
+/* Rightbar buttons: evita colori hard-coded "bianchi" su tema Pro */
+.rbBtn{ color: var(--text); }
+.rbLabel{ color: var(--text); }
+
+body.fp-theme-pro .rbBtn{
+  color: var(--text);
+  background: var(--btnBg);
+  border-color: var(--topbarBorder);
+}
+body.fp-theme-pro .rbBtn:hover{ background: var(--btnBgHover); }
+
+/* Availability toolbar nel modal: in Pro è su pannello chiaro -> testo scuro */
+body.fp-theme-pro .fp-av-top{ color: rgba(13,23,44,.86); }
+body.fp-theme-pro .fp-av-toolbar label{ color: rgba(13,23,44,.86) !important; }
+body.fp-theme-pro .fp-av-dayhead .d,
+body.fp-theme-pro .fp-av-dayhead .row{ color: rgba(13,23,44,.72); }
+body.fp-theme-pro .fp-av-dayhead input{
+  background: rgba(13,23,44,.03);
+  border-color: rgba(13,23,44,.14);
+  color: rgba(13,23,44,.92);
+}
+
+/* Agenda “OsteoEasy-like” (legacy): card/modale bianchi -> testo scuro */
+.oe-hovercard,
+.oe-modal{
+  color: rgba(0,0,0,.88);
+}
+.oe-modal__patientlink{ color: var(--accent); }
+
