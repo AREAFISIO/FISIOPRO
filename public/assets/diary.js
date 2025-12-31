@@ -3159,12 +3159,27 @@
           }
 
           // Optimistic local update for immediate UI response.
-          it.startAt = newStart;
-          it.endAt = newEnd;
-          if (multiUser && therTrim) it.therapist = therTrim;
+          // IMPORTANT: `it` is a *copy* (see items.map({ ...x })), so we must update `rawItems`.
+          const rawIdx = (rawItems || []).findIndex((x) => String(x?.id || "") === String(it.id || ""));
+          if (rawIdx >= 0) {
+            rawItems[rawIdx] = {
+              ...rawItems[rawIdx],
+              startAt: newStart,
+              endAt: newEnd,
+              therapist: (multiUser && therTrim) ? therTrim : rawItems[rawIdx]?.therapist,
+            };
+          } else {
+            // Fallback (should be rare): update local copy.
+            it.startAt = newStart;
+            it.endAt = newEnd;
+            if (multiUser && therTrim) it.therapist = therTrim;
+          }
+
+          // Re-render immediately so the block moves visually right away.
+          try { render(); } catch {}
           toast?.("Spostato");
 
-          // Reload without cache so it reflects instantly.
+          // Reload without cache so server data stays consistent.
           load({ nocache: true }).catch(() => {});
         } catch (e) {
           console.error(e);
