@@ -39,6 +39,32 @@ function isUnknownFieldError(msg) {
   return s.includes("unknown field name") || s.includes("unknown field names");
 }
 
+async function probeField(tableEnc, candidate) {
+  const name = String(candidate || "").trim();
+  if (!name) return false;
+  const qs = new URLSearchParams({ pageSize: "1" });
+  qs.append("fields[]", name);
+  try {
+    await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    return true;
+  } catch (e) {
+    if (isUnknownFieldError(e?.message)) return false;
+    throw e;
+  }
+}
+
+async function resolveFieldNameByProbe(tableEnc, cacheKey, candidates) {
+  const cached = memGet(cacheKey);
+  if (cached) return String(cached || "");
+  for (const c of candidates || []) {
+    if (await probeField(tableEnc, c)) {
+      memSet(cacheKey, String(c).trim(), 60 * 60_000);
+      return String(c).trim();
+    }
+  }
+  return "";
+}
+
 function ymdFromIso(iso) {
   const s = norm(iso);
   return s ? s.slice(0, 10) : "";
@@ -156,7 +182,15 @@ export default async function handler(req, res) {
     // Requested mapping: in "APPUNTAMENTI" the linked field is usually "Servizio" (to PRESTAZIONI).
     // Keep it overrideable via env, but default to the correct one.
     const FIELD_SERVICE = process.env.AGENDA_SERVICE_FIELD || "Servizio";
-    const FIELD_LOCATION = process.env.AGENDA_LOCATION_FIELD || "Sede";
+    const tableEnc = encodeURIComponent(tableName);
+    const FIELD_LOCATION =
+      process.env.AGENDA_LOCATION_FIELD ||
+      (await resolveFieldNameByProbe(
+        tableEnc,
+        `apptCreate:field:location:${tableName}`,
+        ["Posizione", "Posizione appuntamento", "Sede", "Sedi", "Location", "Luogo"].filter(Boolean),
+      )) ||
+      "Sede";
     const FIELD_VOCE_AGENDA = process.env.AGENDA_VOCE_AGENDA_FIELD || process.env.AGENDA_TYPE_FIELD || "Voce agenda";
     const FIELD_DURATION = process.env.AGENDA_DURATION_FIELD || "Durata";
     const FIELD_INTERNAL = process.env.AGENDA_INTERNAL_NOTES_FIELD || "Note interne";

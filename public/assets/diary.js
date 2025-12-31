@@ -294,11 +294,16 @@
 
     const time = String(ctx.time || "").trim() || "—";
     const ther = String(ctx.therapist || "").trim() || "—";
-    const loc = String(ctx.location || "").trim() || "—";
+    const loc = String(ctx.location || "").trim(); // requested: empty in empty slots
 
     slotHoverCard.querySelector("[data-slot-time]").textContent = time;
     slotHoverCard.querySelector("[data-slot-ther]").textContent = ther;
-    slotHoverCard.querySelector("[data-slot-loc]").textContent = loc;
+    const locEl = slotHoverCard.querySelector("[data-slot-loc]");
+    if (locEl) {
+      locEl.textContent = loc;
+      const row = locEl.closest(".oe-hovercard__row");
+      if (row) row.style.display = loc ? "" : "none";
+    }
 
     const left = Math.min(window.innerWidth - 280, x + 12);
     const top = Math.min(window.innerHeight - 140, y + 12);
@@ -1497,7 +1502,8 @@
 
   async function loadLocations() {
     if (Array.isArray(locationsCache)) return locationsCache;
-    const data = await apiGet("/api/locations");
+    // Positions are stored in Airtable table "AZIENDA" (requested).
+    const data = await apiGet("/api/locations?table=AZIENDA");
     locationsCache = data.items || [];
     return locationsCache;
   }
@@ -1958,7 +1964,8 @@
           const therLabel = therapistName ? (therapistName + (role ? " • " + role : "")) : "—";
 
           const ruleForHover = getSlotRule(therapistName, day, slotStartMin);
-          const loc = (ruleForHover?.locationName || inferSlotLocation(toYmd(day), therapistName) || "—");
+          // Requested: in empty slots the position must be empty (no inference from other appointments).
+          const loc = String(ruleForHover?.locationName || "").trim();
           showSlotHover({ time: timeStr, therapist: therLabel, location: loc }, lastMouseX, lastMouseY);
         };
 
@@ -2195,7 +2202,7 @@
         </label>
 
         <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Sede</span>
+          <span class="fpFormLabel">Posizione</span>
           <select class="select" data-f-location><option value="">Carico…</option></select>
         </label>
 
@@ -2396,7 +2403,7 @@
       })
       .catch((e) => renderSelectError(elStatus, "STATO APPUNTAMENTO", e));
 
-    // locations
+    // positions (AZIENDA)
     const startMinOfDay = (startAt?.getHours?.() || 0) * 60 + (startAt?.getMinutes?.() || 0);
     const ruleLoc = getSlotRule(therapistName, startAt, startMinOfDay);
     const inferredLocName = (ruleLoc?.locationName || inferSlotLocation(toYmd(startAt), therapistName));
@@ -2409,7 +2416,7 @@
           if (found?.id) elLoc.value = String(found.id);
         }
       })
-      .catch((e) => renderSelectError(elLoc, "SEDI", e));
+      .catch((e) => renderSelectError(elLoc, "POSIZIONE", e));
 
     // treatments (multi)
     loadTreatments()

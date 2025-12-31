@@ -396,7 +396,7 @@ function buildModal() {
           <label class="oe-field"><span>Prestazione</span><select data-f-service></select></label>
           <label class="oe-field"><span>Collaboratore</span><select data-f-operator></select></label>
 
-          <label class="oe-field"><span>Sede</span><select data-f-location></select></label>
+          <label class="oe-field"><span>Posizione</span><select data-f-location></select></label>
           <label class="oe-field"><span>Durata (min)</span><input type="number" min="0" step="1" data-f-duration /></label>
 
           <label class="oe-field"><span>Tipi Erogati (separati da virgola)</span><input data-f-tipi placeholder="Es. FKT, MASSO" /></label>
@@ -485,7 +485,8 @@ async function ensureModalStaticOptions(modal) {
     const [ops, serv, loc, tr] = await Promise.all([
       api("/api/operators"),
       api("/api/services"),
-      api("/api/locations"),
+      // Positions are stored in Airtable table "AZIENDA" (requested).
+      api("/api/locations?table=AZIENDA"),
       api("/api/treatments?activeOnly=1"),
     ]);
     setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
