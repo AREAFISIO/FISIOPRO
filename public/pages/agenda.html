@@ -24,7 +24,8 @@
       --fp-grid-line: color-mix(in srgb, var(--text) 10%, transparent);
       --fp-grid-line-strong: color-mix(in srgb, var(--text) 16%, transparent);
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, var(--fp-grid-line-strong));
-      --fp-day-sep: color-mix(in srgb, var(--accent-2) 28%, var(--border));
+      /* Strong vertical day separators: make them clearly BLUE */
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 82%, var(--border));
       --fp-col-bg: linear-gradient(
         180deg,
         color-mix(in srgb, var(--panel) 96%, transparent),
@@ -45,7 +46,8 @@
       --fp-grid-line: color-mix(in srgb, var(--accent-2) 10%, rgba(13,23,44,.12));
       --fp-grid-line-strong: color-mix(in srgb, var(--accent-2) 14%, rgba(13,23,44,.18));
       --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, rgba(13,23,44,.22));
-      --fp-day-sep: color-mix(in srgb, var(--accent-2) 34%, rgba(13,23,44,.22));
+      /* Pro (light): keep separators blue but not washed out */
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 82%, rgba(13,23,44,.22));
       --fp-event-bg: color-mix(in srgb, var(--accent-2) 14%, rgba(45,108,255,.06));
       --fp-event-border: color-mix(in srgb, var(--accent-2) 42%, rgba(13,23,44,.18));
     }
