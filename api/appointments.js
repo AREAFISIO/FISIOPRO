@@ -173,11 +173,23 @@ async function resolveSchema(tableEnc, tableName) {
     `appts:field:start:${tableName}`,
     [
       process.env.AGENDA_START_FIELD,
+      // Keep in sync with /api/agenda candidates (bases differ; Airtable is case-sensitive)
+      "Data e Ora",
+      "Data e ora",
       "Data e ora INIZIO",
+      "Data e Ora INIZIO",
       "Data e ora Inizio",
+      "Data e Ora Inizio",
       "Inizio",
       "Start",
       "Start at",
+      "Inizio appuntamento",
+      "DataOra Inizio",
+      "DataOra INIZIO",
+      "Data e ora INIZIO (manuale)",
+      "Data e Ora INIZIO (manuale)",
+      "Data e ora Inizio (manuale)",
+      "Data e Ora Inizio (manuale)",
     ].filter(Boolean),
   );
   const FIELD_END = await resolveFieldName(
@@ -186,7 +198,9 @@ async function resolveSchema(tableEnc, tableName) {
     [
       process.env.AGENDA_END_FIELD,
       "Data e ora FINE",
+      "Data e Ora FINE",
       "Data e ora Fine",
+      "Data e Ora Fine",
       "Data e ora fine",
       "Fine",
       "End",
@@ -592,6 +606,12 @@ export default async function handler(req, res) {
 
       // Date/time fields (drag & drop support)
       const startRaw = body.start_at ?? body.startAt ?? body.startISO ?? body.start;
+      // If the caller is trying to move/change the datetime, we must have a start field mapped.
+      if (startRaw !== undefined && !schema.FIELD_START) {
+        const err = new Error("agenda_schema_mismatch: missing start field");
+        err.status = 500;
+        throw err;
+      }
       if (schema.FIELD_START && startRaw !== undefined) {
         const iso = startRaw === null || String(startRaw).trim() === "" ? "" : parseIsoOrThrow(startRaw, "start_at");
         // Allow clearing only if caller explicitly passes empty; otherwise require a valid datetime.
