@@ -2983,8 +2983,11 @@
       ev.style.height = height + "px";
       {
         const solid = solidForTherapist(it.therapist);
-        ev.style.background = rgbaFromColor(solid, 0.18);
-        ev.style.borderColor = rgbaFromColor(solid, 0.42);
+        // Requested: make appointment block more evident (no transparency).
+        // Use a solid tinted panel so text stays readable in both themes.
+        ev.style.background = `color-mix(in srgb, ${solid} 32%, var(--panelSolid) 68%)`;
+        ev.style.borderColor = `color-mix(in srgb, ${solid} 58%, var(--border))`;
+        ev.style.borderLeftColor = `color-mix(in srgb, ${solid} 85%, rgba(0,0,0,.18))`;
       }
 
       const dotSolid = solidForTherapist(it.therapist);
@@ -3035,8 +3038,9 @@
         const ind = document.createElement("div");
         ind.setAttribute("data-fp-drop-preview", "1");
         ind.style.position = "absolute";
-        ind.style.left = "10px";
-        ind.style.right = "10px";
+        // Align with event width
+        ind.style.left = "6px";
+        ind.style.right = "6px";
         ind.style.top = Math.round(topPx) + "px";
         ind.style.height = Math.max(18, Math.round(heightPx)) + "px";
         ind.style.border = valid ? "2px dashed rgba(255, 122, 0, .95)" : "2px dashed rgba(255, 77, 109, .95)";
