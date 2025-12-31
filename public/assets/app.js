@@ -1154,6 +1154,8 @@ function buildAvailabilityUI() {
   // Operators (collaborators) list for per-therapist availability.
   // Cache in window to avoid repeated API calls as user opens/closes the modal.
   window.__FP_AV_OPERATORS = window.__FP_AV_OPERATORS || null;
+  window.__FP_AV_OPERATOR_ITEMS = window.__FP_AV_OPERATOR_ITEMS || null; // [{id,name}]
+  window.__FP_AV_OPNAME_TO_ID = window.__FP_AV_OPNAME_TO_ID || null; // { [name]: id }
   window.__FP_AV_OPERATORS_LOADING = window.__FP_AV_OPERATORS_LOADING || false;
   const ensureOperators = async () => {
     if (Array.isArray(window.__FP_AV_OPERATORS)) return window.__FP_AV_OPERATORS;
@@ -1161,11 +1163,20 @@ function buildAvailabilityUI() {
     window.__FP_AV_OPERATORS_LOADING = true;
     try {
       const data = await api("/api/operators");
-      const names = (data.items || []).map((x) => String(x.name || "").trim()).filter(Boolean);
+      const items = (data.items || [])
+        .map((x) => ({ id: String(x.id || "").trim(), name: String(x.name || "").trim() }))
+        .filter((x) => x.id && x.name);
+      const names = items.map((x) => x.name);
+      const map = {};
+      items.forEach((x) => { map[x.name] = x.id; });
+      window.__FP_AV_OPERATOR_ITEMS = items;
+      window.__FP_AV_OPNAME_TO_ID = map;
       window.__FP_AV_OPERATORS = names;
       return names;
     } catch {
       window.__FP_AV_OPERATORS = [];
+      window.__FP_AV_OPERATOR_ITEMS = [];
+      window.__FP_AV_OPNAME_TO_ID = {};
       return [];
     } finally {
       window.__FP_AV_OPERATORS_LOADING = false;
@@ -1213,23 +1224,65 @@ function buildAvailabilityUI() {
   let currentTherapist = String(saved?.lastTherapist || window.__FP_AV_LAST_THER || "DEFAULT").trim() || "DEFAULT";
   window.__FP_AV_LAST_THER = currentTherapist;
 
+  // Agenda per-operator colors (shared source with diary.js)
+  function agendaPrefsKey() {
+    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+    return `fp_agenda_prefs_${email}`;
+  }
+  function normalizeHexColor(s) {
+    const x = String(s || "").trim();
+    const m = x.match(/^#([0-9a-fA-F]{6})$/);
+    return m ? ("#" + m[1].toUpperCase()) : "";
+  }
+  function hexToRgb(hex) {
+    const h = String(hex || "").trim();
+    const m = h.match(/^#([0-9a-fA-F]{6})$/);
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function rgbaFromHex(hex, alpha) {
+    const a = Math.max(0, Math.min(1, Number(alpha)));
+    const rgb = hexToRgb(hex);
+    if (!rgb) return "";
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+  }
   function hashHue(s) {
     const str = String(s || "");
     let h = 0;
     for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
     return h % 360;
   }
-  function workBgForTherapist(name) {
+  function defaultHslaForName(name, alpha) {
     const n = String(name || "").trim();
-    if (!n || n === "DEFAULT") return "rgba(34,230,195,.22)";
+    if (!n || n === "DEFAULT") return `rgba(34,230,195,${Math.max(0, Math.min(1, Number(alpha)))})`;
     const hue = hashHue(n);
-    return `hsla(${hue} 78% 58% / 0.22)`;
+    return `hsla(${hue} 78% 58% / ${Math.max(0, Math.min(1, Number(alpha)))})`;
+  }
+  function loadAgendaOperatorColors() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(agendaPrefsKey()) || "null"); } catch {}
+    const oc = raw && typeof raw === "object" && raw.operatorColors && typeof raw.operatorColors === "object" ? raw.operatorColors : {};
+    return oc;
+  }
+  function operatorHexForTherapistName(name) {
+    const n = String(name || "").trim();
+    if (!n || n === "DEFAULT") return "";
+    const map = window.__FP_AV_OPNAME_TO_ID && typeof window.__FP_AV_OPNAME_TO_ID === "object" ? window.__FP_AV_OPNAME_TO_ID : {};
+    const opId = String(map[n] || "").trim();
+    if (!opId) return "";
+    const oc = loadAgendaOperatorColors();
+    return normalizeHexColor(oc[opId]);
+  }
+  function workBgForTherapist(name) {
+    const hex = operatorHexForTherapistName(name);
+    if (hex) return rgbaFromHex(hex, 0.22) || defaultHslaForName(name, 0.22);
+    return defaultHslaForName(name, 0.22);
   }
   function workOutlineForTherapist(name) {
-    const n = String(name || "").trim();
-    if (!n || n === "DEFAULT") return "rgba(34,230,195,.35)";
-    const hue = hashHue(n);
-    return `hsla(${hue} 78% 58% / 0.40)`;
+    const hex = operatorHexForTherapistName(name);
+    if (hex) return rgbaFromHex(hex, 0.40) || defaultHslaForName(name, 0.40);
+    return defaultHslaForName(name, 0.40);
   }
 
   const ensureTherBucket = (ther) => {
@@ -1552,6 +1605,19 @@ function buildAvailabilityUI() {
   }
   window.__FP_AV_KEYDOWN = onKeyDown;
   window.addEventListener("keydown", window.__FP_AV_KEYDOWN);
+
+  // If Agenda "colori collaboratori" change, refresh availability UI (if open).
+  const onAgendaPrefsChanged = () => {
+    try {
+      const b = document.querySelector("[data-fp-av-back]");
+      if (b && b.style.display === "block") buildAvailabilityUI();
+    } catch {}
+  };
+  if (window.__FP_AV_AGENDA_PREFS) {
+    try { window.removeEventListener("fpAgendaPrefsChanged", window.__FP_AV_AGENDA_PREFS); } catch {}
+  }
+  window.__FP_AV_AGENDA_PREFS = onAgendaPrefsChanged;
+  window.addEventListener("fpAgendaPrefsChanged", window.__FP_AV_AGENDA_PREFS);
 
   // wire modal controls
   const close = back.querySelector("[data-fp-av-close]");
