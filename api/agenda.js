@@ -1,5 +1,5 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
-import { memGet, memGetOrSet, memSet, setPrivateCache } from "./_common.js";
+import { fetchWithTimeout, memGet, memGetOrSet, memSet, setPrivateCache } from "./_common.js";
 
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -65,7 +65,8 @@ async function discoverFieldNamesViaMeta(tableName) {
 
   const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    const timeoutMs = Number(process.env.AIRTABLE_META_TIMEOUT_MS || 12_000);
+    const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }, timeoutMs);
     const text = await res.text();
     let json = {};
     try {

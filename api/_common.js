@@ -103,3 +103,30 @@ export function setPrivateCache(res, seconds = 60) {
   res.setHeader("Cache-Control", `private, max-age=${s}, stale-while-revalidate=${Math.max(0, s * 5)}`);
 }
 
+// ---------------------
+// fetch() with timeout (prevents infinite hangs)
+// ---------------------
+
+export async function fetchWithTimeout(url, init = {}, timeoutMs = 15_000) {
+  const ms = Math.max(1_000, Number(timeoutMs) || 15_000);
+  const controller = new AbortController();
+  const t = setTimeout(() => {
+    try { controller.abort(); } catch {}
+  }, ms);
+
+  try {
+    return await fetch(url, { ...(init || {}), signal: controller.signal });
+  } catch (e) {
+    // Normalize abort error message (Node's AbortError message can be inconsistent)
+    if (e?.name === "AbortError") {
+      const err = new Error(`timeout_after_${ms}ms`);
+      err.status = 504;
+      err.cause = e;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
