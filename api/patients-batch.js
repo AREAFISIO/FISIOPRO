@@ -1,4 +1,5 @@
 import { requireSession } from "./_auth.js";
+import { fetchWithTimeout } from "./_common.js";
 
 const {
   AIRTABLE_TOKEN,
@@ -43,9 +44,10 @@ export default async function handler(req, res) {
       `?filterByFormula=${encodeURIComponent(formula)}` +
       `&pageSize=50`;
 
-    const r = await fetch(apiUrl, {
+    const timeoutMs = Number(process.env.AIRTABLE_FETCH_TIMEOUT_MS || 20_000);
+    const r = await fetchWithTimeout(apiUrl, {
       headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
-    });
+    }, timeoutMs);
 
     if (!r.ok) {
       const t = await r.text();

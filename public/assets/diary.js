@@ -1681,7 +1681,23 @@
   }
 
   async function apiGet(url) {
-    const r = await fetch(url, { credentials: "include" });
+    // Prevent indefinite hangs (Airtable/network stalls can otherwise leave UI on "Carico…" forever).
+    const timeoutMs = 15_000;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      try { ctrl.abort(); } catch {}
+    }, timeoutMs);
+
+    let r;
+    try {
+      r = await fetch(url, { credentials: "include", signal: ctrl.signal });
+    } catch (e) {
+      if (e?.name === "AbortError") throw new Error(`Timeout (${Math.round(timeoutMs / 1000)}s) su ${url}`);
+      throw e;
+    } finally {
+      clearTimeout(t);
+    }
+
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       const extra = data.details ? `\n\nDettagli: ${JSON.stringify(data.details)}` : "";

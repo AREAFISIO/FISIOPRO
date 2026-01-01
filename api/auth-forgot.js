@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./_common.js";
+
 const {
   AIRTABLE_TOKEN,
   AIRTABLE_BASE_ID,
@@ -36,14 +38,15 @@ export default async function handler(req, res) {
       ]
     };
 
-    const r = await fetch(url, {
+    const timeoutMs = Number(process.env.AIRTABLE_FETCH_TIMEOUT_MS || 20_000);
+    const r = await fetchWithTimeout(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${AIRTABLE_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
-    });
+    }, timeoutMs);
 
     if (!r.ok) return send(res, 500, { ok: false, error: "airtable_write_failed" });
 

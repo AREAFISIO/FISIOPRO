@@ -1,5 +1,5 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
-import { memGetOrSet, setPrivateCache } from "./_common.js";
+import { fetchWithTimeout, memGetOrSet, setPrivateCache } from "./_common.js";
 
 function normalizeKeyLoose(s) {
   return String(s ?? "")
@@ -23,7 +23,8 @@ async function discoverTableMeta(tableName) {
 
   const url = `https://api.airtable.com/v0/meta/bases/${encodeURIComponent(AIRTABLE_BASE_ID)}/tables`;
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } });
+    const timeoutMs = Number(process.env.AIRTABLE_META_TIMEOUT_MS || 12_000);
+    const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }, timeoutMs);
     const text = await res.text();
     let json = {};
     try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }

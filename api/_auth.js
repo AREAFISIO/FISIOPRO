@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { fetchWithTimeout } from "./_common.js";
 
 const { SESSION_SECRET } = process.env;
 const SESSION_COOKIE = "fp_session";
@@ -148,7 +149,20 @@ export async function airtableFetch(path, init = {}) {
     ...(init.headers || {}),
   };
 
-  const res = await fetch(url, { ...init, headers });
+  // Avoid hanging forever on network/Airtable stalls.
+  const timeoutMs = Number(process.env.AIRTABLE_FETCH_TIMEOUT_MS || 20_000);
+  // Retry once on timeout (often resolves transient stalls).
+  let res;
+  try {
+    res = await fetchWithTimeout(url, { ...init, headers }, timeoutMs);
+  } catch (e) {
+    const isTimeout = String(e?.message || "").startsWith("timeout_after_") || e?.status === 504;
+    if (isTimeout) {
+      res = await fetchWithTimeout(url, { ...init, headers }, timeoutMs);
+    } else {
+      throw e;
+    }
+  }
   const text = await res.text();
   let json = {};
   try {

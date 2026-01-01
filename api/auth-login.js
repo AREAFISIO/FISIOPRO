@@ -1,4 +1,5 @@
 import { normalizeRole, signSession, setJson, makeSessionCookie } from "./_auth.js";
+import { fetchWithTimeout } from "./_common.js";
 
 const {
   AIRTABLE_TOKEN,
@@ -50,9 +51,15 @@ export default async function handler(req, res) {
     const filter = encodeURIComponent(filterFormula);
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}?filterByFormula=${filter}&pageSize=10&maxRecords=10`;
 
-    const r = await fetch(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` },
-    });
+    const timeoutMs = Number(process.env.AIRTABLE_FETCH_TIMEOUT_MS || 20_000);
+    let r;
+    try {
+      r = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${AIRTABLE_TOKEN}` } }, timeoutMs);
+    } catch (e) {
+      // Treat timeouts as invalid (prevents hanging login screen)
+      if (String(e?.message || "").startsWith("timeout_after_")) return setJson(res, 503, { ok: false, error: "temporarily_unavailable" });
+      throw e;
+    }
 
     if (!r.ok) return setJson(res, 401, { ok: false, error: "invalid" });
 
