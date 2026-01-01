@@ -2741,15 +2741,39 @@
       const btn = modalBody.querySelector("[data-f-save]");
       btn.disabled = true;
       try {
-        const durMin = Number(elDur.value || "30");
+        // Basic client-side validation to avoid "silent" Airtable rejects.
+        // Note: some inputs show a label, but their value must be the underlying id (rec...).
+        const patientText = String(qInput?.value || "").trim();
+        const therapistId = String(elOp?.value || "").trim();
+        const serviceId = String(elServ?.value || "").trim();
+
+        // Patient is picked only when clicking a search result (we need the record id).
+        if (patientText && !(patientPicked && patientPicked.id)) {
+          throw new Error("Seleziona il paziente dalla lista (non solo testo) oppure premi Svuota.");
+        }
+        if (!therapistId) {
+          throw new Error("Seleziona un Operatore.");
+        }
+        if (String(elServQ?.value || "").trim() && !serviceId) {
+          throw new Error("Seleziona una Prestazione dalla lista.");
+        }
+
+        const durMin = Number.parseInt(String(elDur?.value || "30"), 10);
+        if (!Number.isFinite(durMin) || durMin <= 0) {
+          throw new Error("Durata non valida. Seleziona una durata in minuti.");
+        }
+
         const endAt = new Date(startAt.getTime() + durMin * 60000);
+        if (!Number.isFinite(startAt?.getTime?.()) || !Number.isFinite(endAt?.getTime?.())) {
+          throw new Error("Data/ora non valida. Riprova selezionando lo slot in agenda.");
+        }
 
         const payload = {
           startAt: toLocalDateTimeISO(startAt),
           endAt: toLocalDateTimeISO(endAt),
-          therapistId: String(elOp.value || ""),
-          patientId: patientPicked.id || "",
-          serviceId: String(elServ.value || ""),
+          therapistId,
+          patientId: (patientPicked && patientPicked.id) ? patientPicked.id : "",
+          serviceId,
           locationId: String(elLoc?.value || ""),
           voceAgenda: String(elVoce?.value || ""),
           status: String(elStatus?.value || ""),
@@ -2764,15 +2788,21 @@
           erogatoId: String(elErogato?.value || ""),
         };
 
-        // create uses POST; use fetch directly.
+        // create uses POST; use fetch directly with a timeout to avoid "stuck" UI.
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 20000);
         const res = await fetch("/api/appointment-create", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
+          signal: ac.signal,
+        }).finally(() => clearTimeout(t));
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.ok) throw new Error(data.error || ("HTTP " + res.status));
+        if (!res.ok || !data?.ok) {
+          const details = data?.details?.lastError ? `\n\nDettagli: ${String(data.details.lastError)}` : "";
+          throw new Error((data?.error ? String(data.error) : ("HTTP " + res.status)) + details);
+        }
 
         // Ensure the appointment shows under the chosen collaborator.
         try {
@@ -2785,7 +2815,10 @@
         load().catch(()=>{});
       } catch (e) {
         console.error(e);
-        alert(e.message || "Errore salvataggio appuntamento");
+        const msg = String(e?.name || "") === "AbortError"
+          ? "Timeout durante il salvataggio (rete lenta o Airtable non risponde). Riprova."
+          : (e?.message || "Errore salvataggio appuntamento");
+        alert(msg);
       } finally {
         btn.disabled = false;
       }
