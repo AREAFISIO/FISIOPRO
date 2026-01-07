@@ -336,12 +336,20 @@ function mapAppointmentFromRecord({
     return v.map((x) => String(x)).filter(Boolean);
   };
 
-  const patient_id = getLinkId(schema.FIELD_PATIENT);
+  const patientField = schema.FIELD_PATIENT ? f[schema.FIELD_PATIENT] : undefined;
+  const patient_id =
+    Array.isArray(patientField) &&
+    patientField.length &&
+    typeof patientField[0] === "string" &&
+    patientField[0].startsWith("rec")
+      ? String(patientField[0] || "")
+      : "";
   const patient_name =
     String(patientNamesById[patient_id] || "").trim() ||
-    (Array.isArray(f[schema.FIELD_PATIENT]) && f[schema.FIELD_PATIENT].length && !String(f[schema.FIELD_PATIENT][0] || "").startsWith("rec")
-      ? String(f[schema.FIELD_PATIENT][0] || "")
+    (Array.isArray(patientField) && patientField.length && !String(patientField[0] || "").startsWith("rec")
+      ? String(patientField[0] || "")
       : "") ||
+    (typeof patientField === "string" ? String(patientField).trim() : "") ||
     "";
 
   const therapist_id = getLinkId(schema.FIELD_OPERATOR);

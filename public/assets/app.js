@@ -344,7 +344,7 @@ function buildHoverCard() {
 function showHoverCard(card, appt, x, y) {
   card.style.left = (x + 12) + "px";
   card.style.top = (y + 12) + "px";
-  card.querySelector("[data-hc-title]").textContent = appt.patient_name || "Paziente";
+  card.querySelector("[data-hc-title]").textContent = appt.patient_name || "";
   card.querySelector("[data-hc-time]").textContent = fmtTime(appt.start_at);
 
   const statusRow = card.querySelector("[data-hc-status-row]");
@@ -582,7 +582,7 @@ async function loadModalPatientOptions(modal, patientId) {
 async function openModal(modal, appt, onSaved) {
   modal.__current = appt;
 
-  modal.querySelector("[data-pname]").textContent = appt.patient_name || "Paziente";
+  modal.querySelector("[data-pname]").textContent = appt.patient_name || "";
   modal.querySelector("[data-plink]").href = `/pages/paziente.html?id=${encodeURIComponent(appt.patient_id || "")}`;
 
   await ensureModalStaticOptions(modal);
@@ -2137,7 +2137,7 @@ function renderWeek(appointments, weekStart, hoverCard, modal, setAppointments) 
     ev.style.height = height + "px";
 
     ev.innerHTML = `
-      <div class="oe-event__title">${(appt.patient_name || "Paziente")}</div>
+      <div class="oe-event__title">${(appt.patient_name || "")}</div>
       <div class="oe-event__meta">${fmtTime(appt.start_at)}${appt.service_name ? " • " + appt.service_name : ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}</div>
     `;
 
