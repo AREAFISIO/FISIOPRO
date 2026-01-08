@@ -90,6 +90,25 @@ function pickAttachmentUrl(val) {
   return "";
 }
 
+function fieldValueMatchesSedeLoose(v, sedeLower) {
+  if (!sedeLower) return false;
+  if (typeof v === "string") return v.trim().toLowerCase() === sedeLower;
+  if (typeof v === "number") return String(v).trim().toLowerCase() === sedeLower;
+  return false;
+}
+
+function recordMatchesSedeLoose(fields, sede) {
+  const sedeLower = String(sede || "").trim().toLowerCase();
+  if (!sedeLower) return false;
+  const f = fields && typeof fields === "object" ? fields : {};
+  for (const k of Object.keys(f)) {
+    const v = f[k];
+    if (fieldValueMatchesSedeLoose(v, sedeLower)) return true;
+    // Sometimes a single-select comes as string; other complex values are ignored.
+  }
+  return false;
+}
+
 export default async function handler(req, res) {
   ensureRes(res);
   const user = requireRoles(req, res, ["physio", "front", "manager"]);
@@ -110,17 +129,17 @@ export default async function handler(req, res) {
     const out = await memGetOrSet(cacheKey, 60_000, async () => {
       // Prefer Meta API so we can see fields even when empty in records.
       const meta = await discoverTableMeta(TABLE);
-      const keys = meta.fieldNames.length ? meta.fieldNames : [];
+      let keys = meta.fieldNames.length ? meta.fieldNames : [];
       const PRIMARY = meta.primaryFieldName || "";
 
-      const FIELD_LOGO = resolveFieldKeyFromKeys(keys, [
+      let FIELD_LOGO = resolveFieldKeyFromKeys(keys, [
         process.env.AIRTABLE_AZIENDA_LOGO_FIELD,
         "Logo",
         "logo",
         "LOGO",
       ].filter(Boolean));
 
-      const FIELD_NAME = resolveFieldKeyFromKeys(keys, [
+      let FIELD_NAME = resolveFieldKeyFromKeys(keys, [
         process.env.AIRTABLE_AZIENDA_NAME_FIELD,
         "Nome",
         "Azienda",
@@ -129,7 +148,7 @@ export default async function handler(req, res) {
       ].filter(Boolean));
 
       // Identify the "row" (BOLOGNA): try primary field first, then common candidates.
-      const FIELD_SEDE = resolveFieldKeyFromKeys(keys, [
+      let FIELD_SEDE = resolveFieldKeyFromKeys(keys, [
         process.env.AIRTABLE_AZIENDA_SEDE_FIELD,
         PRIMARY,
         "Sede",
@@ -156,6 +175,47 @@ export default async function handler(req, res) {
       let data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
       let records = Array.isArray(data?.records) ? data.records : [];
 
+      // If Meta API was unavailable, we might not know the field names at all.
+      // Derive keys from returned records (only non-empty fields are present in Airtable records).
+      if (!keys.length && records.length) {
+        const keySet = new Set();
+        for (const r of records) {
+          const f = r?.fields || {};
+          Object.keys(f).forEach((k) => keySet.add(String(k)));
+        }
+        keys = Array.from(keySet);
+        // Re-resolve using derived keys (now we can find "Logo" / "Sede" etc if present).
+        if (!FIELD_LOGO) {
+          FIELD_LOGO = resolveFieldKeyFromKeys(keys, [
+            process.env.AIRTABLE_AZIENDA_LOGO_FIELD,
+            "Logo",
+            "logo",
+            "LOGO",
+          ].filter(Boolean));
+        }
+        if (!FIELD_NAME) {
+          FIELD_NAME = resolveFieldKeyFromKeys(keys, [
+            process.env.AIRTABLE_AZIENDA_NAME_FIELD,
+            "Nome",
+            "Azienda",
+            "Ragione Sociale",
+            "Name",
+          ].filter(Boolean));
+        }
+        if (!FIELD_SEDE) {
+          FIELD_SEDE = resolveFieldKeyFromKeys(keys, [
+            process.env.AIRTABLE_AZIENDA_SEDE_FIELD,
+            PRIMARY,
+            "Sede",
+            "Città",
+            "Citta",
+            "Città sede",
+            "Nome",
+            "Name",
+          ].filter(Boolean));
+        }
+      }
+
       // If the requested sede yields no records (common when env/frontend uses a default like "BOLOGNA"),
       // fall back to an unfiltered fetch so we can still pick "first record with a logo".
       if (shouldFilterBySede && records.length === 0) {
@@ -177,11 +237,21 @@ export default async function handler(req, res) {
         const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : "";
         if (logoUrl) { chosen = { record: r, logoUrl }; break; }
       }
+      // If we still don't know which field contains the primary value (Meta API off),
+      // try matching "BOLOGNA" against any string/number field values.
+      if (!chosen) {
+        for (const r of records) {
+          const f = r?.fields || {};
+          if (!recordMatchesSedeLoose(f, sede)) continue;
+          const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : pickAttachmentUrl(f["Logo"]);
+          if (logoUrl) { chosen = { record: r, logoUrl }; break; }
+        }
+      }
       // Otherwise: first record with a logo (from filtered list, or unfiltered if filter not applied).
       if (!chosen) {
         for (const r of records) {
           const f = r?.fields || {};
-          const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : "";
+          const logoUrl = FIELD_LOGO ? pickAttachmentUrl(f[FIELD_LOGO]) : pickAttachmentUrl(f["Logo"]);
           if (logoUrl) { chosen = { record: r, logoUrl }; break; }
         }
       }
