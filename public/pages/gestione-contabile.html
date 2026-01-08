@@ -34,6 +34,122 @@
     .kpi .label{ color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
     .kpi .value{ font-size: 28px; font-weight: 900; margin-top: 6px; letter-spacing: -.2px; }
     .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+
+    /* ===== Dashboard Contabile (white/grey/blue, big readable) ===== */
+    .accDash{
+      --accText: rgba(13,23,44,.94);
+      --accMuted: rgba(13,23,44,.62);
+      --accBorder: rgba(13,23,44,.12);
+      --accBg: rgba(255,255,255,.92);
+      --accBg2: rgba(242,246,255,.92);
+      --accBlue: #2D6CFF;
+      --accBlue2: #19B6FF;
+      color: var(--accText);
+    }
+    .accDash .card{
+      background: var(--accBg);
+      border-color: var(--accBorder);
+      box-shadow: 0 18px 60px rgba(13,23,44,.10);
+    }
+    .accDash .head h2{ font-size: 18px; color: var(--accText); }
+    .accDash .mini{ color: var(--accMuted); font-size: 14px; line-height: 1.5; }
+    .accDash .muted{ color: var(--accMuted) !important; }
+    .accDash .chip{
+      background: rgba(45,108,255,.10);
+      border-color: rgba(45,108,255,.24);
+      color: rgba(13,23,44,.85);
+      font-weight: 900;
+    }
+    .accDashGrid{
+      display:grid;
+      grid-template-columns: 1.35fr .85fr;
+      gap: 14px;
+    }
+    @media (max-width: 1100px){
+      .accDashGrid{ grid-template-columns: 1fr; }
+    }
+    .accDashToolbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      padding: 10px 0 12px;
+      flex-wrap: wrap;
+    }
+    .accDashToolbar .left{
+      display:flex;
+      align-items:center;
+      gap: 12px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .accDashTitle{
+      font-size: 20px;
+      font-weight: 950;
+      letter-spacing: -.2px;
+      color: var(--accText);
+    }
+    .accDashStatus{
+      font-size: 14px;
+      color: var(--accMuted);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .accDash .btn{
+      background: rgba(13,23,44,.05);
+      border-color: rgba(13,23,44,.14);
+      color: var(--accText);
+      font-weight: 900;
+    }
+    .accDash .btn:hover{ background: rgba(13,23,44,.08); }
+    .accDash .btn.primary{
+      background: rgba(45,108,255,.12);
+      border-color: rgba(45,108,255,.26);
+    }
+    .chartWrap{
+      height: 340px;
+      border-radius: 14px;
+      border: 1px solid var(--accBorder);
+      background: linear-gradient(180deg, var(--accBg2), rgba(255,255,255,.84));
+      padding: 12px 12px;
+    }
+    @media (max-width: 640px){
+      .chartWrap{ height: 280px; }
+    }
+    .chartWrap canvas{ width:100% !important; height:100% !important; }
+    .accTableWrap{
+      overflow:auto;
+      border-radius: 14px;
+      border: 1px solid var(--accBorder);
+      background: rgba(255,255,255,.86);
+    }
+    .accDash table{ min-width: 620px; }
+    .accDash th{
+      position: sticky;
+      top: 0;
+      background: rgba(242,246,255,.92);
+      color: rgba(13,23,44,.58);
+      border-bottom: 1px solid var(--accBorder);
+    }
+    .accDash td{
+      border-bottom: 1px solid rgba(13,23,44,.08);
+      font-size: 16px;
+      color: var(--accText);
+    }
+    .accRight{ text-align: right; font-variant-numeric: tabular-nums; }
+    .accBadge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(45,108,255,.22);
+      background: rgba(45,108,255,.10);
+      color: rgba(13,23,44,.82);
+      font-weight: 900;
+      font-size: 14px;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -88,50 +204,85 @@
     <div data-role="manager">
       <div class="kpiRow" style="margin-bottom:14px;">
         <div class="kpi">
-          <div class="label">Incassi (periodo)</div>
-          <div class="value">—</div>
-          <div class="mini">Placeholder: collegare a vendite/erogato.</div>
+          <div class="label">Totale costi</div>
+          <div class="value" data-costi-kpi-totale>—</div>
+          <div class="mini">Somma dei costi per categoria.</div>
         </div>
         <div class="kpi">
-          <div class="label">Fatturato (periodo)</div>
-          <div class="value">—</div>
-          <div class="mini">Placeholder: report contabile.</div>
+          <div class="label">Categorie</div>
+          <div class="value" data-costi-kpi-categorie>—</div>
+          <div class="mini">Numero categorie presenti nel report.</div>
         </div>
         <div class="kpi">
-          <div class="label">Scadenze</div>
-          <div class="value">—</div>
-          <div class="mini">Placeholder: reminder e controlli.</div>
+          <div class="label">Top categoria</div>
+          <div class="value" style="font-size:22px;" data-costi-kpi-topcat>—</div>
+          <div class="mini">Categoria con costo maggiore.</div>
         </div>
       </div>
 
-      <div class="accGrid">
+      <div class="accDash" data-costi-dashboard>
         <section class="card">
-          <div class="head"><h2>Report</h2><span class="chip">Manager</span></div>
-          <div class="body">
-            <div class="mini" style="margin-top:4px;color:var(--muted);">
-              Sezione pronta: qui possiamo aggiungere estrazioni, filtri per periodo, esportazioni e riconciliazione.
-            </div>
-            <div class="toolbar" style="margin-top:12px;">
-              <button class="btn" disabled>Esporta CSV</button>
-              <button class="btn" disabled>Esporta PDF</button>
-            </div>
+          <div class="head">
+            <h2>Dashboard costi</h2>
+            <span class="chip">Chart.js</span>
           </div>
-        </section>
-
-        <section class="card">
-          <div class="head"><h2>Controlli</h2><span class="chip">Manager</span></div>
           <div class="body">
-            <div class="mini" style="margin-top:4px;color:var(--muted);">
-              Placeholder: controlli mancati incassi, prestazioni senza vendita, discrepanze, ecc.
+            <div class="accDashToolbar">
+              <div class="left">
+                <div class="accDashTitle">Costi per categoria</div>
+                <span class="accBadge">Dati: <span data-costi-source>/api/costi-per-categoria</span></span>
+                <div class="accDashStatus" data-costi-status>Caricamento…</div>
+              </div>
+              <div class="right" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn" type="button" data-costi-refresh>Ricarica</button>
+              </div>
             </div>
-            <div class="tablewrap" style="margin-top:12px;">
-              <table>
-                <thead><tr><th>Tipo</th><th>Dettaglio</th><th>Stato</th></tr></thead>
-                <tbody>
-                  <tr><td>—</td><td>—</td><td>—</td></tr>
-                </tbody>
-              </table>
+
+            <div class="accDashGrid">
+              <section class="card">
+                <div class="head"><h2>Costi per categoria (barre)</h2><span class="chip">€</span></div>
+                <div class="body">
+                  <div class="chartWrap">
+                    <canvas data-costi-bar></canvas>
+                  </div>
+                  <div class="mini" style="margin-top:10px;">
+                    Vista comparativa per categoria.
+                  </div>
+                </div>
+              </section>
+
+              <section class="card">
+                <div class="head"><h2>Percentuali (torta)</h2><span class="chip">%</span></div>
+                <div class="body">
+                  <div class="chartWrap">
+                    <canvas data-costi-pie></canvas>
+                  </div>
+                  <div class="mini" style="margin-top:10px;">
+                    Peso relativo sul totale.
+                  </div>
+                </div>
+              </section>
             </div>
+
+            <section class="card" style="margin-top:14px;">
+              <div class="head"><h2>Riepilogo</h2><span class="chip">Tabella</span></div>
+              <div class="body">
+                <div class="accTableWrap" style="margin-top:10px;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Categoria</th>
+                        <th class="accRight">Totale €</th>
+                        <th class="accRight">% sul totale</th>
+                      </tr>
+                    </thead>
+                    <tbody data-costi-tbody>
+                      <tr><td colspan="3" class="muted">Caricamento…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
           </div>
         </section>
       </div>

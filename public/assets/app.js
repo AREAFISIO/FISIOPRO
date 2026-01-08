@@ -319,6 +319,269 @@ async function initAnagrafica() {
   await load();
 }
 
+// =====================
+// GESTIONE CONTABILE (Dashboard costi)
+// =====================
+function isGestioneContabilePage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/gestione-contabile.html") || p.endsWith("/gestione-contabile.html");
+}
+
+function fmtEuro(v) {
+  const n = Number(v || 0);
+  const safe = Number.isFinite(n) ? n : 0;
+  try {
+    return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(safe);
+  } catch {
+    return `${safe.toFixed(2)} €`;
+  }
+}
+
+function fmtPct(v) {
+  const n = Number(v || 0);
+  const safe = Number.isFinite(n) ? n : 0;
+  try {
+    return new Intl.NumberFormat("it-IT", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(safe);
+  } catch {
+    return `${(safe * 100).toFixed(1)}%`;
+  }
+}
+
+function costsPalette(n) {
+  const base = [
+    "#2D6CFF", // blue
+    "#19B6FF", // cyan
+    "#4C8DFF",
+    "#6AA3FF",
+    "#2DB7A3", // teal-ish
+    "#10B981", // green
+    "#A7B7D6", // grey-blue
+    "#7E93B8",
+    "#4C5F7F",
+    "#9AA7BD",
+  ];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+  return out;
+}
+
+function ensureChartJsLoaded() {
+  if (window.Chart) return Promise.resolve();
+  if (window.__FP_CHARTJS_PROMISE) return window.__FP_CHARTJS_PROMISE;
+
+  window.__FP_CHARTJS_PROMISE = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("chartjs_load_failed"));
+    document.head.appendChild(s);
+  });
+  return window.__FP_CHARTJS_PROMISE;
+}
+
+function destroyCostCharts() {
+  const c = window.__FP_COSTI_CHARTS;
+  try { c?.bar?.destroy?.(); } catch {}
+  try { c?.pie?.destroy?.(); } catch {}
+  window.__FP_COSTI_CHARTS = null;
+}
+
+function normalizeCostiItems(data) {
+  const arr =
+    Array.isArray(data) ? data :
+    Array.isArray(data?.items) ? data.items :
+    Array.isArray(data?.records) ? data.records :
+    [];
+
+  return arr
+    .map((x) => {
+      const categoria = String(x?.categoria ?? x?.Categoria ?? x?.category ?? x?.name ?? "").trim() || "Senza categoria";
+      const totaleRaw = x?.totale ?? x?.Totale ?? x?.amount ?? x?.value ?? 0;
+      const totale = Number(totaleRaw);
+      return { categoria, totale: Number.isFinite(totale) ? totale : Number(String(totaleRaw).replace(/\./g, "").replace(",", ".")) || 0 };
+    })
+    .filter((x) => x.categoria);
+}
+
+async function initCostiDashboard() {
+  if (!isGestioneContabilePage()) return;
+  const root = document.querySelector("[data-costi-dashboard]");
+  if (!root) return;
+  if (root.dataset.fpInited === "1") return;
+  root.dataset.fpInited = "1";
+
+  const statusEl = root.querySelector("[data-costi-status]");
+  const refreshBtn = root.querySelector("[data-costi-refresh]");
+  const barCanvas = root.querySelector("[data-costi-bar]");
+  const pieCanvas = root.querySelector("[data-costi-pie]");
+  const tbody = root.querySelector("[data-costi-tbody]");
+  const kpiTot = document.querySelector("[data-costi-kpi-totale]");
+  const kpiCats = document.querySelector("[data-costi-kpi-categorie]");
+  const kpiTop = document.querySelector("[data-costi-kpi-topcat]");
+
+  const setStatus = (msg) => {
+    if (statusEl) statusEl.textContent = String(msg || "");
+  };
+
+  const setTableLoading = (msg) => {
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="3" class="muted">${String(msg || "Caricamento…")}</td></tr>`;
+  };
+
+  const render = async () => {
+    setStatus("Caricamento…");
+    setTableLoading("Caricamento…");
+    if (refreshBtn) refreshBtn.disabled = true;
+
+    try {
+      await ensureChartJsLoaded();
+
+      const data = await api("/api/costi-per-categoria");
+      const items = normalizeCostiItems(data).sort((a, b) => Number(b.totale) - Number(a.totale));
+      const total = items.reduce((s, x) => s + (Number(x.totale) || 0), 0);
+
+      // KPIs
+      if (kpiTot) kpiTot.textContent = total ? fmtEuro(total) : "—";
+      if (kpiCats) kpiCats.textContent = items.length ? String(items.length) : "—";
+      if (kpiTop) kpiTop.textContent = items[0]?.categoria ? `${items[0].categoria}` : "—";
+
+      // Empty state
+      if (!items.length) {
+        setStatus("Nessun dato");
+        if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="muted">Nessun costo disponibile.</td></tr>`;
+        destroyCostCharts();
+        return;
+      }
+
+      // Table
+      if (tbody) {
+        tbody.innerHTML = "";
+        for (const it of items) {
+          const tr = document.createElement("tr");
+          const pct = total > 0 ? (Number(it.totale) / total) : 0;
+          tr.innerHTML = `
+            <td>${it.categoria}</td>
+            <td class="accRight">${fmtEuro(it.totale)}</td>
+            <td class="accRight">${fmtPct(pct)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      // Charts
+      destroyCostCharts();
+      const labels = items.map((x) => x.categoria);
+      const values = items.map((x) => Number(x.totale) || 0);
+      const colors = costsPalette(items.length);
+
+      const tickFmt = (v) => {
+        const n = Number(v || 0);
+        try {
+          return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+        } catch {
+          return `${Math.round(n)}€`;
+        }
+      };
+
+      const bar = barCanvas
+        ? new window.Chart(barCanvas.getContext("2d"), {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "Totale €",
+                  data: values,
+                  backgroundColor: "rgba(45,108,255,.30)",
+                  borderColor: "#2D6CFF",
+                  borderWidth: 1,
+                  borderRadius: 10,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const v = Number(ctx.parsed?.y ?? ctx.raw ?? 0);
+                      const pct = total > 0 ? (v / total) : 0;
+                      return `${fmtEuro(v)} (${fmtPct(pct)})`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                x: {
+                  ticks: { color: "rgba(13,23,44,.72)", font: { size: 13, weight: "700" } },
+                  grid: { display: false },
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: "rgba(13,23,44,.62)", callback: tickFmt },
+                  grid: { color: "rgba(13,23,44,.08)" },
+                },
+              },
+            },
+          })
+        : null;
+
+      const pie = pieCanvas
+        ? new window.Chart(pieCanvas.getContext("2d"), {
+            type: "pie",
+            data: {
+              labels,
+              datasets: [
+                {
+                  data: values,
+                  backgroundColor: colors.map((c) => c),
+                  borderColor: "rgba(255,255,255,.85)",
+                  borderWidth: 2,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: "bottom",
+                  labels: { color: "rgba(13,23,44,.75)", font: { size: 13, weight: "800" } },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      const label = String(ctx.label || "");
+                      const v = Number(ctx.parsed ?? 0);
+                      const pct = total > 0 ? (v / total) : 0;
+                      return `${label}: ${fmtEuro(v)} (${fmtPct(pct)})`;
+                    },
+                  },
+                },
+              },
+            },
+          })
+        : null;
+
+      window.__FP_COSTI_CHARTS = { bar, pie };
+      setStatus(`Aggiornato • Totale ${fmtEuro(total)}`);
+    } catch (e) {
+      console.error(e);
+      setStatus("Errore caricamento");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="3" class="muted">Errore: ${String(e?.message || e || "server_error")}</td></tr>`;
+    } finally {
+      if (refreshBtn) refreshBtn.disabled = false;
+    }
+  };
+
+  if (refreshBtn) refreshBtn.addEventListener("click", render);
+  await render();
+}
+
 // Hover card
 function buildHoverCard() {
   const el = document.createElement("div");
@@ -1022,6 +1285,7 @@ async function runRouteInits() {
 
   await initAnagrafica();
   await initPatientPage();
+  await initCostiDashboard();
   await ensureDiaryLoaded();
 }
 
