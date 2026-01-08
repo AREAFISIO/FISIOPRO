@@ -26,6 +26,7 @@
       <div class="toprow">
         <div class="h1">Note & Alert <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
+          <button class="btn" data-fp-notes-enable-notify>Abilita notifiche</button>
           <button class="btn" data-fp-notes-range="today">Oggi</button>
           <button class="btn" data-fp-notes-range="48h">48h</button>
           <button class="btn" data-fp-notes-range="7d">7 giorni</button>
@@ -40,6 +41,43 @@
         <div class="muted" data-fp-notes-loading style="display:none;">Caricamento…</div>
         <div class="muted" data-fp-notes-error style="display:none;"></div>
         <div data-fp-notes-summary class="muted" style="margin-top:10px;"></div>
+        <div style="height:12px;"></div>
+        <div class="card" style="padding:12px;">
+          <div style="font-weight:950; margin-bottom:8px;">Regole attive</div>
+          <div style="display:flex; gap:14px; flex-wrap:wrap;">
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="contacts" />
+              <span>Contatti mancanti</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="consent" />
+              <span>Consenso/anamnesi</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="insurance" />
+              <span>Assicurazioni aperte</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="confirmPatient" />
+              <span>Conferma paziente</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="confirmPlatform" />
+              <span>Conferma piattaforma</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="missingPatient" />
+              <span>Nuovo paziente da creare</span>
+            </label>
+            <label style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" data-fp-notes-rule="billing" />
+              <span>Pagamenti / erogato</span>
+            </label>
+          </div>
+          <div class="muted" style="margin-top:8px;">
+            Suggerimento: lascia attive solo le regole utili al ruolo (Front/Back).
+          </div>
+        </div>
         <div style="height:12px;"></div>
         <div data-fp-notes-groups></div>
       </div>

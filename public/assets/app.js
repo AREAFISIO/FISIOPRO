@@ -287,6 +287,23 @@ function isDashboardPage() {
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
 }
 
+function isSalesPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/vendite.html") || p.endsWith("/vendite.html");
+}
+function isErogatoPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/erogato.html") || p.endsWith("/erogato.html");
+}
+function isInsurancePage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/pratiche-assicurative.html") || p.endsWith("/pratiche-assicurative.html");
+}
+function isAnamnesiPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/anamnesi.html") || p.endsWith("/anamnesi.html");
+}
+
 // =====================
 // NOTES & ALERTS (operational inbox)
 // =====================
@@ -368,6 +385,8 @@ async function initNotesPage() {
   const groupsEl = document.querySelector("[data-fp-notes-groups]");
   const summaryEl = document.querySelector("[data-fp-notes-summary]");
   const refreshBtn = document.querySelector("[data-fp-notes-refresh]");
+  const enableNotifyBtn = document.querySelector("[data-fp-notes-enable-notify]");
+  const ruleBoxes = Array.from(document.querySelectorAll("[data-fp-notes-rule]"));
 
   const setActiveRangeBtn = (val) => {
     document.querySelectorAll("[data-fp-notes-range]").forEach((b) => {
@@ -377,6 +396,45 @@ async function initNotesPage() {
 
   const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
   const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
+
+  const rulesKey = "fp_notes_rules_v1";
+  const defaultRules = {
+    contacts: true,
+    consent: true,
+    insurance: true,
+    confirmPatient: true,
+    confirmPlatform: true,
+    missingPatient: true,
+    billing: true,
+  };
+  const loadRules = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(rulesKey) || "null");
+      const obj = raw && typeof raw === "object" ? raw : {};
+      return { ...defaultRules, ...obj };
+    } catch {
+      return { ...defaultRules };
+    }
+  };
+  const saveRules = (next) => {
+    try { localStorage.setItem(rulesKey, JSON.stringify(next)); } catch {}
+  };
+  const getRulesFromUI = () => {
+    const cur = loadRules();
+    ruleBoxes.forEach((b) => {
+      const k = String(b.getAttribute("data-fp-notes-rule") || "").trim();
+      if (!k) return;
+      cur[k] = Boolean(b.checked);
+    });
+    return cur;
+  };
+  const syncRulesUI = (rules) => {
+    ruleBoxes.forEach((b) => {
+      const k = String(b.getAttribute("data-fp-notes-rule") || "").trim();
+      if (!k) return;
+      b.checked = Boolean(rules?.[k]);
+    });
+  };
 
   const computeRange = (rangeKey) => {
     const now = new Date();
@@ -442,8 +500,90 @@ async function initNotesPage() {
     });
   };
 
+  const normalizeTel = (v) => String(v || "").trim().replace(/[^\d+]/g, "");
+
+  const mapWithConcurrency = async (items, limit, fn) => {
+    const arr = Array.from(items || []);
+    const out = new Array(arr.length);
+    const cap = Math.max(1, Math.min(Number(limit) || 8, 16));
+    let idx = 0;
+    const worker = async () => {
+      while (idx < arr.length) {
+        const i = idx++;
+        try { out[i] = await fn(arr[i], i); } catch (e) { out[i] = null; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(cap, arr.length) }, worker));
+    return out;
+  };
+
+  const patientCache = new Map();   // patientId -> { Telefono, Email, ... }
+  const anamnesiCache = new Map();  // patientId -> { ok, items }
+  const insuranceCache = new Map(); // patientId -> { items }
+
+  const getPatient = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (patientCache.has(pid)) return patientCache.get(pid);
+    const p = await api(`/api/patient?id=${encodeURIComponent(pid)}`);
+    patientCache.set(pid, p || null);
+    return p || null;
+  };
+  const getAnamnesi = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (anamnesiCache.has(pid)) return anamnesiCache.get(pid);
+    const a = await api(`/api/anamnesi?patientId=${encodeURIComponent(pid)}&maxRecords=50`);
+    anamnesiCache.set(pid, a || null);
+    return a || null;
+  };
+  const getInsurance = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (insuranceCache.has(pid)) return insuranceCache.get(pid);
+    const ins = await api(`/api/insurance?patientId=${encodeURIComponent(pid)}`);
+    insuranceCache.set(pid, ins || null);
+    return ins || null;
+  };
+
+  const isClosedStatus = (statoRaw) => {
+    const s = String(statoRaw || "").trim().toLowerCase();
+    if (!s) return false;
+    return (
+      s.includes("chius") ||
+      s.includes("conclus") ||
+      s.includes("liquidat") ||
+      s.includes("pagat") ||
+      s.includes("ok") ||
+      s === "chiusa" ||
+      s === "chiuso"
+    );
+  };
+
+  const isCompletedish = (statoRaw) => {
+    const s = String(statoRaw || "").trim().toLowerCase();
+    if (!s) return false;
+    return (
+      s.includes("eseguit") ||
+      s.includes("complet") ||
+      s.includes("termin") ||
+      s.includes("chius") ||
+      s.includes("fatto") ||
+      s.includes("erogat") ||
+      s === "ok"
+    );
+  };
+  const isPast = (iso) => {
+    const d = new Date(String(iso || ""));
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getTime() < Date.now();
+  };
+
   const load = async () => {
     if (!groupsEl) return;
+    const rules = getRulesFromUI();
+    saveRules(rules);
+
     const rangeKey = getRange();
     setActiveRangeBtn(rangeKey);
     const { start, end, label } = computeRange(rangeKey);
@@ -458,16 +598,80 @@ async function initNotesPage() {
     const appts = (data.appointments || []).slice();
     appts.sort((a, b) => String(a.start_at || "").localeCompare(String(b.start_at || ""), "it"));
 
-    const missingPatient = appts.filter((a) => !a.patient_id);
-    const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient);
-    const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform);
+    const missingPatient = rules.missingPatient ? appts.filter((a) => !a.patient_id) : [];
+    const needConfirmPatient = rules.confirmPatient ? appts.filter((a) => a.patient_id && !a.confirmed_by_patient) : [];
+    const needConfirmPlatform = rules.confirmPlatform ? appts.filter((a) => a.patient_id && !a.confirmed_in_platform) : [];
+
+    // Fetch patient-level data only for patients in range (bounded).
+    const uniquePatientIds = Array.from(new Set(appts.map((a) => String(a.patient_id || "")).filter(Boolean)));
+    const maxPatients = 60; // safety cap (keeps page responsive in large ranges)
+    const patientIds = uniquePatientIds.slice(0, maxPatients);
+
+    if (rules.contacts || rules.consent || rules.insurance) {
+      await mapWithConcurrency(patientIds, 10, async (pid) => {
+        // Preload minimal info used by rules (best-effort).
+        await getPatient(pid);
+        return true;
+      });
+    }
+
+    const missingContacts = [];
+    if (rules.contacts) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const p = patientCache.get(String(a.patient_id)) || null;
+        const tel = normalizeTel(p?.Telefono);
+        const email = String(p?.Email || "").trim();
+        if (!tel && !email) missingContacts.push(a);
+      }
+    }
+
+    // Consent/anamnesi + insurance checks (bounded)
+    if (rules.consent || rules.insurance) {
+      await mapWithConcurrency(patientIds, 8, async (pid) => {
+        const ps = [];
+        if (rules.consent) ps.push(getAnamnesi(pid));
+        if (rules.insurance) ps.push(getInsurance(pid));
+        await Promise.allSettled(ps);
+        return true;
+      });
+    }
+
+    const missingConsent = [];
+    if (rules.consent) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const an = anamnesiCache.get(String(a.patient_id)) || null;
+        const items = an?.items || [];
+        const hasConsent = items.some((x) => Boolean(x?.consenso) || String(x?.dataConsenso || "").trim());
+        if (!hasConsent) missingConsent.push(a);
+      }
+    }
+
+    const openInsurance = [];
+    if (rules.insurance) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const ins = insuranceCache.get(String(a.patient_id)) || null;
+        const items = ins?.items || [];
+        if (!items.length) continue;
+        const hasOpen = items.some((x) => !isClosedStatus(x?.stato));
+        if (hasOpen) openInsurance.push(a);
+      }
+    }
 
     if (summaryEl) {
-      summaryEl.textContent =
-        `${label} • ` +
-        `Nuovi pazienti da agganciare: ${missingPatient.length} • ` +
-        `Conferme paziente: ${needConfirmPatient.length} • ` +
-        `Conferme piattaforma: ${needConfirmPlatform.length}`;
+      const parts = [label];
+      if (rules.missingPatient) parts.push(`Nuovi pazienti da agganciare: ${missingPatient.length}`);
+      if (rules.confirmPatient) parts.push(`Conferme paziente: ${needConfirmPatient.length}`);
+      if (rules.confirmPlatform) parts.push(`Conferme piattaforma: ${needConfirmPlatform.length}`);
+      if (rules.contacts) parts.push(`Contatti mancanti: ${missingContacts.length}`);
+      if (rules.consent) parts.push(`Consensi/anamnesi: ${missingConsent.length}`);
+      if (rules.insurance) parts.push(`Assicurazioni aperte: ${openInsurance.length}`);
+      summaryEl.textContent = parts.join(" • ");
+      if (uniquePatientIds.length > maxPatients) {
+        summaryEl.textContent += ` • Pazienti analizzati: ${maxPatients}/${uniquePatientIds.length}`;
+      }
     }
 
     const mkApptActions = (a) => {
@@ -505,6 +709,22 @@ async function initNotesPage() {
             await updateInboxBadge();
           },
         });
+        actions.push({
+          kind: "button",
+          label: "Nota interna",
+          primary: false,
+          onClick: async () => {
+            const prev = String(a.internal_note || a.quick_note || "").trim();
+            const txt = prompt("Nota interna (visibile solo internamente):", prev);
+            if (txt === null) return;
+            await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ quick_note: String(txt || "").trim() }),
+            });
+            toast("Nota salvata");
+            await load();
+          },
+        });
       }
       if (a.patient_id) {
         actions.push({
@@ -535,6 +755,30 @@ async function initNotesPage() {
           href: `paziente.html?id=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
+        actions.push({
+          kind: "link",
+          label: "Anamnesi/consensi",
+          href: `anamnesi.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Pratiche assicurative",
+          href: `pratiche-assicurative.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Vendite",
+          href: `vendite.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Erogato",
+          href: `erogato.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
       }
       if (!a.patient_id) {
         actions.push({ kind: "link", label: "Crea paziente", href: "nuovo-paziente.html", primary: true });
@@ -543,6 +787,24 @@ async function initNotesPage() {
     };
 
     const groups = [
+      {
+        title: "Contatti mancanti (rischio perdita paziente)",
+        items: missingContacts.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: inserire telefono/email in scheda paziente prima dell'appuntamento.",
+          badge: "☎️",
+          actions: mkApptActions(a),
+        })),
+      },
+      {
+        title: "Consenso informato / anamnesi mancanti",
+        items: missingConsent.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: raccogliere consensi e aggiornare anamnesi (privacy ecc.).",
+          badge: "📝",
+          actions: mkApptActions(a),
+        })),
+      },
       {
         title: "Nuovi pazienti (appuntamento senza scheda)",
         items: missingPatient.map((a) => ({
@@ -570,6 +832,28 @@ async function initNotesPage() {
           actions: mkApptActions(a),
         })),
       },
+      {
+        title: "Pratiche assicurative aperte (verifica stato)",
+        items: openInsurance.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: controlla pratica assicurativa e documentazione prima/durante la visita.",
+          badge: "🛡️",
+          actions: mkApptActions(a),
+        })),
+      },
+      {
+        title: "Pagamenti / Erogato da sistemare",
+        items: (rules.billing ? appts : [])
+          .filter((a) => a.patient_id && isPast(a.start_at))
+          .filter((a) => isCompletedish(a.status) || Boolean(a.confirmed_by_patient) || Boolean(a.confirmed_in_platform))
+          .filter((a) => !String(a.erogato_id || "").trim() && !String(a.vendita_id || "").trim())
+          .map((a) => ({
+            title: apptLabel(a),
+            meta: "Azione: verificare se va creato/collegato Erogato o Vendita e chiudere il flusso pagamenti.",
+            badge: "€",
+            actions: mkApptActions(a),
+          })),
+      },
     ].filter((g) => g.items.length);
 
     if (!groups.length) {
@@ -588,7 +872,219 @@ async function initNotesPage() {
   });
   refreshBtn && (refreshBtn.onclick = () => load().catch(() => {}));
 
+  // Rules UI: initialize + reload on change
+  if (ruleBoxes.length) {
+    const saved = loadRules();
+    syncRulesUI(saved);
+    ruleBoxes.forEach((b) => {
+      b.addEventListener("change", () => load().catch(() => {}));
+    });
+  }
+
+  if (enableNotifyBtn) {
+    const updateBtnLabel = () => {
+      try {
+        const p = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+        enableNotifyBtn.textContent =
+          p === "granted" ? "Notifiche attive" :
+          p === "denied" ? "Notifiche bloccate" :
+          "Abilita notifiche";
+        enableNotifyBtn.disabled = p === "granted";
+      } catch {}
+    };
+    updateBtnLabel();
+    enableNotifyBtn.onclick = async () => {
+      try {
+        if (typeof Notification === "undefined") {
+          alert("Notifiche non supportate su questo browser.");
+          return;
+        }
+        const p = await Notification.requestPermission();
+        updateBtnLabel();
+        if (p === "granted") toast("Notifiche abilitate");
+      } catch {
+        // ignore
+      }
+    };
+  }
+
   await load();
+}
+
+// =====================
+// FILTERED LIST PAGES (support ?patientId=recXXX)
+// =====================
+function fmtItDate(isoOrStr) {
+  const s = String(isoOrStr || "").trim();
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  try { return d.toLocaleDateString("it-IT"); } catch { return s; }
+}
+function boolChip(ok, yes = "OK", no = "Mancante") {
+  const label = ok ? yes : no;
+  return `<span class="chip"${ok ? "" : ' style="border-color:rgba(255,77,109,.35);background:rgba(255,77,109,.10)"'}>${label}</span>`;
+}
+
+async function initSalesPage() {
+  if (!isSalesPage()) return;
+  const tbody = document.querySelector("[data-sales-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-sales-loading]");
+  const errorEl = document.querySelector("[data-sales-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Vendite • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/sales?patientId=${encodeURIComponent(patientId)}`),
+    loadingText: "Caricamento vendite…",
+  });
+
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna vendita.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.voce) || "—"}</td>
+      <td style="text-align:right;">${normStr(x.importo) || "—"}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initErogatoPage() {
+  if (!isErogatoPage()) return;
+  const tbody = document.querySelector("[data-erogato-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-erogato-loading]");
+  const errorEl = document.querySelector("[data-erogato-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Erogato • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/erogato?patientId=${encodeURIComponent(patientId)}&maxRecords=100`),
+    loadingText: "Caricamento erogato…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna prestazione erogata.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.prestazione) || "—"}</td>
+      <td>${normStr(x.stato) ? `<span class="chip">${normStr(x.stato)}</span>` : `<span class="chip">—</span>`}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initInsurancePage() {
+  if (!isInsurancePage()) return;
+  const tbody = document.querySelector("[data-insurance-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-insurance-loading]");
+  const errorEl = document.querySelector("[data-insurance-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Assicurazioni • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/insurance?patientId=${encodeURIComponent(patientId)}`),
+    loadingText: "Caricamento pratiche…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna pratica.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.pratica) || "—"}</td>
+      <td>${normStr(x.stato) ? `<span class="chip">${normStr(x.stato)}</span>` : `<span class="chip">—</span>`}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initAnamnesiPage() {
+  if (!isAnamnesiPage()) return;
+  const tbody = document.querySelector("[data-anamnesi-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-anamnesi-loading]");
+  const errorEl = document.querySelector("[data-anamnesi-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  const patientName = p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "Paziente";
+  if (p) toast(`Anamnesi • ${patientName || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/anamnesi?patientId=${encodeURIComponent(patientId)}&maxRecords=50`),
+    loadingText: "Caricamento anamnesi…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td><div class="rowlink">${patientName || "—"}</div></td>
+        <td>${boolChip(false, "OK", "Mancante")}</td>
+        <td>${boolChip(false, "OK", "Mancante")}</td>
+        <td>—</td>
+      </tr>
+    `;
+    return;
+  }
+  // latest first (best-effort by consent date or id)
+  const sorted = items.slice().sort((a, b) => String(b.dataConsenso || b.id).localeCompare(String(a.dataConsenso || a.id)));
+  const latest = sorted[0] || {};
+  const hasAnam = Boolean(String(latest.anamnesiRemota || latest.anamnesiRecente || "").trim());
+  const hasCons = Boolean(latest.consenso) || Boolean(String(latest.dataConsenso || "").trim());
+  tbody.innerHTML = `
+    <tr>
+      <td><div class="rowlink">${patientName || "—"}</div></td>
+      <td>${boolChip(hasAnam, "OK", "In attesa")}</td>
+      <td>${boolChip(hasCons, "OK", "Mancante")}</td>
+      <td>${latest.dataConsenso ? fmtItDate(latest.dataConsenso) : "—"}</td>
+    </tr>
+  `;
 }
 function isDashboardCostiPage() {
   const p = location.pathname || "";
@@ -1854,6 +2350,10 @@ async function runRouteInits() {
 
   await updateInboxBadge();
   await initNotesPage();
+  await initSalesPage();
+  await initErogatoPage();
+  await initInsurancePage();
+  await initAnamnesiPage();
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();
