@@ -953,7 +953,6 @@ function ensureGlobalTopbar() {
         <button type="button" class="fp-iconbtn" data-toggle-left="1" aria-label="Apri/chiudi menu sinistro">
           <span class="ic">☰</span>
         </button>
-        <div class="fp-topbar__logo" aria-hidden="true"></div>
         <div class="fp-topbar__brand">
           <div class="fp-topbar__title" data-fp-top-title></div>
           <div class="fp-topbar__sub" data-fp-top-sub></div>
