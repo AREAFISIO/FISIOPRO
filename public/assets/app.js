@@ -388,6 +388,7 @@ async function initNotesPage() {
     confirmPatient: true,
     confirmPlatform: true,
     missingPatient: true,
+    billing: true,
   };
   const loadRules = () => {
     try {
@@ -542,6 +543,25 @@ async function initNotesPage() {
     );
   };
 
+  const isCompletedish = (statoRaw) => {
+    const s = String(statoRaw || "").trim().toLowerCase();
+    if (!s) return false;
+    return (
+      s.includes("eseguit") ||
+      s.includes("complet") ||
+      s.includes("termin") ||
+      s.includes("chius") ||
+      s.includes("fatto") ||
+      s.includes("erogat") ||
+      s === "ok"
+    );
+  };
+  const isPast = (iso) => {
+    const d = new Date(String(iso || ""));
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getTime() < Date.now();
+  };
+
   const load = async () => {
     if (!groupsEl) return;
     const rules = getRulesFromUI();
@@ -624,12 +644,17 @@ async function initNotesPage() {
     }
 
     if (summaryEl) {
-      summaryEl.textContent =
-        `${label} • ` +
-        (rules.missingPatient ? `Nuovi pazienti da agganciare: ${missingPatient.length} • ` : "") +
-        (rules.confirmPatient ? `Conferme paziente: ${needConfirmPatient.length} • ` : "") +
-        (rules.confirmPlatform ? `Conferme piattaforma: ${needConfirmPlatform.length}` : "").replace(/\s+•\s*$/, "") +
-        (uniquePatientIds.length > maxPatients ? ` • Pazienti analizzati: ${maxPatients}/${uniquePatientIds.length}` : "");
+      const parts = [label];
+      if (rules.missingPatient) parts.push(`Nuovi pazienti da agganciare: ${missingPatient.length}`);
+      if (rules.confirmPatient) parts.push(`Conferme paziente: ${needConfirmPatient.length}`);
+      if (rules.confirmPlatform) parts.push(`Conferme piattaforma: ${needConfirmPlatform.length}`);
+      if (rules.contacts) parts.push(`Contatti mancanti: ${missingContacts.length}`);
+      if (rules.consent) parts.push(`Consensi/anamnesi: ${missingConsent.length}`);
+      if (rules.insurance) parts.push(`Assicurazioni aperte: ${openInsurance.length}`);
+      summaryEl.textContent = parts.join(" • ");
+      if (uniquePatientIds.length > maxPatients) {
+        summaryEl.textContent += ` • Pazienti analizzati: ${maxPatients}/${uniquePatientIds.length}`;
+      }
     }
 
     const mkApptActions = (a) => {
@@ -716,13 +741,25 @@ async function initNotesPage() {
         actions.push({
           kind: "link",
           label: "Anamnesi/consensi",
-          href: `anamnesi.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          href: "anamnesi.html",
           primary: false,
         });
         actions.push({
           kind: "link",
           label: "Pratiche assicurative",
-          href: `pratiche-assicurative.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          href: "pratiche-assicurative.html",
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Vendite",
+          href: "vendite.html",
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Erogato",
+          href: "erogato.html",
           primary: false,
         });
       }
@@ -786,6 +823,19 @@ async function initNotesPage() {
           badge: "🛡️",
           actions: mkApptActions(a),
         })),
+      },
+      {
+        title: "Pagamenti / Erogato da sistemare",
+        items: (rules.billing ? appts : [])
+          .filter((a) => a.patient_id && isPast(a.start_at))
+          .filter((a) => isCompletedish(a.status) || Boolean(a.confirmed_by_patient) || Boolean(a.confirmed_in_platform))
+          .filter((a) => !String(a.erogato_id || "").trim() && !String(a.vendita_id || "").trim())
+          .map((a) => ({
+            title: apptLabel(a),
+            meta: "Azione: verificare se va creato/collegato Erogato o Vendita e chiudere il flusso pagamenti.",
+            badge: "€",
+            actions: mkApptActions(a),
+          })),
       },
     ].filter((g) => g.items.length);
 
