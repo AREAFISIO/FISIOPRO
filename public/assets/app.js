@@ -124,55 +124,25 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   const section = (title, dataRole = "") =>
     `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
 
-  // Keep it fast: search + few high-signal items, ordered by "flow".
+  // Keep it extremely simple: few generic hubs.
   nav.innerHTML = `
-    <div class="fpNavSearch">
-      <input type="search" placeholder="Cerca nel menù… (es. agenda, vendite, contabile)" data-fp-nav-search />
-      <small>Ordine: appuntamento → accoglienza → paziente → documenti/pratiche → vendite/pagamenti → controllo</small>
-    </div>
-
-    ${section("Operatività (oggi)")}
+    ${section("Operativo")}
     ${link("agenda.html", "Agenda", "physio,front,back,manager")}
-    ${link("front-office.html", "Front Office (hub)", "front,back,manager")}
     ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
-    ${link("dashboard.html", "Dashboard", "front,back,manager")}
-    ${link("anagrafica.html", "Pazienti", "physio,front,back,manager")}
-    ${link("nuovo-paziente.html", "Nuovo paziente", "front,back,manager")}
 
-    ${section("Accoglienza e documentazione")}
-    ${link("anamnesi.html", "Anamnesi / consensi", "front,back,manager")}
-    ${link("archivio-documenti.html", "Archivio documenti", "front,back,manager")}
-    ${link("pratiche-assicurative.html", "Pratiche assicurative", "front,back,manager")}
+    ${section("Pazienti")}
+    ${link("anagrafica.html", "Anagrafica", "physio,front,back,manager")}
 
-    ${section("Vendite e pagamenti")}
-    ${link("vendite.html", "Vendite", "front,back,manager")}
-    ${link("erogato.html", "Erogato", "front,back,manager")}
-
-    ${section("Back Office", "back,manager")}
-    ${link("gestione-contabile.html", "Gestione contabile", "back,manager")}
-
-    ${section("Manager", "manager")}
-    ${link("dashboard-costi.html", "Costi per categoria", "manager")}
-    ${link("dashboard-controllo.html", "Riepilogo mensile", "manager")}
+    ${section("Ruolo")}
+    ${link("front-office.html", "Front Office", "front,manager")}
+    ${link("back-office.html", "Back Office", "back,manager")}
+    ${link("manager.html", "Manager", "manager")}
 
     ${section("Sessione")}
     ${link("login.html", "Logout")}
   `;
 
   nav.setAttribute("data-fp-unified-nav", "1");
-
-  // Simple client-side filter for speed.
-  const input = nav.querySelector("[data-fp-nav-search]");
-  if (input) {
-    input.addEventListener("input", () => {
-      const q = String(input.value || "").trim().toLowerCase();
-      nav.querySelectorAll("a[data-nav]").forEach((a) => {
-        const txt = String(a.textContent || "").toLowerCase();
-        a.style.display = !q || txt.includes(q) ? "" : "none";
-      });
-      nav.querySelectorAll(".section").forEach((s) => (s.style.display = "")); // keep sections visible
-    });
-  }
 }
 
 // Inject "Controllo di Gestione" section into the persistent sidebar.

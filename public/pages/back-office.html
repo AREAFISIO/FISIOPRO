@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Back Office</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .two-col{ display:grid; grid-template-columns: 1.4fr 1fr; gap:14px; }
+    @media (max-width: 1100px){ .two-col{ grid-template-columns: 1fr; } }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
+    .tile[aria-disabled="true"]{ opacity:.55; pointer-events:none; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Back Office</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="position:sticky; top:0; z-index:10;">
+      <div class="toprow">
+        <div class="h1">Back Office <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='note.html'">Apri Note & Alert</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <section class="card">
+        <div class="head"><h2>Contabilità e controllo</h2><span class="chip">Back Office</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='gestione-contabile.html'">
+            <div><h3>Gestione contabile</h3><p>Conti correnti, pagamenti, controllo flussi.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='vendite.html'">
+            <div><h3>Vendite</h3><p>Controllo vendite e collegamenti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='erogato.html'">
+            <div><h3>Erogato</h3><p>Prestazioni erogate e stati.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card" style="align-self:start;">
+        <div class="head"><h2>Gestione segreteria</h2><span class="chip">in arrivo</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" aria-disabled="true">
+            <div><h3>Presenze</h3><p>Registrazione presenze e turni (placeholder).</p></div><div class="go">—</div>
+          </div>
+          <div class="tile" aria-disabled="true">
+            <div><h3>Ferie</h3><p>Richieste ferie e approvazioni (placeholder).</p></div><div class="go">—</div>
+          </div>
+          <div class="tile" aria-disabled="true">
+            <div><h3>Checklist operative</h3><p>Procedure standard per ridurre errori (placeholder).</p></div><div class="go">—</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+

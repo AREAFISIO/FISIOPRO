@@ -64,6 +64,8 @@
       background: color-mix(in srgb, var(--cardBg) 92%, transparent);
       overflow:hidden;
       box-shadow: var(--shadow);
+      display:flex;
+      flex-direction:column;
     }
 
     .calTop{
@@ -195,7 +197,12 @@
       background: color-mix(in srgb, var(--accent) 92%, transparent);
     }
 
-    .calGridOuter{ height: 100%; overflow:auto; }
+    /* Fix scroll: calTop takes space; grid must be flexed + scrollable */
+    .calGridOuter{
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow:auto;
+    }
 
     .calGrid{
       position: relative;

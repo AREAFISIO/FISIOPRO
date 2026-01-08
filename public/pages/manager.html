@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Manager</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .grid3{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+    @media (max-width: 1100px){ .grid3{ grid-template-columns:1fr; } }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Manager</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="position:sticky; top:0; z-index:10;">
+      <div class="toprow">
+        <div class="h1">Manager <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='note.html'">Apri Note & Alert</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" style="margin-bottom:14px;">
+      <div class="head"><h2>Controllo e numeri</h2><span class="chip">CEO / Manager</span></div>
+      <div class="body">
+        <div class="grid3">
+          <div class="tile" onclick="location.href='dashboard.html'">
+            <div><h3>Dashboard</h3><p>Operativo generale.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='dashboard-controllo.html'">
+            <div><h3>Riepilogo mensile</h3><p>Budget vs reale, scostamenti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='dashboard-costi.html'">
+            <div><h3>Costi per categoria</h3><p>Analisi costi e trend.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>Controllo produzione</h2><span class="chip">Manager</span></div>
+      <div class="body">
+        <div class="grid3">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>Agenda</h3><p>Visione e controllo appuntamenti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='front-office.html'">
+            <div><h3>Front Office</h3><p>Vendite, pratiche, documenti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='back-office.html'">
+            <div><h3>Back Office</h3><p>Contabilità e gestione segreteria.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+
