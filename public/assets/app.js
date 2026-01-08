@@ -109,6 +109,53 @@ function activeNav() {
   });
 }
 
+// Inject "Controllo di Gestione" section into the persistent sidebar.
+// This avoids editing many HTML files and plays well with the SPA router (sidebar stays mounted).
+function ensureControlloGestioneMenu() {
+  const nav = document.querySelector(".sidebar .nav");
+  if (!nav) return;
+  const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  if (role !== "manager") return;
+  if (nav.querySelector("[data-fp-cdg-menu]")) return;
+
+  // If links already exist in HTML, don't duplicate.
+  const hasCosti = Boolean(nav.querySelector('a[href$="dashboard-costi.html"]'));
+  const hasCtrl = Boolean(nav.querySelector('a[href$="dashboard-controllo.html"]'));
+  if (hasCosti && hasCtrl) return;
+
+  const marker = document.createElement("div");
+  marker.setAttribute("data-fp-cdg-menu", "1");
+  marker.style.display = "none";
+
+  const section = document.createElement("div");
+  section.className = "section";
+  section.setAttribute("data-role", "manager");
+  section.textContent = "Controllo di Gestione";
+
+  const a1 = document.createElement("a");
+  a1.setAttribute("data-nav", "");
+  a1.setAttribute("data-role", "manager");
+  a1.href = "dashboard-costi.html";
+  a1.textContent = "Costi per categoria";
+
+  const a2 = document.createElement("a");
+  a2.setAttribute("data-nav", "");
+  a2.setAttribute("data-role", "manager");
+  a2.href = "dashboard-controllo.html";
+  a2.textContent = "Riepilogo mensile";
+
+  // Insert before Logout link if possible (keeps menu tidy)
+  const logout = nav.querySelector('a[href$="login.html"], a[href$="/login.html"]');
+  const insertBeforeNode = logout || null;
+
+  nav.insertBefore(marker, insertBeforeNode);
+  if (!hasCosti || !hasCtrl) {
+    nav.insertBefore(section, insertBeforeNode);
+    if (!hasCosti) nav.insertBefore(a1, insertBeforeNode);
+    if (!hasCtrl) nav.insertBefore(a2, insertBeforeNode);
+  }
+}
+
 function toast(msg){
   const t = document.querySelector(".toast");
   if(!t) return;
@@ -170,6 +217,14 @@ function isAgendaPage() {
 function isDashboardPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
+}
+function isDashboardCostiPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/dashboard-costi.html") || p.endsWith("/dashboard-costi.html");
+}
+function isDashboardControlloPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/dashboard-controllo.html") || p.endsWith("/dashboard-controllo.html");
 }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function toISODate(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
@@ -301,6 +356,300 @@ async function initDashboard() {
   } catch (e) {
     console.error(e);
     if (miniEl) miniEl.textContent = "Impossibile caricare gli appuntamenti di oggi.";
+  }
+}
+
+// =====================
+// CFO DASHBOARDS (Manager only)
+// =====================
+async function ensureChartJs() {
+  if (window.Chart) return;
+  if (window.__FP_CHARTJS_LOADING) return await window.__FP_CHARTJS_LOADING;
+
+  window.__FP_CHARTJS_LOADING = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("chartjs_load_failed"));
+    document.head.appendChild(s);
+  });
+  return await window.__FP_CHARTJS_LOADING;
+}
+
+function fmtEuro(n) {
+  const v = typeof n === "number" && isFinite(n) ? n : Number(n || 0);
+  try {
+    return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(v);
+  } catch {
+    return `${Math.round(v * 100) / 100} €`;
+  }
+}
+
+function fmtPct(n) {
+  const v = typeof n === "number" && isFinite(n) ? n : Number(n || 0);
+  const x = Math.round(v * 10) / 10;
+  return `${x}%`;
+}
+
+function chartKeyFor(el) {
+  const k = el?.getAttribute?.("data-chart-key");
+  if (k) return k;
+  const id = el?.id || "";
+  return id ? `chart:${id}` : `chart:${Math.random().toString(36).slice(2)}`;
+}
+
+function destroyChartFor(canvas) {
+  const key = chartKeyFor(canvas);
+  window.__FP_CHARTS = window.__FP_CHARTS || new Map();
+  const prev = window.__FP_CHARTS.get(key);
+  if (prev?.destroy) {
+    try { prev.destroy(); } catch {}
+  }
+  return key;
+}
+
+function buildPalette(n) {
+  const base = [
+    "rgba(34,230,195,.75)",
+    "rgba(74,163,255,.75)",
+    "rgba(255,140,0,.75)",
+    "rgba(255,77,109,.75)",
+    "rgba(41,211,154,.75)",
+    "rgba(180,120,255,.75)",
+    "rgba(255,210,77,.75)",
+    "rgba(140,200,255,.75)",
+  ];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+  return out;
+}
+
+function getQueryParam(name) {
+  try { return new URL(location.href).searchParams.get(name); } catch { return null; }
+}
+
+function setQueryParamAndNavigate(name, value) {
+  const u = new URL(location.href);
+  if (value) u.searchParams.set(name, value);
+  else u.searchParams.delete(name);
+  if (typeof window.fpNavigate === "function") window.fpNavigate(u.toString(), { replace: true });
+  else location.replace(u.toString());
+}
+
+async function initDashboardCosti() {
+  if (!isDashboardCostiPage()) return;
+  const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  if (role !== "manager") return;
+
+  const meseSel = document.querySelector("[data-costi-mese]");
+  const refreshBtn = document.querySelector("[data-costi-refresh]");
+  const loadingEl = document.querySelector("[data-costi-loading]");
+  const errorEl = document.querySelector("[data-costi-error]");
+  const totalEl = document.querySelector("[data-costi-totale]");
+  const tbody = document.querySelector("[data-costi-tbody]");
+  const barCanvas = document.querySelector("[data-costi-bar]");
+  const pieCanvas = document.querySelector("[data-costi-pie]");
+  if (!tbody || !barCanvas || !pieCanvas) return;
+
+  const months = ["", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  if (meseSel && !meseSel.dataset.fpInited) {
+    meseSel.dataset.fpInited = "1";
+    meseSel.innerHTML = months
+      .map((m) => `<option value="${String(m).replaceAll('"', "&quot;")}">${m ? m : "Tutti i mesi"}</option>`)
+      .join("");
+    const qMese = String(getQueryParam("mese") || "");
+    meseSel.value = months.includes(qMese) ? qMese : "";
+    meseSel.addEventListener("change", () => setQueryParamAndNavigate("mese", meseSel.value));
+  }
+  refreshBtn && !refreshBtn.dataset.fpInited && (refreshBtn.dataset.fpInited = "1") && refreshBtn.addEventListener("click", () => {
+    // reload same route (keeps current query)
+    if (typeof window.fpNavigate === "function") window.fpNavigate(location.href, { replace: true });
+    else location.reload();
+  });
+
+  const show = (el, msg) => { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = String(msg || ""); };
+  const hide = (el) => { if (!el) return; el.style.display = "none"; };
+
+  hide(errorEl);
+  show(loadingEl, "Caricamento…");
+
+  try {
+    await ensureChartJs();
+
+    const mese = String(getQueryParam("mese") || "").trim();
+    const clinica = String(getQueryParam("clinica") || "").trim();
+    const qs = new URLSearchParams();
+    if (mese) qs.set("mese", mese);
+    if (clinica) qs.set("clinica", clinica);
+
+    const data = await api("/api/costi-per-categoria" + (qs.toString() ? `?${qs.toString()}` : ""));
+    const rows = Array.isArray(data) ? data : [];
+
+    const total = rows.reduce((s, r) => s + Number(r?.totale || 0), 0);
+    if (totalEl) totalEl.textContent = fmtEuro(total);
+
+    // Table
+    tbody.innerHTML = "";
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted">Nessun dato disponibile.</td></tr>`;
+    } else {
+      for (const r of rows) {
+        const tot = Number(r?.totale || 0);
+        const pct = total > 0 ? (tot / total) * 100 : 0;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><span class="rowlink">${String(r?.categoria || "—")}</span></td>
+          <td style="text-align:right;">${fmtEuro(tot)}</td>
+          <td style="text-align:right;">${fmtPct(pct)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // Charts
+    const labels = rows.map((r) => String(r?.categoria || "—"));
+    const values = rows.map((r) => Number(r?.totale || 0));
+    const colors = buildPalette(values.length);
+
+    window.__FP_CHARTS = window.__FP_CHARTS || new Map();
+
+    const barKey = destroyChartFor(barCanvas);
+    barCanvas.setAttribute("data-chart-key", barKey);
+    window.__FP_CHARTS.set(
+      barKey,
+      new window.Chart(barCanvas.getContext("2d"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{ label: "Totale €", data: values, backgroundColor: colors, borderWidth: 0 }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+            y: { ticks: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+          },
+        },
+      }),
+    );
+
+    const pieKey = destroyChartFor(pieCanvas);
+    pieCanvas.setAttribute("data-chart-key", pieKey);
+    window.__FP_CHARTS.set(
+      pieKey,
+      new window.Chart(pieCanvas.getContext("2d"), {
+        type: "pie",
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+          },
+        },
+      }),
+    );
+  } catch (e) {
+    console.error(e);
+    show(errorEl, e?.message || "Errore");
+  } finally {
+    hide(loadingEl);
+  }
+}
+
+async function initDashboardControllo() {
+  if (!isDashboardControlloPage()) return;
+  const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  if (role !== "manager") return;
+
+  const refreshBtn = document.querySelector("[data-ctrl-refresh]");
+  const loadingEl = document.querySelector("[data-ctrl-loading]");
+  const errorEl = document.querySelector("[data-ctrl-error]");
+  const tbody = document.querySelector("[data-ctrl-tbody]");
+  const lineCanvas = document.querySelector("[data-ctrl-line]");
+  if (!tbody || !lineCanvas) return;
+
+  refreshBtn && !refreshBtn.dataset.fpInited && (refreshBtn.dataset.fpInited = "1") && refreshBtn.addEventListener("click", () => {
+    if (typeof window.fpNavigate === "function") window.fpNavigate(location.href, { replace: true });
+    else location.reload();
+  });
+
+  const show = (el, msg) => { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = String(msg || ""); };
+  const hide = (el) => { if (!el) return; el.style.display = "none"; };
+
+  hide(errorEl);
+  show(loadingEl, "Caricamento…");
+
+  try {
+    await ensureChartJs();
+
+    const clinica = String(getQueryParam("clinica") || "").trim();
+    const qs = new URLSearchParams();
+    if (clinica) qs.set("clinica", clinica);
+
+    const data = await api("/api/riepilogo-mensile" + (qs.toString() ? `?${qs.toString()}` : ""));
+    const rows = Array.isArray(data) ? data : [];
+
+    tbody.innerHTML = "";
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun dato disponibile.</td></tr>`;
+    } else {
+      for (const r of rows) {
+        const mese = String(r?.Mese || "—");
+        const budget = Number(r?.["Totale Mensile"] || 0);
+        const reale = Number(r?.["Totale Reale"] || 0);
+        const scost = Number(r?.Scostamento || 0);
+        const tr = document.createElement("tr");
+        if (scost > 0) tr.classList.add("fpRowBad");
+        tr.innerHTML = `
+          <td><span class="rowlink">${mese}</span></td>
+          <td style="text-align:right;">${fmtEuro(budget)}</td>
+          <td style="text-align:right;">${fmtEuro(reale)}</td>
+          <td style="text-align:right;">${fmtEuro(scost)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    const labels = rows.map((r) => String(r?.Mese || "—"));
+    const budgets = rows.map((r) => Number(r?.["Totale Mensile"] || 0));
+    const reals = rows.map((r) => Number(r?.["Totale Reale"] || 0));
+
+    window.__FP_CHARTS = window.__FP_CHARTS || new Map();
+    const key = destroyChartFor(lineCanvas);
+    lineCanvas.setAttribute("data-chart-key", key);
+    window.__FP_CHARTS.set(
+      key,
+      new window.Chart(lineCanvas.getContext("2d"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Budget", data: budgets, borderColor: "rgba(74,163,255,.95)", backgroundColor: "rgba(74,163,255,.18)", tension: 0.25 },
+            { label: "Reale", data: reals, borderColor: "rgba(34,230,195,.95)", backgroundColor: "rgba(34,230,195,.18)", tension: 0.25 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom", labels: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+          },
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+            y: { ticks: { color: getComputedStyle(document.body).getPropertyValue("--muted") || undefined } },
+          },
+        },
+      }),
+    );
+  } catch (e) {
+    console.error(e);
+    show(errorEl, e?.message || "Errore");
+  } finally {
+    hide(loadingEl);
   }
 }
 
@@ -1123,6 +1472,7 @@ async function runRouteInits() {
   normalizeRightbar();
   ensureSettingsModals();
   initSidebars();
+  ensureControlloGestioneMenu();
   activeNav();
   initLogoutLinks();
 
@@ -1133,6 +1483,8 @@ async function runRouteInits() {
   await initPatientPage();
   await ensureDiaryLoaded();
   await initDashboard();
+  await initDashboardCosti();
+  await initDashboardControllo();
 }
 
 function removeInnerMenuIcons() {

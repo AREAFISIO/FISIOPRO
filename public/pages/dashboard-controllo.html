@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Riepilogo mensile</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .fpCtrlGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .fpChartWrap{ height: 340px; }
+    @media (max-width: 700px){
+      .fpChartWrap{ height: 280px; }
+    }
+    .fpRowBad td{
+      background: rgba(255,77,109,.10);
+    }
+    body.fp-theme-pro .fpRowBad td{
+      background: rgba(227,59,95,.10);
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Riepilogo mensile</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <a data-nav href="gestione-contabile.html" data-role="manager">Gestione contabile</a>
+
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Riepilogo mensile <span class="pill" data-user-badge>—</span></div>
+        <div class="actions" data-role="manager">
+          <button class="btn" data-ctrl-refresh>Aggiorna</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" data-role="physio,front">
+      <div class="head"><h2>Accesso riservato</h2><span class="chip">CEO / Manager</span></div>
+      <div class="body">
+        <div class="mini" style="padding:12px;color:var(--muted);">
+          Questa dashboard è visibile solo a CEO o Manager.
+        </div>
+      </div>
+    </section>
+
+    <div data-role="manager" class="fpCtrlGrid">
+      <section class="card">
+        <div class="head"><h2>Budget vs Reale</h2><span class="chip">CFO</span></div>
+        <div class="body">
+          <div class="muted" data-ctrl-loading style="display:none;">Caricamento…</div>
+          <div class="muted" data-ctrl-error style="display:none;"></div>
+          <div class="fpChartWrap" style="margin-top:10px;">
+            <canvas data-ctrl-line></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="head"><h2>Tabella mensile</h2><span class="chip">Controllo di gestione</span></div>
+        <div class="body">
+          <div class="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mese</th>
+                  <th style="text-align:right;">Budget</th>
+                  <th style="text-align:right;">Reale</th>
+                  <th style="text-align:right;">Scostamento</th>
+                </tr>
+              </thead>
+              <tbody data-ctrl-tbody>
+                <tr><td colspan="4" class="muted">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;" data-role="manager">
+      <button class="btn" style="width:100%;" onclick="location.href='dashboard-costi.html'">Costi per categoria</button>
+      <div class="mini" style="margin-top:10px;color:var(--muted);">
+        Le righe con scostamento &gt; 0 sono evidenziate.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+
