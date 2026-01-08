@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Note & Follow-up</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Note & Follow-up</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <!-- injected by app.js -->
+      <div class="section">Caricamento…</div>
+    </nav>
+  </aside>
+
+  <main class="main" data-notes-page>
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Note & Follow-up <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" data-notes-new type="button">Nuova nota</button>
+          <button class="btn primary" data-notes-save type="button">Salva</button>
+          <button class="btn" data-notes-done type="button">Chiudi (Done)</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head">
+        <h2>Operativo (anti-errore)</h2>
+        <span class="chip" data-notes-meta>—</span>
+      </div>
+      <div class="body">
+        <div class="fp-noteGrid">
+          <div>
+            <div class="toolbar" style="padding-top:0;">
+              <div class="search" style="width:100%; max-width:none;">
+                Cerca nota
+                <input placeholder="Per paziente, titolo, tipo…" disabled />
+              </div>
+            </div>
+            <div data-notes-list style="display:grid; gap:10px;"></div>
+          </div>
+
+          <div>
+            <div class="card" style="padding:14px;">
+              <div style="display:grid; gap:10px;">
+                <input type="hidden" data-nf-id />
+                <input type="hidden" data-nf-created />
+                <input type="hidden" data-nf-patient-id />
+
+                <div class="fpFormLabel">Tipo</div>
+                <select class="select" data-nf-type>
+                  <option value="generico">Generico</option>
+                  <option value="accoglienza">Accoglienza / Prima visita</option>
+                  <option value="vendita">Vendita / Preventivo</option>
+                  <option value="assicurazione">Assicurazione / Pratica</option>
+                  <option value="pagamento">Pagamento / Sollecito</option>
+                </select>
+
+                <div class="fpFormLabel">Priorità</div>
+                <select class="select" data-nf-priority>
+                  <option value="normale">Normale</option>
+                  <option value="alta">Alta</option>
+                </select>
+
+                <div class="fpFormLabel">Paziente (ricerca in anagrafica)</div>
+                <input class="input" placeholder="Scrivi almeno 2 caratteri…" data-nf-patient-q />
+                <div class="fp-pick" data-nf-patient-pick></div>
+
+                <div class="fpFormLabel">Nome paziente (obbligatorio)</div>
+                <input class="input" placeholder="Es. Mario Rossi" data-nf-patient-name />
+
+                <div class="fpFormLabel">Telefono (obbligatorio)</div>
+                <input class="input" placeholder="+39…" data-nf-patient-phone />
+
+                <div class="fpFormLabel">Titolo</div>
+                <input class="input" placeholder="Es. Follow-up privacy / conferma appuntamento" data-nf-title />
+
+                <div class="fpFormLabel">Scadenza (obbligatoria)</div>
+                <input class="input" type="datetime-local" data-nf-dueat />
+
+                <label style="display:flex; gap:10px; align-items:center; font-weight:900;">
+                  <input type="checkbox" data-nf-notify />
+                  <span>Notifica browser (se autorizzata)</span>
+                </label>
+
+                <div class="fpFormLabel">Checklist (auto)</div>
+                <div data-nf-checklist style="display:grid; gap:8px;"></div>
+
+                <div class="fpFormLabel">Dettagli / Note</div>
+                <textarea class="textarea" style="min-height:120px;" placeholder="Scrivi cosa fare e cosa hai già fatto…" data-nf-body></textarea>
+
+                <div class="fp-noteErr" data-notes-error></div>
+              </div>
+            </div>
+
+            <div class="mini" style="margin-top:10px; color:var(--muted); line-height:1.5;">
+              Regola base: <b>ogni nota deve avere paziente + telefono + scadenza</b>.
+              Il sistema crea un promemoria (default: 2 ore prima) e mostra un badge sul menù.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;">
+      <button class="btn" style="width:100%;" onclick="location.href='agenda.html'">🗓️ Vai in Agenda</button>
+      <div style="height:10px;"></div>
+      <button class="btn" style="width:100%;" onclick="location.href='anagrafica.html'">👤 Apri Anagrafica</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+

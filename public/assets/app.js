@@ -118,6 +118,227 @@ function toast(msg){
   window.__toastTimer = setTimeout(()=> t.style.display="none", 1600);
 }
 
+// =====================
+// NOTES (local-first) + reminders
+// =====================
+function fpUserEmail() {
+  return String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+}
+
+function fpNotesKey() {
+  return `fp_notes_${fpUserEmail()}`;
+}
+
+function fpNotesLoad() {
+  try {
+    const raw = localStorage.getItem(fpNotesKey());
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function fpNotesSave(items) {
+  try { localStorage.setItem(fpNotesKey(), JSON.stringify(Array.isArray(items) ? items : [])); } catch {}
+  try { window.dispatchEvent(new CustomEvent("fpNotesChanged")); } catch {}
+}
+
+function fpNotesNowIso() {
+  return new Date().toISOString();
+}
+
+function fpParseDateSafe(v) {
+  const d = new Date(String(v || ""));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function fpNotesStats(items) {
+  const now = new Date();
+  const open = (items || []).filter((n) => String(n?.status || "open") !== "done");
+  let overdue = 0;
+  let dueToday = 0;
+  for (const n of open) {
+    const due = fpParseDateSafe(n?.dueAt);
+    if (!due) continue;
+    const isOver = due.getTime() < now.getTime();
+    if (isOver) overdue++;
+    else {
+      const sameDay = due.getFullYear() === now.getFullYear() && due.getMonth() === now.getMonth() && due.getDate() === now.getDate();
+      if (sameDay) dueToday++;
+    }
+  }
+  return { openCount: open.length, overdue, dueToday };
+}
+
+function ensureNotesReminderLoop() {
+  if (window.__FP_NOTES_REMINDER_LOOP) return;
+  window.__FP_NOTES_REMINDER_LOOP = true;
+
+  const tick = () => {
+    const items = fpNotesLoad();
+    const now = new Date();
+    let changed = false;
+
+    for (const n of items) {
+      if (!n || typeof n !== "object") continue;
+      if (String(n.status || "open") === "done") continue;
+
+      const remindAt = fpParseDateSafe(n.remindAt);
+      if (!remindAt) continue;
+      if (remindAt.getTime() > now.getTime()) continue;
+      if (n.remindedAt) continue;
+
+      n.remindedAt = fpNotesNowIso();
+      changed = true;
+
+      const title = String(n.title || n.type || "Promemoria").trim() || "Promemoria";
+      const patient = String(n.patientName || "").trim();
+      const msg = patient ? `${title} • ${patient}` : title;
+      toast(msg);
+
+      try {
+        if (n.notifyBrowser && "Notification" in window) {
+          if (Notification.permission === "granted") new Notification("FisioPro • Promemoria", { body: msg });
+        }
+      } catch {}
+    }
+
+    if (changed) fpNotesSave(items);
+  };
+
+  // Run immediately + every minute
+  tick();
+  window.setInterval(tick, 60_000);
+}
+
+// =====================
+// LEFT MENU (structured + fast)
+// =====================
+function buildMenuHtmlForRole(role) {
+  const r = String(role || "").trim() || "front";
+
+  // Temporal logic (workflow): prima appuntamento, poi accoglienza/paziente, poi documenti/vendite/pratiche, poi contabilità.
+  const items = [
+    { kind: "section", label: "Operativo (oggi)" },
+    { kind: "link", label: "Agenda (Appuntamenti)", href: "agenda.html", roles: ["physio","front","manager"] },
+    { kind: "link", label: "Note & Follow-up", href: "note-e-followup.html", roles: ["front","manager"] },
+    { kind: "link", label: "Dashboard", href: "dashboard.html", roles: ["physio","front","manager"] },
+
+    { kind: "section", label: "Accoglienza (in sede)" },
+    { kind: "link", label: "Pazienti (Anagrafica)", href: "anagrafica.html", roles: ["physio","front","manager"] },
+    { kind: "link", label: "Nuovo paziente", href: "nuovo-paziente.html", roles: ["front","manager"] },
+    { kind: "link", label: "Anamnesi & Consensi", href: "anamnesi.html", roles: ["front","manager"] },
+    { kind: "link", label: "Archivio documenti", href: "archivio-documenti.html", roles: ["front","manager"] },
+
+    { kind: "section", label: "Commerciale & Pratiche" },
+    { kind: "link", label: "Vendite", href: "vendite.html", roles: ["front","manager"] },
+    { kind: "link", label: "Pratiche assicurative", href: "pratiche-assicurative.html", roles: ["front","manager"] },
+    { kind: "link", label: "Erogato", href: "erogato.html", roles: ["front","manager"] },
+
+    { kind: "section", label: "Back Office" },
+    { kind: "link", label: "Gestione contabile", href: "gestione-contabile.html", roles: ["manager"] },
+    { kind: "link", label: "Impostazioni", href: "impostazioni.html", roles: ["physio","front","manager"] },
+  ];
+
+  // Build HTML. Role guard still applies, but we also filter here to keep it clean.
+  const lines = [];
+  lines.push(`
+    <div class="fp-navSearch">
+      <input class="fp-navSearchInput" type="search" placeholder="Cerca nel menù…" aria-label="Cerca nel menù" data-fp-nav-search />
+    </div>
+  `.trim());
+
+  for (const it of items) {
+    if (it.kind === "section") {
+      lines.push(`<div class="section">${it.label}</div>`);
+      continue;
+    }
+    if (it.kind === "link") {
+      const allowed = Array.isArray(it.roles) ? it.roles : [];
+      if (allowed.length && !allowed.includes(r)) continue;
+      const roleAttr = allowed.length ? ` data-role="${allowed.join(",")}"` : "";
+      // badge host (filled dynamically, e.g. Note overdue)
+      const badgeAttr = it.href === "note-e-followup.html" ? ` data-fp-notes-badge-host="1"` : "";
+      lines.push(`<a data-nav href="${it.href}"${roleAttr}${badgeAttr}>${it.label}${it.href === "note-e-followup.html" ? ` <span class="badge" data-fp-notes-badge style="display:none;"></span>` : ""}</a>`);
+      continue;
+    }
+  }
+
+  // Logout always last
+  lines.push(`<div class="section">Account</div>`);
+  lines.push(`<a data-nav href="login.html">Logout</a>`);
+
+  return lines.join("\n");
+}
+
+function wireSidebarMenuSearch(navEl) {
+  const input = navEl?.querySelector?.("[data-fp-nav-search]");
+  if (!input) return;
+  if (input.dataset.fpWired === "1") return;
+  input.dataset.fpWired = "1";
+
+  const norm = (s) => String(s || "").trim().toLowerCase();
+
+  const apply = () => {
+    const q = norm(input.value);
+    const links = Array.from(navEl.querySelectorAll("a[data-nav]"));
+    const sections = Array.from(navEl.querySelectorAll(".section"));
+
+    // reset first
+    links.forEach((a) => (a.style.display = ""));
+    sections.forEach((s) => (s.style.display = ""));
+
+    if (!q) return;
+
+    links.forEach((a) => {
+      const txt = norm(a.textContent);
+      if (!txt.includes(q)) a.style.display = "none";
+    });
+
+    // hide sections that have no visible links until next section
+    sections.forEach((sec) => {
+      let el = sec.nextElementSibling;
+      let any = false;
+      while (el && !el.classList.contains("section")) {
+        if (el.matches && el.matches("a[data-nav]") && el.style.display !== "none") any = true;
+        el = el.nextElementSibling;
+      }
+      if (!any) sec.style.display = "none";
+    });
+  };
+
+  input.addEventListener("input", () => apply());
+}
+
+function refreshNotesBadge(navEl) {
+  const badge = navEl?.querySelector?.("[data-fp-notes-badge]");
+  if (!badge) return;
+  const stats = fpNotesStats(fpNotesLoad());
+  const n = stats.overdue + stats.dueToday;
+  if (n <= 0) {
+    badge.style.display = "none";
+    badge.textContent = "";
+    return;
+  }
+  badge.style.display = "inline-flex";
+  badge.textContent = stats.overdue > 0 ? `${stats.overdue} !` : `${stats.dueToday}`;
+  badge.title = stats.overdue > 0 ? "Note in ritardo" : "Note in scadenza oggi";
+}
+
+function ensureStructuredSidebar(role) {
+  const navEl = document.querySelector(".sidebar .nav");
+  if (!navEl) return;
+  const current = navEl.getAttribute("data-fp-structured") || "";
+  const want = "v20260108a";
+  if (current !== want) {
+    navEl.innerHTML = buildMenuHtmlForRole(role);
+    navEl.setAttribute("data-fp-structured", want);
+  }
+  wireSidebarMenuSearch(navEl);
+  refreshNotesBadge(navEl);
+}
+
 function initLogoutLinks() {
   document.querySelectorAll('a[href$="login.html"], a[href$="/login.html"]').forEach((a) => {
     a.addEventListener("click", async (e) => {
@@ -1123,16 +1344,19 @@ async function runRouteInits() {
   normalizeRightbar();
   ensureSettingsModals();
   initSidebars();
-  activeNav();
-  initLogoutLinks();
 
   const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  ensureStructuredSidebar(role);
+  activeNav();
+  initLogoutLinks();
   if (role) roleGuard(role);
+  ensureNotesReminderLoop();
 
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();
   await initDashboard();
+  await initNotesPage();
 }
 
 function removeInnerMenuIcons() {
@@ -2481,7 +2705,337 @@ async function initAgenda() {
   // Non-blocking: load logo from Airtable if configured.
   initBrandLogo();
   setUserBadges(user);
+  ensureStructuredSidebar(user.role);
   roleGuard(user.role);
   activeNav();
+  ensureNotesReminderLoop();
   await runRouteInits();
 })();
+
+// =====================
+// NOTES PAGE (Note & Follow-up)
+// =====================
+function isNotesPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/note-e-followup.html") || p.endsWith("/note-e-followup.html");
+}
+
+function uid() {
+  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+}
+
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function noteTemplatesByType(type) {
+  const t = String(type || "").toLowerCase();
+  if (t === "accoglienza") {
+    return [
+      "Conferma appuntamento (telefono/WA)",
+      "Privacy & consensi: consegnati e firmati",
+      "Dati anagrafici completi (CF, indirizzo, nascita)",
+      "Canale preferito comunicazioni salvato",
+      "Note cliniche iniziali (se necessario)",
+    ];
+  }
+  if (t === "assicurazione") {
+    return [
+      "Documenti assicurazione raccolti",
+      "Invio richiesta / apertura pratica",
+      "Follow-up stato pratica",
+      "Scadenza documenti/integrazioni",
+    ];
+  }
+  if (t === "vendita") {
+    return [
+      "Preventivo spiegato",
+      "Proposta pacchetto / piano",
+      "Conferma modalità pagamento",
+      "Invio riepilogo al paziente",
+    ];
+  }
+  return [
+    "Contatto effettuato",
+    "Prossimo step definito",
+  ];
+}
+
+function renderNotesList(root, items) {
+  const listEl = root.querySelector("[data-notes-list]");
+  const metaEl = root.querySelector("[data-notes-meta]");
+  if (!listEl) return;
+
+  const open = (items || []).filter((n) => String(n?.status || "open") !== "done");
+  const stats = fpNotesStats(items);
+  if (metaEl) metaEl.textContent = `${open.length} aperte • ${stats.overdue} in ritardo • ${stats.dueToday} oggi`;
+
+  const fmt = (iso) => {
+    const d = fpParseDateSafe(iso);
+    if (!d) return "—";
+    try { return d.toLocaleString("it-IT", { year:"2-digit", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }); } catch { return String(iso || ""); }
+  };
+
+  listEl.innerHTML = "";
+  if (!open.length) {
+    listEl.innerHTML = `<div class="muted">Nessuna nota aperta. Sei “pulito”.</div>`;
+    return;
+  }
+
+  for (const n of open.sort((a,b) => {
+    const da = fpParseDateSafe(a?.dueAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const db = fpParseDateSafe(b?.dueAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+    return da - db;
+  })) {
+    const card = document.createElement("div");
+    card.className = "fp-noteCard";
+    card.setAttribute("data-note-id", String(n.id || ""));
+    card.innerHTML = `
+      <div class="fp-noteCard__top">
+        <div class="fp-noteCard__title">${escapeHtml(n.title || n.type || "Nota")}</div>
+        <div class="fp-noteCard__pill">${escapeHtml(String(n.priority || "normale"))}</div>
+      </div>
+      <div class="fp-noteCard__sub">
+        <div>${escapeHtml(n.patientName || "—")}</div>
+        <div class="muted">Scadenza: ${escapeHtml(fmt(n.dueAt))}</div>
+      </div>
+    `;
+    card.onclick = () => {
+      root.querySelectorAll(".fp-noteCard").forEach((x) => x.classList.remove("isActive"));
+      card.classList.add("isActive");
+      fillFormFromNote(root, n);
+    };
+    listEl.appendChild(card);
+  }
+}
+
+function fillFormFromNote(root, note) {
+  const set = (sel, val) => {
+    const el = root.querySelector(sel);
+    if (!el) return;
+    el.value = String(val ?? "");
+  };
+  set("[data-nf-id]", note?.id || "");
+  set("[data-nf-title]", note?.title || "");
+  set("[data-nf-type]", note?.type || "generico");
+  set("[data-nf-priority]", note?.priority || "normale");
+  set("[data-nf-patient-id]", note?.patientId || "");
+  set("[data-nf-patient-name]", note?.patientName || "");
+  set("[data-nf-patient-phone]", note?.patientPhone || "");
+  set("[data-nf-dueat]", note?.dueAtLocal || "");
+  set("[data-nf-body]", note?.body || "");
+  const chk = root.querySelector("[data-nf-notify]");
+  if (chk) chk.checked = Boolean(note?.notifyBrowser);
+
+  // checklist
+  const wrap = root.querySelector("[data-nf-checklist]");
+  if (wrap) {
+    wrap.innerHTML = "";
+    const list = Array.isArray(note?.checklist) ? note.checklist : [];
+    list.forEach((it, idx) => {
+      const id = `c_${note.id}_${idx}`;
+      const row = document.createElement("label");
+      row.className = "fp-noteCheck";
+      row.innerHTML = `<input type="checkbox" ${it?.done ? "checked" : ""} data-c-idx="${idx}" /> <span>${escapeHtml(it?.text || "")}</span>`;
+      wrap.appendChild(row);
+    });
+  }
+}
+
+function readFormNote(root) {
+  const get = (sel) => String(root.querySelector(sel)?.value || "");
+  const id = get("[data-nf-id]") || uid();
+  const type = get("[data-nf-type]") || "generico";
+  const title = get("[data-nf-title]") || type;
+  const priority = get("[data-nf-priority]") || "normale";
+  const patientId = get("[data-nf-patient-id]");
+  const patientName = get("[data-nf-patient-name]").trim();
+  const patientPhone = get("[data-nf-patient-phone]").trim();
+  const dueAtLocal = get("[data-nf-dueat]");
+  const dueAt = dueAtLocal ? new Date(dueAtLocal).toISOString() : "";
+  const body = get("[data-nf-body]");
+  const notifyBrowser = Boolean(root.querySelector("[data-nf-notify]")?.checked);
+
+  // checklist from DOM (keeps checked state)
+  const checklistWrap = root.querySelector("[data-nf-checklist]");
+  const checklist = [];
+  if (checklistWrap) {
+    const rows = Array.from(checklistWrap.querySelectorAll("input[type=checkbox][data-c-idx]"));
+    rows.forEach((inp, i) => {
+      const text = String(inp.parentElement?.querySelector?.("span")?.textContent || "").trim();
+      if (text) checklist.push({ text, done: Boolean(inp.checked) });
+    });
+  }
+
+  // Validation: error-proof basics
+  if (!patientName) throw new Error("Inserisci il nome paziente (o selezionalo dall’anagrafica).");
+  if (!patientPhone) throw new Error("Inserisci un numero di telefono (serve per evitare “perdite pazienti”).");
+  if (!dueAt) throw new Error("Imposta una scadenza (data/ora) per il follow-up.");
+
+  // Reminder default: 2h prima (se possibile)
+  const due = fpParseDateSafe(dueAt);
+  const remindAt = due ? new Date(due.getTime() - 2 * 60 * 60_000).toISOString() : "";
+
+  return {
+    id,
+    status: "open",
+    type,
+    title,
+    priority,
+    patientId,
+    patientName,
+    patientPhone,
+    dueAt,
+    dueAtLocal,
+    remindAt,
+    notifyBrowser,
+    body,
+    checklist,
+    createdAt: get("[data-nf-created]") || fpNotesNowIso(),
+    updatedAt: fpNotesNowIso(),
+  };
+}
+
+function clearForm(root) {
+  ["[data-nf-id]","[data-nf-title]","[data-nf-patient-id]","[data-nf-patient-name]","[data-nf-patient-phone]","[data-nf-dueat]","[data-nf-body]"].forEach((s) => {
+    const el = root.querySelector(s);
+    if (el) el.value = "";
+  });
+  const typeEl = root.querySelector("[data-nf-type]");
+  if (typeEl) typeEl.value = "generico";
+  const prEl = root.querySelector("[data-nf-priority]");
+  if (prEl) prEl.value = "normale";
+  const chk = root.querySelector("[data-nf-notify]");
+  if (chk) chk.checked = false;
+  const wrap = root.querySelector("[data-nf-checklist]");
+  if (wrap) wrap.innerHTML = "";
+}
+
+async function initNotesPage() {
+  if (!isNotesPage()) return;
+  const root = document.querySelector("[data-notes-page]");
+  if (!root) return;
+  if (root.dataset.fpInited === "1") return;
+  root.dataset.fpInited = "1";
+
+  const items = fpNotesLoad();
+  renderNotesList(root, items);
+
+  // Template auto-fill
+  const typeSel = root.querySelector("[data-nf-type]");
+  const checklistWrap = root.querySelector("[data-nf-checklist]");
+  if (typeSel && checklistWrap) {
+    typeSel.addEventListener("change", () => {
+      const t = String(typeSel.value || "generico");
+      const list = noteTemplatesByType(t);
+      checklistWrap.innerHTML = list.map((x) => `<label class="fp-noteCheck"><input type="checkbox" /> <span>${escapeHtml(x)}</span></label>`).join("");
+      const titleEl = root.querySelector("[data-nf-title]");
+      if (titleEl && !String(titleEl.value || "").trim()) titleEl.value = t;
+    });
+  }
+
+  // Patient search (Airtable)
+  const qEl = root.querySelector("[data-nf-patient-q]");
+  const pickEl = root.querySelector("[data-nf-patient-pick]");
+  let timer = null;
+  const doSearch = async () => {
+    if (!qEl || !pickEl) return;
+    const q = String(qEl.value || "").trim();
+    if (q.length < 2) { pickEl.innerHTML = ""; pickEl.style.display = "none"; return; }
+    try {
+      const data = await api(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(q)}&maxRecords=20&pageSize=20`);
+      const list = Array.isArray(data?.items) ? data.items : [];
+      if (!list.length) { pickEl.innerHTML = `<div class="muted" style="padding:10px 12px;">Nessun risultato</div>`; pickEl.style.display = "block"; return; }
+      pickEl.innerHTML = list.map((p) => {
+        const name = [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || p["Cognome e Nome"] || "—";
+        const tel = String(p.Telefono || "").trim();
+        return `<button type="button" class="fp-pickRow" data-pid="${escapeHtml(p.id)}" data-pname="${escapeHtml(name)}" data-ptel="${escapeHtml(tel)}">
+          <div class="t">${escapeHtml(name)}</div>
+          <div class="m">${escapeHtml(tel || p.Email || "")}</div>
+        </button>`;
+      }).join("");
+      pickEl.style.display = "block";
+    } catch {
+      pickEl.innerHTML = `<div class="muted" style="padding:10px 12px;">Errore ricerca anagrafica</div>`;
+      pickEl.style.display = "block";
+    }
+  };
+  if (qEl && pickEl) {
+    qEl.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(doSearch, 250);
+    });
+    pickEl.addEventListener("click", (e) => {
+      const btn = e.target?.closest?.("[data-pid]");
+      if (!btn) return;
+      const pid = btn.getAttribute("data-pid") || "";
+      const name = btn.getAttribute("data-pname") || "";
+      const tel = btn.getAttribute("data-ptel") || "";
+      const idEl = root.querySelector("[data-nf-patient-id]");
+      const nameEl = root.querySelector("[data-nf-patient-name]");
+      const telEl = root.querySelector("[data-nf-patient-phone]");
+      if (idEl) idEl.value = pid;
+      if (nameEl) nameEl.value = name;
+      if (telEl) telEl.value = tel;
+      pickEl.style.display = "none";
+      pickEl.innerHTML = "";
+      if (qEl) qEl.value = "";
+    });
+  }
+
+  // Actions
+  const btnNew = root.querySelector("[data-notes-new]");
+  const btnSave = root.querySelector("[data-notes-save]");
+  const btnDone = root.querySelector("[data-notes-done]");
+  const errEl = root.querySelector("[data-notes-error]");
+
+  const showErr = (msg) => {
+    if (!errEl) return;
+    errEl.style.display = msg ? "block" : "none";
+    errEl.textContent = String(msg || "");
+  };
+
+  btnNew && (btnNew.onclick = () => { showErr(""); clearForm(root); });
+
+  btnSave && (btnSave.onclick = () => {
+    showErr("");
+    try {
+      const next = readFormNote(root);
+      const all = fpNotesLoad();
+      const idx = all.findIndex((x) => String(x?.id || "") === String(next.id));
+      if (idx >= 0) all[idx] = { ...all[idx], ...next };
+      else all.unshift(next);
+      fpNotesSave(all);
+      renderNotesList(root, all);
+      toast("Nota salvata");
+    } catch (e) {
+      showErr(e.message || "Errore");
+    }
+  });
+
+  btnDone && (btnDone.onclick = () => {
+    showErr("");
+    const id = String(root.querySelector("[data-nf-id]")?.value || "").trim();
+    if (!id) return showErr("Seleziona una nota dalla lista (o salva prima).");
+    const all = fpNotesLoad();
+    const idx = all.findIndex((x) => String(x?.id || "") === id);
+    if (idx < 0) return showErr("Nota non trovata.");
+    all[idx].status = "done";
+    all[idx].updatedAt = fpNotesNowIso();
+    fpNotesSave(all);
+    renderNotesList(root, all);
+    clearForm(root);
+    toast("Chiusa");
+  });
+
+  // keep badges in sync
+  window.addEventListener("fpNotesChanged", () => {
+    renderNotesList(root, fpNotesLoad());
+    refreshNotesBadge(document.querySelector(".sidebar .nav"));
+  });
+}
