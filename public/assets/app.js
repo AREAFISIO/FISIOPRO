@@ -13,6 +13,41 @@ async function api(path, opts = {}) {
   return data;
 }
 
+// Expose a stable, reusable client for other pages/scripts.
+// (Keeps existing internal usage untouched.)
+window.fpApi = api;
+
+// Minimal reusable helper to handle loading + error states (no framework).
+// Usage:
+//   const data = await window.fpWithLoading({
+//     loadingEl: document.querySelector("[data-loading]"),
+//     errorEl: document.querySelector("[data-error]"),
+//     run: () => window.fpApi("/api/contabilita?op=dashboard"),
+//   });
+window.fpWithLoading = async function fpWithLoading({ loadingEl, errorEl, run, loadingText = "Caricamento…" } = {}) {
+  const show = (el, msg) => {
+    if (!el) return;
+    el.style.display = "block";
+    if (msg !== undefined) el.textContent = String(msg || "");
+  };
+  const hide = (el) => {
+    if (!el) return;
+    el.style.display = "none";
+  };
+
+  hide(errorEl);
+  show(loadingEl, loadingText);
+  try {
+    return await run();
+  } catch (e) {
+    const msg = String(e?.message || "Errore");
+    show(errorEl, msg);
+    throw e;
+  } finally {
+    hide(loadingEl);
+  }
+};
+
 async function ensureAuth() {
   try {
     const isLoginPage = location.pathname === "/" || location.pathname.endsWith("/index.html") || location.pathname.endsWith("/pages/login.html");
