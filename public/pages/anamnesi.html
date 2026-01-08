@@ -36,11 +36,13 @@
     <section class="card">
       <div class="head"><h2>Stato anamnesi e consensi</h2><span class="chip">Front Office</span></div>
       <div class="body">
+        <div class="muted" data-anamnesi-loading style="display:none;">Caricamento…</div>
+        <div class="muted" data-anamnesi-error style="display:none;"></div>
         <div class="tablewrap">
           <table>
             <thead><tr><th>Paziente</th><th>Anamnesi</th><th>Consenso</th><th>Ultimo aggiornamento</th></tr></thead>
-            <tbody>
-              <tr><td><div class="rowlink">placeholder</div></td><td><span class="chip">In attesa</span></td><td><span class="chip">Mancante</span></td><td>—</td></tr>
+            <tbody data-anamnesi-tbody>
+              <tr><td colspan="4" class="muted">—</td></tr>
             </tbody>
           </table>
         </div>

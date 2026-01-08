@@ -287,6 +287,23 @@ function isDashboardPage() {
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
 }
 
+function isSalesPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/vendite.html") || p.endsWith("/vendite.html");
+}
+function isErogatoPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/erogato.html") || p.endsWith("/erogato.html");
+}
+function isInsurancePage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/pratiche-assicurative.html") || p.endsWith("/pratiche-assicurative.html");
+}
+function isAnamnesiPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/anamnesi.html") || p.endsWith("/anamnesi.html");
+}
+
 // =====================
 // NOTES & ALERTS (operational inbox)
 // =====================
@@ -741,25 +758,25 @@ async function initNotesPage() {
         actions.push({
           kind: "link",
           label: "Anamnesi/consensi",
-          href: "anamnesi.html",
+          href: `anamnesi.html?patientId=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
         actions.push({
           kind: "link",
           label: "Pratiche assicurative",
-          href: "pratiche-assicurative.html",
+          href: `pratiche-assicurative.html?patientId=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
         actions.push({
           kind: "link",
           label: "Vendite",
-          href: "vendite.html",
+          href: `vendite.html?patientId=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
         actions.push({
           kind: "link",
           label: "Erogato",
-          href: "erogato.html",
+          href: `erogato.html?patientId=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
       }
@@ -892,6 +909,182 @@ async function initNotesPage() {
   }
 
   await load();
+}
+
+// =====================
+// FILTERED LIST PAGES (support ?patientId=recXXX)
+// =====================
+function fmtItDate(isoOrStr) {
+  const s = String(isoOrStr || "").trim();
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  try { return d.toLocaleDateString("it-IT"); } catch { return s; }
+}
+function boolChip(ok, yes = "OK", no = "Mancante") {
+  const label = ok ? yes : no;
+  return `<span class="chip"${ok ? "" : ' style="border-color:rgba(255,77,109,.35);background:rgba(255,77,109,.10)"'}>${label}</span>`;
+}
+
+async function initSalesPage() {
+  if (!isSalesPage()) return;
+  const tbody = document.querySelector("[data-sales-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-sales-loading]");
+  const errorEl = document.querySelector("[data-sales-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Vendite • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/sales?patientId=${encodeURIComponent(patientId)}`),
+    loadingText: "Caricamento vendite…",
+  });
+
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna vendita.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.voce) || "—"}</td>
+      <td style="text-align:right;">${normStr(x.importo) || "—"}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initErogatoPage() {
+  if (!isErogatoPage()) return;
+  const tbody = document.querySelector("[data-erogato-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-erogato-loading]");
+  const errorEl = document.querySelector("[data-erogato-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Erogato • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/erogato?patientId=${encodeURIComponent(patientId)}&maxRecords=100`),
+    loadingText: "Caricamento erogato…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna prestazione erogata.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.prestazione) || "—"}</td>
+      <td>${normStr(x.stato) ? `<span class="chip">${normStr(x.stato)}</span>` : `<span class="chip">—</span>`}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initInsurancePage() {
+  if (!isInsurancePage()) return;
+  const tbody = document.querySelector("[data-insurance-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-insurance-loading]");
+  const errorEl = document.querySelector("[data-insurance-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  if (p) toast(`Assicurazioni • ${[p.Nome, p.Cognome].filter(Boolean).join(" ").trim() || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/insurance?patientId=${encodeURIComponent(patientId)}`),
+    loadingText: "Caricamento pratiche…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessuna pratica.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map((x) => `
+    <tr>
+      <td>${fmtItDate(x.data)}</td>
+      <td>${p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "—"}</td>
+      <td>${normStr(x.pratica) || "—"}</td>
+      <td>${normStr(x.stato) ? `<span class="chip">${normStr(x.stato)}</span>` : `<span class="chip">—</span>`}</td>
+      <td>${normStr(x.note) || "—"}</td>
+    </tr>
+  `).join("");
+}
+
+async function initAnamnesiPage() {
+  if (!isAnamnesiPage()) return;
+  const tbody = document.querySelector("[data-anamnesi-tbody]");
+  if (!tbody) return;
+  const loadingEl = document.querySelector("[data-anamnesi-loading]");
+  const errorEl = document.querySelector("[data-anamnesi-error]");
+  const patientId = getQueryParam("patientId") || "";
+  if (!patientId) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    return;
+  }
+
+  const p = await api(`/api/patient?id=${encodeURIComponent(patientId)}`).catch(() => null);
+  const patientName = p ? [p.Nome, p.Cognome].filter(Boolean).join(" ").trim() : "Paziente";
+  if (p) toast(`Anamnesi • ${patientName || "Paziente"}`);
+
+  const data = await window.fpWithLoading({
+    loadingEl,
+    errorEl,
+    run: () => api(`/api/anamnesi?patientId=${encodeURIComponent(patientId)}&maxRecords=50`),
+    loadingText: "Caricamento anamnesi…",
+  });
+  const items = data.items || [];
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td><div class="rowlink">${patientName || "—"}</div></td>
+        <td>${boolChip(false, "OK", "Mancante")}</td>
+        <td>${boolChip(false, "OK", "Mancante")}</td>
+        <td>—</td>
+      </tr>
+    `;
+    return;
+  }
+  // latest first (best-effort by consent date or id)
+  const sorted = items.slice().sort((a, b) => String(b.dataConsenso || b.id).localeCompare(String(a.dataConsenso || a.id)));
+  const latest = sorted[0] || {};
+  const hasAnam = Boolean(String(latest.anamnesiRemota || latest.anamnesiRecente || "").trim());
+  const hasCons = Boolean(latest.consenso) || Boolean(String(latest.dataConsenso || "").trim());
+  tbody.innerHTML = `
+    <tr>
+      <td><div class="rowlink">${patientName || "—"}</div></td>
+      <td>${boolChip(hasAnam, "OK", "In attesa")}</td>
+      <td>${boolChip(hasCons, "OK", "Mancante")}</td>
+      <td>${latest.dataConsenso ? fmtItDate(latest.dataConsenso) : "—"}</td>
+    </tr>
+  `;
 }
 function isDashboardCostiPage() {
   const p = location.pathname || "";
@@ -2157,6 +2350,10 @@ async function runRouteInits() {
 
   await updateInboxBadge();
   await initNotesPage();
+  await initSalesPage();
+  await initErogatoPage();
+  await initInsurancePage();
+  await initAnamnesiPage();
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();

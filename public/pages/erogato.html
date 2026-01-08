@@ -36,11 +36,13 @@
     <section class="card">
       <div class="head"><h2>Prestazioni erogate</h2><span class="chip">Front Office</span></div>
       <div class="body">
+        <div class="muted" data-erogato-loading style="display:none;">Caricamento…</div>
+        <div class="muted" data-erogato-error style="display:none;"></div>
         <div class="tablewrap">
           <table>
             <thead><tr><th>Data</th><th>Paziente</th><th>Prestazione</th><th>Stato</th><th>Note</th></tr></thead>
-            <tbody>
-              <tr><td>—</td><td>—</td><td>—</td><td><span class="chip">—</span></td><td>—</td></tr>
+            <tbody data-erogato-tbody>
+              <tr><td colspan="5" class="muted">—</td></tr>
             </tbody>
           </table>
         </div>
