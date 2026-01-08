@@ -276,6 +276,19 @@ body.fp-has-topbar .app{
   min-width: 0;
 }
 
+.fp-topbar__logo{
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background-image: var(--brandLogo), linear-gradient(135deg,var(--accent),var(--accent-2));
+  background-size: 78% 78%, cover;
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  box-shadow: 0 10px 24px rgba(34,230,195,.14);
+  border: 1px solid rgba(255,255,255,.10);
+  flex: 0 0 44px;
+}
+
 .fp-topbar__brand{
   display:flex;
   flex-direction:column;
