@@ -109,11 +109,79 @@ function activeNav() {
   });
 }
 
+// =====================
+// UNIFIED SIDEBAR MENU (workflow-ordered)
+// =====================
+function ensureUnifiedSidebarMenu(roleRaw) {
+  const nav = document.querySelector(".sidebar .nav");
+  if (!nav) return;
+  if (nav.getAttribute("data-fp-unified-nav") === "1") return;
+
+  const role = String(roleRaw || "").trim() || String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+
+  const link = (href, label, dataRole = "", extraHtml = "") =>
+    `<a data-nav href="${href}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
+  const section = (title, dataRole = "") =>
+    `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
+
+  // Keep it fast: search + few high-signal items, ordered by "flow".
+  nav.innerHTML = `
+    <div class="fpNavSearch">
+      <input type="search" placeholder="Cerca nel menù… (es. agenda, vendite, contabile)" data-fp-nav-search />
+      <small>Ordine: appuntamento → accoglienza → paziente → documenti/pratiche → vendite/pagamenti → controllo</small>
+    </div>
+
+    ${section("Operatività (oggi)")}
+    ${link("agenda.html", "Agenda", "physio,front,back,manager")}
+    ${link("front-office.html", "Front Office (hub)", "front,back,manager")}
+    ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
+    ${link("dashboard.html", "Dashboard", "front,back,manager")}
+    ${link("anagrafica.html", "Pazienti", "physio,front,back,manager")}
+    ${link("nuovo-paziente.html", "Nuovo paziente", "front,back,manager")}
+
+    ${section("Accoglienza e documentazione")}
+    ${link("anamnesi.html", "Anamnesi / consensi", "front,back,manager")}
+    ${link("archivio-documenti.html", "Archivio documenti", "front,back,manager")}
+    ${link("pratiche-assicurative.html", "Pratiche assicurative", "front,back,manager")}
+
+    ${section("Vendite e pagamenti")}
+    ${link("vendite.html", "Vendite", "front,back,manager")}
+    ${link("erogato.html", "Erogato", "front,back,manager")}
+
+    ${section("Back Office", "back,manager")}
+    ${link("gestione-contabile.html", "Gestione contabile", "back,manager")}
+
+    ${section("Manager", "manager")}
+    ${link("dashboard-costi.html", "Costi per categoria", "manager")}
+    ${link("dashboard-controllo.html", "Riepilogo mensile", "manager")}
+
+    ${section("Sessione")}
+    ${link("login.html", "Logout")}
+  `;
+
+  nav.setAttribute("data-fp-unified-nav", "1");
+
+  // Simple client-side filter for speed.
+  const input = nav.querySelector("[data-fp-nav-search]");
+  if (input) {
+    input.addEventListener("input", () => {
+      const q = String(input.value || "").trim().toLowerCase();
+      nav.querySelectorAll("a[data-nav]").forEach((a) => {
+        const txt = String(a.textContent || "").toLowerCase();
+        a.style.display = !q || txt.includes(q) ? "" : "none";
+      });
+      nav.querySelectorAll(".section").forEach((s) => (s.style.display = "")); // keep sections visible
+    });
+  }
+}
+
 // Inject "Controllo di Gestione" section into the persistent sidebar.
 // This avoids editing many HTML files and plays well with the SPA router (sidebar stays mounted).
 function ensureControlloGestioneMenu() {
   const nav = document.querySelector(".sidebar .nav");
   if (!nav) return;
+  // If unified menu is active, it already contains these items.
+  if (nav.getAttribute("data-fp-unified-nav") === "1") return;
   const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
   if (role !== "manager") return;
   if (nav.querySelector("[data-fp-cdg-menu]")) return;
@@ -217,6 +285,310 @@ function isAgendaPage() {
 function isDashboardPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
+}
+
+// =====================
+// NOTES & ALERTS (operational inbox)
+// =====================
+function isNotesPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/note.html") || p.endsWith("/note.html");
+}
+
+function toStartOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+function addDaysLocal(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + Number(n || 0));
+  return x;
+}
+
+function apptLabel(a) {
+  const who = a.patient_name || "(senza nome)";
+  const when = fmtTime(a.start_at);
+  const svc = a.service_name ? ` • ${a.service_name}` : "";
+  const th = a.therapist_name ? ` • ${a.therapist_name}` : "";
+  return `${when} • ${who}${svc}${th}`;
+}
+
+async function updateInboxBadge() {
+  const badge = document.querySelector("[data-fp-inbox-badge]");
+  if (!badge) return;
+
+  // Cache for ~60s to keep navigation snappy.
+  const key = "fp_inbox_badge_v1";
+  let prevN = null;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || "null");
+    if (cached && Date.now() - Number(cached.t || 0) < 60_000) {
+      const n = Number(cached.n || 0);
+      badge.textContent = String(n);
+      badge.style.display = n > 0 ? "" : "none";
+      return;
+    }
+    if (cached && typeof cached.n === "number") prevN = Number(cached.n || 0);
+  } catch {}
+
+  try {
+    const start = new Date(); // now
+    const end = addDaysLocal(start, 2);
+    const data = await api(`/api/appointments?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
+    const appts = data.appointments || [];
+    const n =
+      appts.filter((a) => !a.patient_id).length +
+      appts.filter((a) => a.patient_id && !a.confirmed_by_patient).length +
+      appts.filter((a) => a.patient_id && !a.confirmed_in_platform).length;
+    badge.textContent = String(n);
+    badge.style.display = n > 0 ? "" : "none";
+    try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), n })); } catch {}
+
+    // In-app notification when new alerts appear (best-effort, non-invasive).
+    if (prevN !== null && n > prevN && n > 0) {
+      toast(`Nuovi alert: +${n - prevN} (totale ${n})`);
+      try {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          new Notification("FisioPro • Note & Alert", { body: `Hai ${n} alert operativi.` });
+        }
+      } catch {}
+    }
+  } catch {
+    // If inbox can't load, don't show a misleading badge.
+    badge.style.display = "none";
+  }
+}
+
+async function initNotesPage() {
+  if (!isNotesPage()) return;
+
+  const loadingEl = document.querySelector("[data-fp-notes-loading]");
+  const errorEl = document.querySelector("[data-fp-notes-error]");
+  const groupsEl = document.querySelector("[data-fp-notes-groups]");
+  const summaryEl = document.querySelector("[data-fp-notes-summary]");
+  const refreshBtn = document.querySelector("[data-fp-notes-refresh]");
+
+  const setActiveRangeBtn = (val) => {
+    document.querySelectorAll("[data-fp-notes-range]").forEach((b) => {
+      b.classList.toggle("primary", String(b.getAttribute("data-fp-notes-range")) === String(val));
+    });
+  };
+
+  const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
+  const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
+
+  const computeRange = (rangeKey) => {
+    const now = new Date();
+    if (rangeKey === "today") {
+      const s = toStartOfDay(now);
+      const e = addDaysLocal(s, 1);
+      return { start: s, end: e, label: "Oggi" };
+    }
+    if (rangeKey === "7d") {
+      const s = now;
+      const e = addDaysLocal(now, 7);
+      return { start: s, end: e, label: "Prossimi 7 giorni" };
+    }
+    // default "48h"
+    return { start: now, end: addDaysLocal(now, 2), label: "Prossime 48 ore" };
+  };
+
+  const renderGroups = (groups) => {
+    if (!groupsEl) return;
+    groupsEl.innerHTML = "";
+
+    (groups || []).forEach((g) => {
+      const wrap = document.createElement("div");
+      wrap.className = "fpNotesGroup";
+      wrap.innerHTML = `
+        <div class="fpNotesGroupHead">
+          <div>${g.title}</div>
+          <div class="badge">${g.items.length}</div>
+        </div>
+        <div class="fpNotesItems"></div>
+      `;
+      const itemsEl = wrap.querySelector(".fpNotesItems");
+      (g.items || []).forEach((it) => {
+        const row = document.createElement("div");
+        row.className = "fpNotesItem";
+        row.innerHTML = `
+          <div class="fpNotesItemTop">
+            <div>
+              <div class="fpNotesItemTitle">${it.title}</div>
+              <div class="fpNotesItemMeta">${it.meta || ""}</div>
+            </div>
+            <div class="fpNotesTiny">${it.badge || ""}</div>
+          </div>
+          <div class="fpNotesItemActions"></div>
+        `;
+        const actionsEl = row.querySelector(".fpNotesItemActions");
+        (it.actions || []).forEach((a) => {
+          const btn = document.createElement(a.kind === "link" ? "a" : "button");
+          btn.className = a.primary ? "btn primary" : "btn";
+          if (a.kind === "link") {
+            btn.setAttribute("href", a.href || "#");
+            if (a.target) btn.setAttribute("target", a.target);
+          } else {
+            btn.type = "button";
+            btn.onclick = a.onClick || null;
+          }
+          btn.textContent = a.label;
+          actionsEl.appendChild(btn);
+        });
+        itemsEl.appendChild(row);
+      });
+      groupsEl.appendChild(wrap);
+    });
+  };
+
+  const load = async () => {
+    if (!groupsEl) return;
+    const rangeKey = getRange();
+    setActiveRangeBtn(rangeKey);
+    const { start, end, label } = computeRange(rangeKey);
+
+    const data = await window.fpWithLoading({
+      loadingEl,
+      errorEl,
+      run: () => api(`/api/appointments?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`),
+      loadingText: "Caricamento inbox…",
+    });
+
+    const appts = (data.appointments || []).slice();
+    appts.sort((a, b) => String(a.start_at || "").localeCompare(String(b.start_at || ""), "it"));
+
+    const missingPatient = appts.filter((a) => !a.patient_id);
+    const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient);
+    const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform);
+
+    if (summaryEl) {
+      summaryEl.textContent =
+        `${label} • ` +
+        `Nuovi pazienti da agganciare: ${missingPatient.length} • ` +
+        `Conferme paziente: ${needConfirmPatient.length} • ` +
+        `Conferme piattaforma: ${needConfirmPlatform.length}`;
+    }
+
+    const mkApptActions = (a) => {
+      const actions = [
+        { kind: "link", label: "Apri Agenda", href: "agenda.html", primary: false },
+      ];
+      if (a.id) {
+        actions.push({
+          kind: "button",
+          label: "Segna confermato (paziente)",
+          primary: true,
+          onClick: async () => {
+            await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ confirmed_by_patient: true }),
+            });
+            toast("Conferma paziente salvata");
+            try { sessionStorage.removeItem("fp_inbox_badge_v1"); } catch {}
+            await load();
+            await updateInboxBadge();
+          },
+        });
+        actions.push({
+          kind: "button",
+          label: "Segna conferma (piattaforma)",
+          primary: false,
+          onClick: async () => {
+            await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ confirmed_in_platform: true }),
+            });
+            toast("Conferma piattaforma salvata");
+            try { sessionStorage.removeItem("fp_inbox_badge_v1"); } catch {}
+            await load();
+            await updateInboxBadge();
+          },
+        });
+      }
+      if (a.patient_id) {
+        actions.push({
+          kind: "button",
+          label: "Contatti paziente",
+          primary: false,
+          onClick: async () => {
+            try {
+              const p = await api(`/api/patient?id=${encodeURIComponent(a.patient_id)}`);
+              const telRaw = String(p.Telefono || "").trim();
+              const tel = telRaw.replace(/[^\d+]/g, "");
+              const wa = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
+              const email = String(p.Email || "").trim();
+              const msg = [
+                telRaw ? `Tel: ${telRaw}` : "",
+                email ? `Email: ${email}` : "",
+                wa ? `WhatsApp: ${wa}` : "",
+              ].filter(Boolean).join("\n");
+              alert(msg || "Contatti non disponibili");
+            } catch (e) {
+              alert("Contatti non disponibili");
+            }
+          },
+        });
+        actions.push({
+          kind: "link",
+          label: "Scheda paziente",
+          href: `paziente.html?id=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
+      }
+      if (!a.patient_id) {
+        actions.push({ kind: "link", label: "Crea paziente", href: "nuovo-paziente.html", primary: true });
+      }
+      return actions;
+    };
+
+    const groups = [
+      {
+        title: "Nuovi pazienti (appuntamento senza scheda)",
+        items: missingPatient.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: crea/aggancia la scheda paziente (quando è in sede o appena possibile).",
+          badge: "⚠️",
+          actions: mkApptActions(a),
+        })),
+      },
+      {
+        title: "Conferme da ottenere (paziente)",
+        items: needConfirmPatient.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: contatta e poi marca come confermato.",
+          badge: "⏳",
+          actions: mkApptActions(a),
+        })),
+      },
+      {
+        title: "Conferme in piattaforma (InBuoneMani)",
+        items: needConfirmPlatform.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: verifica e marca la conferma in piattaforma.",
+          badge: "⏳",
+          actions: mkApptActions(a),
+        })),
+      },
+    ].filter((g) => g.items.length);
+
+    if (!groups.length) {
+      renderGroups([{ title: "Tutto sotto controllo", items: [{ title: "Nessun alert nel periodo selezionato.", meta: "", badge: "✅", actions: [] }] }]);
+    } else {
+      renderGroups(groups);
+    }
+  };
+
+  document.querySelectorAll("[data-fp-notes-range]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const v = String(b.getAttribute("data-fp-notes-range") || "48h");
+      setRange(v);
+      load().catch(() => {});
+    });
+  });
+  refreshBtn && (refreshBtn.onclick = () => load().catch(() => {}));
+
+  await load();
 }
 function isDashboardCostiPage() {
   const p = location.pathname || "";
@@ -1472,6 +1844,7 @@ async function runRouteInits() {
   normalizeRightbar();
   ensureSettingsModals();
   initSidebars();
+  ensureUnifiedSidebarMenu(String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim());
   ensureControlloGestioneMenu();
   activeNav();
   initLogoutLinks();
@@ -1479,6 +1852,8 @@ async function runRouteInits() {
   const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
   if (role) roleGuard(role);
 
+  await updateInboxBadge();
+  await initNotesPage();
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();

@@ -41,12 +41,17 @@ export function normalizeRole(roleRaw) {
   // Choose the MOST privileged role found.
   if (r.includes("ceo")) return "manager";
   if (r.includes("manager") || r.includes("admin") || r.includes("amministr")) return "manager";
+  // Back office: amministrazione / segreteria (distinct from Manager)
+  if (r.includes("back")) return "back";
+  if (r.includes("segreteria")) return "back";
+  if (r.includes("amministrazione")) return "back";
   if (r.includes("front")) return "front";
   if (r.includes("physio") || r.includes("fisioterap")) return "physio";
 
   // Exact fallbacks
   if (r === "fisioterapista" || r === "physio") return "physio";
   if (r === "front office" || r === "front-office" || r === "front") return "front";
+  if (r === "back office" || r === "back-office" || r === "back") return "back";
   if (r === "manager" || r === "admin" || r === "amministratore") return "manager";
   return "";
 }

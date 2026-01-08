@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Note & Alert</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Note & Alert</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Note & Alert <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" data-fp-notes-range="today">Oggi</button>
+          <button class="btn" data-fp-notes-range="48h">48h</button>
+          <button class="btn" data-fp-notes-range="7d">7 giorni</button>
+          <button class="btn primary" data-fp-notes-refresh>Aggiorna</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head"><h2>Inbox operativa</h2><span class="chip">anti-errori</span></div>
+      <div class="body">
+        <div class="muted" data-fp-notes-loading style="display:none;">Caricamento…</div>
+        <div class="muted" data-fp-notes-error style="display:none;"></div>
+        <div data-fp-notes-summary class="muted" style="margin-top:10px;"></div>
+        <div style="height:12px;"></div>
+        <div data-fp-notes-groups></div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+

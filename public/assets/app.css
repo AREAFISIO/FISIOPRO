@@ -326,6 +326,55 @@ body.fp-has-topbar .app{
 .badge{margin-left:auto;font-size:12px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);
   border:1px solid var(--border);color:rgba(255,255,255,.85)}
 
+/* Sidebar: quick menu search (fast navigation) */
+.fpNavSearch{
+  margin-top: 12px;
+  padding: 8px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.05);
+}
+.fpNavSearch input{
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+}
+.fpNavSearch small{
+  display:block;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: .75;
+}
+
+/* Notes/alerts list */
+.fpNotesGroup{ margin-top: 14px; }
+.fpNotesGroupHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  font-weight: 950;
+}
+.fpNotesItems{ margin-top: 10px; display:grid; gap: 10px; }
+.fpNotesItem{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,.04);
+}
+.fpNotesItemTop{ display:flex; align-items:flex-start; justify-content:space-between; gap: 12px; }
+.fpNotesItemTitle{ font-weight: 950; }
+.fpNotesItemMeta{ margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.fpNotesItemActions{ margin-top: 10px; display:flex; gap: 10px; flex-wrap:wrap; }
+.fpNotesTiny{ font-size: 12px; color: var(--muted); }
+
 .main{overflow:auto;padding:18px 18px 28px}
 
 .topbar{
