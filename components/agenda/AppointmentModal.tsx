@@ -79,7 +79,7 @@ export function AppointmentModal({ appt, open, onClose, onSaved }: Props) {
 
         <div className="oe-modal__body">
           <div className="oe-modal__patientline">
-            <div className="oe-modal__patientname">{appt.patient_name || "Paziente"}</div>
+            <div className="oe-modal__patientname">{appt.patient_name || ""}</div>
 
             {/* LINK scheda paziente:
                nel tuo progetto è una pagina HTML "paziente.html".

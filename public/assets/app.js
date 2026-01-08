@@ -344,7 +344,7 @@ function buildHoverCard() {
 function showHoverCard(card, appt, x, y) {
   card.style.left = (x + 12) + "px";
   card.style.top = (y + 12) + "px";
-  card.querySelector("[data-hc-title]").textContent = appt.patient_name || "Paziente";
+  card.querySelector("[data-hc-title]").textContent = appt.patient_name || "";
   card.querySelector("[data-hc-time]").textContent = fmtTime(appt.start_at);
 
   const statusRow = card.querySelector("[data-hc-status-row]");
@@ -381,35 +381,75 @@ function buildModal() {
       </div>
 
       <div class="oe-modal__body">
-        <div class="oe-modal__patientline">
-          <div class="oe-modal__patientname" data-pname>Paziente</div>
-          <a class="oe-modal__patientlink" data-plink href="#">Apri scheda paziente</a>
+        <div class="oe-modal__top">
+          <div class="oe-modal__topActions">
+            <button class="oe-chipbtn oe-chipbtn--accent" type="button" data-action-repeat>RIPETI</button>
+            <button class="oe-chipbtn" type="button" data-action-notify>NOTIFICHE</button>
+            <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-action-location>LUOGO</button>
+            <button class="oe-chipbtn oe-chipbtn--danger" type="button" data-action-delete>ELIMINA</button>
+          </div>
+          <div class="oe-modal__created" data-created></div>
         </div>
 
-        <div class="oe-grid">
-          <label class="oe-field"><span>Data e ora INIZIO</span><input data-f-start disabled /></label>
-          <label class="oe-field"><span>Data e ora fine</span><input data-f-end disabled /></label>
+        <div class="oe-modal__patientCenter">
+          <div class="oe-modal__patientnameRow">
+            <div class="oe-modal__patientname" data-pname></div>
+            <div class="oe-badge" data-ptag style="display:none"></div>
+          </div>
+          <div class="oe-modal__patientActions">
+            <a class="oe-chipbtn" data-call href="#" aria-disabled="true">CHIAMA</a>
+            <a class="oe-chipbtn oe-chipbtn--accent" data-wa href="#" aria-disabled="true">+39… WhatsApp</a>
+            <a class="oe-chipbtn" data-email href="#" aria-disabled="true">EMAIL</a>
+            <a class="oe-modal__patientlink" data-plink href="#">Apri scheda paziente</a>
+          </div>
+        </div>
 
-          <label class="oe-field"><span>Stato appuntamento</span><input data-f-status placeholder="Es. Non ancora eseguito" /></label>
-          <label class="oe-field"><span>Tipo appuntamento</span><input data-f-type placeholder="Es. Prima visita" /></label>
+        <div class="oe-modal__section">
+          <div class="oe-modal__dt" data-datetime-label></div>
+        </div>
 
-          <label class="oe-field"><span>Prestazione</span><select data-f-service></select></label>
-          <label class="oe-field"><span>Collaboratore</span><select data-f-operator></select></label>
+        <div class="oe-grid oe-grid--2">
+          <label class="oe-field oe-field--wide">
+            <span>Esito appuntamento</span>
+            <select data-f-status></select>
+          </label>
+        </div>
 
-          <label class="oe-field"><span>Posizione</span><select data-f-location></select></label>
-          <label class="oe-field"><span>Durata (min)</span><input type="number" min="0" step="1" data-f-duration /></label>
+        <div class="oe-grid oe-grid--3">
+          <label class="oe-field">
+            <span>Voce prezzario</span>
+            <select data-f-service></select>
+          </label>
+          <label class="oe-field">
+            <span>Durata (min)</span>
+            <input type="number" min="0" step="1" data-f-duration />
+          </label>
+          <label class="oe-field">
+            <span>Agenda</span>
+            <select data-f-operator></select>
+          </label>
+          <label class="oe-field oe-field--wide">
+            <span>Luogo</span>
+            <select data-f-location></select>
+          </label>
+        </div>
 
-          <label class="oe-field"><span>Tipi Erogati (separati da virgola)</span><input data-f-tipi placeholder="Es. FKT, MASSO" /></label>
-          <label class="oe-field"><span>Erogato collegato</span><select data-f-erogato></select></label>
+        <div class="oe-modal__checks">
+          <label class="oe-check"><input type="checkbox" data-f-confirm-patient /> <span>Confermato dal paziente</span></label>
+          <label class="oe-check"><input type="checkbox" data-f-confirm-platform /> <span>Conferma in InBuoneMani</span></label>
+        </div>
 
-          <label class="oe-field"><span>Caso clinico</span><select data-f-case></select></label>
-          <label class="oe-field"><span>Vendita collegata</span><select data-f-sale></select></label>
-
-          <label class="oe-field"><span>VALUTAZIONI</span><select multiple size="4" data-f-evals></select></label>
-          <label class="oe-field"><span>TRATTAMENTI</span><select multiple size="4" data-f-treatments></select></label>
-
-          <label class="oe-field oe-field--wide"><span>Nota rapida</span><textarea data-f-quick maxlength="255"></textarea></label>
-          <label class="oe-field oe-field--wide"><span>Note</span><textarea data-f-notes maxlength="255"></textarea></label>
+        <div class="oe-grid oe-grid--2">
+          <label class="oe-field oe-field--wide">
+            <span>Note interne</span>
+            <textarea data-f-quick maxlength="255"></textarea>
+            <div class="oe-counter"><span data-count-internal>0</span> / 255</div>
+          </label>
+          <label class="oe-field oe-field--wide">
+            <span>Note visibili al paziente</span>
+            <textarea data-f-notes maxlength="255"></textarea>
+            <div class="oe-counter"><span data-count-patient>0</span> / 255</div>
+          </label>
         </div>
       </div>
 
@@ -480,6 +520,7 @@ async function ensureModalStaticOptions(modal) {
   const operatorSel = modal.querySelector("[data-f-operator]");
   const locationSel = modal.querySelector("[data-f-location]");
   const treatmentsSel = modal.querySelector("[data-f-treatments]");
+  const statusSel = modal.querySelector("[data-f-status]");
 
   try {
     const [ops, serv, loc, tr] = await Promise.all([
@@ -487,11 +528,19 @@ async function ensureModalStaticOptions(modal) {
       api("/api/services"),
       // Positions are stored in Airtable table "AZIENDA" (requested).
       api("/api/locations?table=AZIENDA&nameField=Sede"),
-      api("/api/treatments?activeOnly=1"),
+      treatmentsSel ? api("/api/treatments?activeOnly=1") : Promise.resolve({ items: [] }),
     ]);
     setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
     setSelectOptions(serviceSel, serv.items || [], { placeholder: "—" });
     setSelectOptions(locationSel, loc.items || [], { placeholder: "—" });
+    // Status is a single-select in Airtable: load choices (Meta API) or inferred values.
+    try {
+      const st = await api("/api/appointment-field-options?field=Stato appuntamento");
+      setSelectOptions(statusSel, (st.items || []).map((x) => ({ id: x.id, name: x.name })), { placeholder: "—", allowEmpty: true });
+    } catch (e) {
+      console.warn("Status options not available", e);
+      setSelectOptions(statusSel, [], { placeholder: "—" });
+    }
 
     if (treatmentsSel) {
       treatmentsSel.innerHTML = "";
@@ -507,6 +556,7 @@ async function ensureModalStaticOptions(modal) {
     setSelectOptions(operatorSel, [], { placeholder: "(non disponibile)" });
     setSelectOptions(serviceSel, [], { placeholder: "(non disponibile)" });
     setSelectOptions(locationSel, [], { placeholder: "(non disponibile)" });
+    setSelectOptions(statusSel, [], { placeholder: "(non disponibile)" });
     if (treatmentsSel) {
       treatmentsSel.innerHTML = "";
       const opt = document.createElement("option");
@@ -523,6 +573,9 @@ async function loadModalPatientOptions(modal, patientId) {
   const saleSel = modal.querySelector("[data-f-sale]");
   const evalSel = modal.querySelector("[data-f-evals]");
   const erogatoSel = modal.querySelector("[data-f-erogato]");
+
+  // This modal variant doesn't render these advanced fields.
+  if (!caseSel && !saleSel && !evalSel && !erogatoSel) return;
 
   setSelectOptions(caseSel, [], { placeholder: "—" });
   setSelectOptions(saleSel, [], { placeholder: "—" });
@@ -582,17 +635,71 @@ async function loadModalPatientOptions(modal, patientId) {
 async function openModal(modal, appt, onSaved) {
   modal.__current = appt;
 
-  modal.querySelector("[data-pname]").textContent = appt.patient_name || "Paziente";
+  modal.querySelector("[data-pname]").textContent = appt.patient_name || "";
   modal.querySelector("[data-plink]").href = `/pages/paziente.html?id=${encodeURIComponent(appt.patient_id || "")}`;
 
   await ensureModalStaticOptions(modal);
+  // Older advanced selects are still loaded (cases/erogato/etc) only if present in DOM.
   await loadModalPatientOptions(modal, appt.patient_id || "");
 
-  modal.querySelector("[data-f-start]").value = appt.start_at || "";
-  modal.querySelector("[data-f-end]").value = appt.end_at || "";
+  // Header meta
+  const createdEl = modal.querySelector("[data-created]");
+  if (createdEl) {
+    const ct = appt.created_at || "";
+    if (ct) {
+      const d = new Date(ct);
+      createdEl.textContent = isNaN(d.getTime()) ? "" : `Creato il ${d.toLocaleString("it-IT")}`;
+    } else {
+      createdEl.textContent = "";
+    }
+  }
 
-  modal.querySelector("[data-f-status]").value = appt.status || "";
-  modal.querySelector("[data-f-type]").value = appt.appointment_type || "";
+  const dtLabel = modal.querySelector("[data-datetime-label]");
+  if (dtLabel) {
+    const d = new Date(appt.start_at || "");
+    dtLabel.textContent = isNaN(d.getTime())
+      ? ""
+      : d.toLocaleString("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  // Tag pill (use appointment_type if available)
+  const tagEl = modal.querySelector("[data-ptag]");
+  if (tagEl) {
+    const tag = String(appt.appointment_type || "").trim();
+    if (tag) { tagEl.textContent = tag; tagEl.style.display = ""; }
+    else { tagEl.textContent = ""; tagEl.style.display = "none"; }
+  }
+
+  // Patient contacts
+  const callA = modal.querySelector("[data-call]");
+  const waA = modal.querySelector("[data-wa]");
+  const emailA = modal.querySelector("[data-email]");
+  const setLink = (a, href, text) => {
+    if (!a) return;
+    a.textContent = text || a.textContent;
+    a.href = href || "#";
+    if (href) a.removeAttribute("aria-disabled");
+    else a.setAttribute("aria-disabled", "true");
+  };
+  setLink(callA, "", "CHIAMA");
+  setLink(waA, "", "+39… WhatsApp");
+  setLink(emailA, "", "EMAIL");
+  if (appt.patient_id) {
+    try {
+      const p = await api(`/api/patient?id=${encodeURIComponent(appt.patient_id)}`);
+      const telRaw = String(p.Telefono || "").trim();
+      const tel = telRaw.replace(/[^\d+]/g, "");
+      const telHref = tel ? `tel:${tel}` : "";
+      const waHref = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
+      const email = String(p.Email || "").trim();
+      const emailHref = email ? `mailto:${email}` : "";
+      setLink(callA, telHref, "CHIAMA");
+      setLink(waA, waHref, telRaw ? `${telRaw} WhatsApp` : "+39… WhatsApp");
+      setLink(emailA, emailHref, email || "EMAIL");
+    } catch (e) {
+      console.warn("Patient contact not available", e);
+    }
+  }
 
   const servSel = modal.querySelector("[data-f-service]");
   const opSel = modal.querySelector("[data-f-operator]");
@@ -604,6 +711,10 @@ async function openModal(modal, appt, onSaved) {
   if (opSel) opSel.value = appt.therapist_id || "";
   if (locSel) locSel.value = appt.location_id || "";
 
+  const statusSel = modal.querySelector("[data-f-status]");
+  ensureSelectHasValue(statusSel, appt.status, appt.status);
+  if (statusSel) statusSel.value = appt.status || "";
+
   const durEl = modal.querySelector("[data-f-duration]");
   if (durEl) {
     durEl.value =
@@ -612,60 +723,68 @@ async function openModal(modal, appt, onSaved) {
         : (String(appt.duration_label || "").replace(/[^\d]/g, "") || "");
   }
 
-  modal.querySelector("[data-f-tipi]").value = Array.isArray(appt.tipi_erogati) ? appt.tipi_erogati.join(", ") : (appt.tipi_erogati || "");
-  const erSel = modal.querySelector("[data-f-erogato]");
-  const caSel = modal.querySelector("[data-f-case]");
-  const saSel = modal.querySelector("[data-f-sale]");
-  ensureSelectHasValue(erSel, appt.erogato_id, appt.erogato_id);
-  ensureSelectHasValue(caSel, appt.caso_clinico_id, appt.caso_clinico_id);
-  ensureSelectHasValue(saSel, appt.vendita_id, appt.vendita_id);
-  if (erSel) erSel.value = appt.erogato_id || "";
-  if (caSel) caSel.value = appt.caso_clinico_id || "";
-  if (saSel) saSel.value = appt.vendita_id || "";
-
-  const evalEl = modal.querySelector("[data-f-evals]");
-  const trEl = modal.querySelector("[data-f-treatments]");
-
-  // Ensure current values are visible even if options couldn't be loaded (RBAC/network).
-  if (evalEl && (evalEl.disabled || (evalEl.options?.length || 0) === 0)) {
-    (appt.valutazioni_ids || []).forEach((id) => {
-      ensureSelectHasValue(evalEl, id, id);
-    });
-  }
-  if (trEl && (trEl.disabled || (trEl.options?.length || 0) === 0)) {
-    (appt.trattamenti_ids || []).forEach((id) => {
-      ensureSelectHasValue(trEl, id, id);
-    });
-  }
-
-  setMultiSelectValues(evalEl, appt.valutazioni_ids || []);
-  setMultiSelectValues(trEl, appt.trattamenti_ids || []);
-
   modal.querySelector("[data-f-quick]").value = appt.quick_note || appt.internal_note || "";
   modal.querySelector("[data-f-notes]").value = appt.notes || appt.patient_note || "";
+
+  const chkPatient = modal.querySelector("[data-f-confirm-patient]");
+  const chkPlatform = modal.querySelector("[data-f-confirm-platform]");
+  if (chkPatient) chkPatient.checked = Boolean(appt.confirmed_by_patient);
+  if (chkPlatform) chkPlatform.checked = Boolean(appt.confirmed_in_platform);
+
+  const updateCounters = () => {
+    const internal = modal.querySelector("[data-f-quick]");
+    const patient = modal.querySelector("[data-f-notes]");
+    const ci = modal.querySelector("[data-count-internal]");
+    const cp = modal.querySelector("[data-count-patient]");
+    if (ci && internal) ci.textContent = String((internal.value || "").length);
+    if (cp && patient) cp.textContent = String((patient.value || "").length);
+  };
+  const internalEl = modal.querySelector("[data-f-quick]");
+  const patientEl = modal.querySelector("[data-f-notes]");
+  if (internalEl) internalEl.oninput = updateCounters;
+  if (patientEl) patientEl.oninput = updateCounters;
+  updateCounters();
 
   const close = () => { modal.style.display = "none"; };
   modal.querySelector("[data-close]").onclick = close;
   modal.querySelector("[data-cancel]").onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
 
+  // Header actions (currently placeholders except delete/location)
+  const locBtn = modal.querySelector("[data-action-location]");
+  if (locBtn) locBtn.onclick = () => modal.querySelector("[data-f-location]")?.focus?.();
+
+  const delBtn = modal.querySelector("[data-action-delete]");
+  if (delBtn) delBtn.onclick = async () => {
+    const a = modal.__current;
+    if (!a) return;
+    if (!confirm("Eliminare questo appuntamento?")) return;
+    try {
+      delBtn.disabled = true;
+      await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, { method: "DELETE" });
+      toast("Eliminato");
+      close();
+      if (typeof onSaved === "function") onSaved({ ...a, __deleted: true });
+    } catch (e) {
+      console.error(e);
+      alert("Errore eliminazione. Controlla Console/Network.");
+    } finally {
+      delBtn.disabled = false;
+    }
+  };
+
   modal.querySelector("[data-save]").onclick = async () => {
     const a = modal.__current;
     if (!a) return;
 
     const payload = {
-      status: modal.querySelector("[data-f-status]").value,
-      appointment_type: modal.querySelector("[data-f-type]").value,
+      status: modal.querySelector("[data-f-status]")?.value || "",
       serviceId: modal.querySelector("[data-f-service]").value,
       collaboratoreId: modal.querySelector("[data-f-operator]").value,
       sedeId: modal.querySelector("[data-f-location]").value,
       durata: modal.querySelector("[data-f-duration]").value,
-      tipiErogati: parseCommaList(modal.querySelector("[data-f-tipi]").value),
-      valutazioniIds: getMultiSelectValues(modal.querySelector("[data-f-evals]")),
-      trattamentiIds: getMultiSelectValues(modal.querySelector("[data-f-treatments]")),
-      erogatoId: modal.querySelector("[data-f-erogato]").value,
-      casoClinicoId: modal.querySelector("[data-f-case]").value,
-      venditaId: modal.querySelector("[data-f-sale]").value,
+      confirmed_by_patient: Boolean(modal.querySelector("[data-f-confirm-patient]")?.checked),
+      confirmed_in_platform: Boolean(modal.querySelector("[data-f-confirm-platform]")?.checked),
       notaRapida: modal.querySelector("[data-f-quick]").value,
       note: modal.querySelector("[data-f-notes]").value,
     };
@@ -2137,7 +2256,7 @@ function renderWeek(appointments, weekStart, hoverCard, modal, setAppointments) 
     ev.style.height = height + "px";
 
     ev.innerHTML = `
-      <div class="oe-event__title">${(appt.patient_name || "Paziente")}</div>
+      <div class="oe-event__title">${(appt.patient_name || "")}</div>
       <div class="oe-event__meta">${fmtTime(appt.start_at)}${appt.service_name ? " • " + appt.service_name : ""}${appt.therapist_name ? " • " + appt.therapist_name : ""}</div>
     `;
 
@@ -2150,7 +2269,9 @@ function renderWeek(appointments, weekStart, hoverCard, modal, setAppointments) 
       e.preventDefault();
       hideHoverCard(hoverCard);
       openModal(modal, appt, (updated) => {
-        const next = appointments.map(x => x.id === updated.id ? updated : x);
+        const next = updated && updated.__deleted
+          ? appointments.filter(x => x.id !== updated.id)
+          : appointments.map(x => x.id === updated.id ? updated : x);
         setAppointments(next);
         renderWeek(next, weekStart, hoverCard, modal, setAppointments);
       });
