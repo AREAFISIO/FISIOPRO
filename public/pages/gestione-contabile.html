@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Gestione contabile</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .accGrid{
+      display:grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 1100px){
+      .accGrid{ grid-template-columns: 1fr; }
+    }
+    .kpiRow{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 1100px){
+      .kpiRow{ grid-template-columns: 1fr; }
+    }
+    .kpi{
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      box-shadow: var(--shadow);
+    }
+    .kpi .label{ color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .kpi .value{ font-size: 28px; font-weight: 900; margin-top: 6px; letter-spacing: -.2px; }
+    .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Gestione contabile</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+
+      <div class="section" data-role="manager">Amministrazione</div>
+      <a data-nav href="gestione-contabile.html" class="active" data-role="manager">Gestione contabile</a>
+
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Gestione contabile <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='vendite.html'">Apri Vendite</button>
+          <button class="btn" onclick="location.href='erogato.html'">Apri Erogato</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" data-role="physio,front">
+      <div class="head"><h2>Accesso riservato</h2><span class="chip">CEO / Manager</span></div>
+      <div class="body">
+        <div class="mini" style="padding:12px;color:var(--muted);">
+          Questa sezione è visibile solo a CEO o Manager.
+        </div>
+      </div>
+    </section>
+
+    <div data-role="manager">
+      <div class="kpiRow" style="margin-bottom:14px;">
+        <div class="kpi">
+          <div class="label">Incassi (periodo)</div>
+          <div class="value">—</div>
+          <div class="mini">Placeholder: collegare a vendite/erogato.</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Fatturato (periodo)</div>
+          <div class="value">—</div>
+          <div class="mini">Placeholder: report contabile.</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Scadenze</div>
+          <div class="value">—</div>
+          <div class="mini">Placeholder: reminder e controlli.</div>
+        </div>
+      </div>
+
+      <div class="accGrid">
+        <section class="card">
+          <div class="head"><h2>Report</h2><span class="chip">Manager</span></div>
+          <div class="body">
+            <div class="mini" style="margin-top:4px;color:var(--muted);">
+              Sezione pronta: qui possiamo aggiungere estrazioni, filtri per periodo, esportazioni e riconciliazione.
+            </div>
+            <div class="toolbar" style="margin-top:12px;">
+              <button class="btn" disabled>Esporta CSV</button>
+              <button class="btn" disabled>Esporta PDF</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="head"><h2>Controlli</h2><span class="chip">Manager</span></div>
+          <div class="body">
+            <div class="mini" style="margin-top:4px;color:var(--muted);">
+              Placeholder: controlli mancati incassi, prestazioni senza vendita, discrepanze, ecc.
+            </div>
+            <div class="tablewrap" style="margin-top:12px;">
+              <table>
+                <thead><tr><th>Tipo</th><th>Dettaglio</th><th>Stato</th></tr></thead>
+                <tbody>
+                  <tr><td>—</td><td>—</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;" data-role="manager">
+      <button class="btn primary" style="width:100%;" onclick="location.href='dashboard.html'">Torna Dashboard</button>
+      <div class="mini" style="margin-top:10px;color:var(--muted);">
+        Visibile solo a CEO/Manager.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+
