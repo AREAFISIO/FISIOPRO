@@ -276,19 +276,6 @@ body.fp-has-topbar .app{
   min-width: 0;
 }
 
-.fp-topbar__logo{
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  background-image: var(--brandLogo), linear-gradient(135deg,var(--accent),var(--accent-2));
-  background-size: 78% 78%, cover;
-  background-repeat: no-repeat, no-repeat;
-  background-position: center, center;
-  box-shadow: 0 10px 24px rgba(34,230,195,.14);
-  border: 1px solid rgba(255,255,255,.10);
-  flex: 0 0 44px;
-}
-
 .fp-topbar__brand{
   display:flex;
   flex-direction:column;
@@ -319,11 +306,14 @@ body.fp-has-topbar .app{
 .brand .dot{
   /* Slightly larger logo box */
   width:40px;height:40px;border-radius:14px;
-  background-image: var(--brandLogo), linear-gradient(135deg,var(--accent),var(--accent-2));
-  background-size: 72% 72%, cover;
-  background-repeat: no-repeat, no-repeat;
-  background-position: center, center;
-  box-shadow:0 10px 24px rgba(34,230,195,.18)
+  /* Show only the white logo background (no gradient, no “stacco”) */
+  background-color: #fff;
+  background-image: var(--brandLogo);
+  background-size: 92% 92%;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: none;
+  border: 0;
 }
 .brand .title{font-weight:800;letter-spacing:.2px}
 .brand .sub{color:var(--muted);font-size:12px;margin-top:2px}
