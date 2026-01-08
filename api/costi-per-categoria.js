@@ -1,5 +1,6 @@
-import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
+import { ensureRes, requireRoles } from "./_auth.js";
 import { escAirtableString, memGetOrSet, setPrivateCache, enc } from "./_common.js";
+import { airtableListAll, asNumber } from "./_airtableClient.js";
 
 function normalizeKeyLoose(s) {
   return String(s ?? "")
@@ -33,63 +34,33 @@ function resolveFieldKeyFromKeys(keys, candidates) {
 async function inferTableFieldKeys(tableEnc, cacheKey) {
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
     // Single call: fetch one record without fields[] so we can see real keys.
-    const data = await airtableFetch(`${tableEnc}?pageSize=1`);
-    const first = data?.records?.[0]?.fields || {};
+    const records = await airtableListAll({ tableEnc, pageSize: 1, maxRecords: 1 });
+    const first = records?.[0]?.fields || {};
     return Object.keys(first || {});
   });
-}
-
-function parseEuroNumber(v) {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-
-  // Handle strings like "1.234,56", "1234.56", "€ 1.234,00", "-200", etc.
-  let s = String(v).trim();
-  if (!s) return 0;
-  s = s.replace(/[€\s]/g, "");
-
-  const hasComma = s.includes(",");
-  const hasDot = s.includes(".");
-
-  // If comma is present, assume Italian decimal separator and dot as thousands separator.
-  if (hasComma) {
-    s = s.replace(/\./g, "").replace(/,/g, ".");
-  } else if (hasDot) {
-    // If only dots, assume dot is decimal separator; also remove thousand separators if multiple dots.
-    const parts = s.split(".");
-    if (parts.length > 2) {
-      const dec = parts.pop();
-      s = parts.join("") + "." + dec;
-    }
-  }
-
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
 }
 
 function classifyFixedVariable(v) {
   // Returns "fisse" | "variabili" | "" (unknown)
   if (v === null || v === undefined) return "";
-
-  if (typeof v === "boolean") return v ? "fisse" : "";
-
   const s = String(v).trim().toLowerCase();
   if (!s) return "";
-  if (s.includes("fiss") || s.includes("ricorr") || s.includes("ripet")) return "fisse";
+  if (s.includes("fiss")) return "fisse";
   if (s.includes("variab")) return "variabili";
   return "";
 }
 
-async function fetchAllAirtableRecords(tableEnc, qs) {
-  const records = [];
-  let offset = null;
-  do {
-    if (offset) qs.set("offset", offset);
-    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
-    for (const r of data?.records || []) records.push(r);
-    offset = data?.offset || null;
-  } while (offset);
-  return records;
+function isUnknownFieldError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return s.includes("unknown field name") || s.includes("unknown field names");
+}
+
+function buildClinicFilterFormula({ clinicField, clinicaId }) {
+  const f = String(clinicField || "").trim() || "Clinica";
+  const v = String(clinicaId || "").trim();
+  if (!v) return "";
+  const esc = v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r|\n/g, " ").trim();
+  return `{${f}}="${esc}"`;
 }
 
 export default async function handler(req, res) {
@@ -102,6 +73,7 @@ export default async function handler(req, res) {
     setPrivateCache(res, 30);
 
     const meseRaw = String(req.query?.mese || "").trim();
+    const clinicaId = String(req.query?.clinica || "").trim();
 
     const tableName = process.env.AIRTABLE_ESTRATTO_CONTO_TABLE || "ESTRATTO_CONTO";
     const tableEnc = enc(tableName);
@@ -109,42 +81,22 @@ export default async function handler(req, res) {
     // Resolve real field names from existing keys (robust against schema differences).
     const keys = await inferTableFieldKeys(tableEnc, `estrattoConto:keys:${tableName}`);
 
-    const FIELD_CATEGORIA = resolveFieldKeyFromKeys(keys, [
-      process.env.AIRTABLE_ESTRATTO_CONTO_CATEGORIA_FIELD,
-      "Categoria",
-      "Categoria spesa",
-      "Cat",
+    // AIRTABLE SPEC
+    // - Categoria (link a CATEGORIE_SPESE)
+    // - Tipo Spesa (lookup)
+    // - Importo Fisso (formula)
+    // - Importo Variabile (formula)
+    // - Mese (formula)
+    const FIELD_CATEGORIA = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_CATEGORIA_FIELD, "Categoria"]);
+    const FIELD_IMPORTO = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_IMPORTO_FIELD, "Importo"]);
+    const FIELD_TIPO_SPESA = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_TIPO_SPESA_FIELD, "Tipo Spesa", "Tipo spesa"]);
+    const FIELD_IMPORTO_FISSO = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_IMPORTO_FISSO_FIELD, "Importo Fisso"]);
+    const FIELD_IMPORTO_VARIABILE = resolveFieldKeyFromKeys(keys, [
+      process.env.AIRTABLE_ESTRATTO_CONTO_IMPORTO_VARIABILE_FIELD,
+      "Importo Variabile",
     ]);
-    const FIELD_IMPORTO = resolveFieldKeyFromKeys(keys, [
-      process.env.AIRTABLE_ESTRATTO_CONTO_IMPORTO_FIELD,
-      "Importo",
-      "Importo (€)",
-      "Totale",
-      "Valore",
-      "Uscita",
-      "Spesa",
-    ]);
-    const FIELD_TIPO = resolveFieldKeyFromKeys(keys, [
-      process.env.AIRTABLE_ESTRATTO_CONTO_TIPO_FIELD,
-      "Tipo",
-      "Tipo spesa",
-      "Fissa/Variabile",
-      "Fisso/Variabile",
-      "Fissa",
-      "Ricorrente",
-    ]);
-    const FIELD_MESE = resolveFieldKeyFromKeys(keys, [
-      process.env.AIRTABLE_ESTRATTO_CONTO_MESE_FIELD,
-      "Mese",
-      "Mese competenza",
-      "Mese (testo)",
-    ]);
-    const FIELD_DATA = resolveFieldKeyFromKeys(keys, [
-      process.env.AIRTABLE_ESTRATTO_CONTO_DATA_FIELD,
-      "Data",
-      "Data movimento",
-      "Data operazione",
-    ]);
+    const FIELD_MESE = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_MESE_FIELD, "Mese"]);
+    const FIELD_DATA = resolveFieldKeyFromKeys(keys, [process.env.AIRTABLE_ESTRATTO_CONTO_DATA_FIELD, "Data"]);
 
     if (!FIELD_CATEGORIA || !FIELD_IMPORTO) {
       return res.status(500).json({
@@ -157,40 +109,110 @@ export default async function handler(req, res) {
       });
     }
 
-    const qs = new URLSearchParams({ pageSize: "100" });
-    qs.append("fields[]", FIELD_CATEGORIA);
-    qs.append("fields[]", FIELD_IMPORTO);
-    if (FIELD_TIPO) qs.append("fields[]", FIELD_TIPO);
-    if (FIELD_MESE) qs.append("fields[]", FIELD_MESE);
-    if (FIELD_DATA) qs.append("fields[]", FIELD_DATA);
+    // ---- Carica mappa CATEGORIE_SPESE (recordId -> Nome Categoria) ----
+    const categoriesTableName = process.env.AIRTABLE_CATEGORIE_SPESE_TABLE || "CATEGORIE_SPESE";
+    const categoriesTableEnc = enc(categoriesTableName);
+    const catKeys = await inferTableFieldKeys(categoriesTableEnc, `categorieSpese:keys:${categoriesTableName}`);
+    const FIELD_CAT_NOME = resolveFieldKeyFromKeys(catKeys, [
+      process.env.AIRTABLE_CATEGORIE_SPESE_NOME_FIELD,
+      "Nome Categoria",
+      "Nome",
+      "Categoria",
+      "Name",
+    ]);
 
-    if (meseRaw) {
-      const mese = escAirtableString(meseRaw);
-      if (FIELD_MESE) {
-        qs.set("filterByFormula", `{${FIELD_MESE}}="${mese}"`);
-      } else if (FIELD_DATA) {
-        // Best-effort fallback: match month name extracted from date.
-        // NOTE: month language depends on base locale; this still works if it matches "Gennaio", etc.
-        qs.set("filterByFormula", `DATETIME_FORMAT({${FIELD_DATA}}, "MMMM")="${mese}"`);
-      } else {
-        return res.status(400).json({ ok: false, error: "missing_mese_field" });
-      }
+    const categorieRecords = await airtableListAll({
+      tableName: categoriesTableName,
+      fields: FIELD_CAT_NOME ? [FIELD_CAT_NOME] : undefined,
+      pageSize: 100,
+      maxRecords: 5_000,
+    });
+    const catIdToName = new Map();
+    for (const r of categorieRecords || []) {
+      const f = r?.fields || {};
+      const name = (FIELD_CAT_NOME ? String(f[FIELD_CAT_NOME] || "") : "") || String(Object.values(f || {})?.[0] || "");
+      if (r?.id) catIdToName.set(r.id, String(name || "").trim());
     }
 
-    const records = await fetchAllAirtableRecords(tableEnc, qs);
+    // ---- Carica ESTRATTO_CONTO ----
+    const fields = [
+      FIELD_CATEGORIA,
+      FIELD_IMPORTO,
+      FIELD_TIPO_SPESA,
+      FIELD_IMPORTO_FISSO,
+      FIELD_IMPORTO_VARIABILE,
+      FIELD_MESE,
+      FIELD_DATA,
+    ].filter(Boolean);
+
+    const monthFormula = (() => {
+      if (!meseRaw) return "";
+      const mese = escAirtableString(meseRaw);
+      if (FIELD_MESE) return `{${FIELD_MESE}}="${mese}"`;
+      if (FIELD_DATA) return `DATETIME_FORMAT({${FIELD_DATA}}, "MMMM")="${mese}"`;
+      return "";
+    })();
+    if (meseRaw && !monthFormula) return res.status(400).json({ ok: false, error: "missing_mese_field" });
+
+    const clinicFormula = buildClinicFilterFormula({ clinicField: process.env.AIRTABLE_CLINICA_FIELD || "Clinica", clinicaId });
+    const filterByFormula = [monthFormula, clinicFormula].filter(Boolean).length
+      ? `AND(${[monthFormula, clinicFormula].filter(Boolean).join(",")})`
+      : "";
+
+    let records;
+    try {
+      records = await airtableListAll({
+        tableName,
+        fields,
+        filterByFormula: filterByFormula || undefined,
+        pageSize: 100,
+        maxRecords: 10_000,
+      });
+    } catch (e) {
+      // Se la clinica non è ancora modellata nel base, non bloccare: rimuovi il filtro clinica.
+      if (clinicaId && isUnknownFieldError(e?.message)) {
+        records = await airtableListAll({
+          tableName,
+          fields,
+          filterByFormula: monthFormula || undefined,
+          pageSize: 100,
+          maxRecords: 10_000,
+        });
+      } else {
+        throw e;
+      }
+    }
 
     const byCategoria = new Map(); // categoria -> { categoria, totale, fisse, variabili }
 
     for (const r of records) {
       const f = r?.fields || {};
-      const categoria = String(f[FIELD_CATEGORIA] ?? "").trim() || "Senza categoria";
-      const importo = parseEuroNumber(f[FIELD_IMPORTO]);
-      if (!Number.isFinite(importo) || importo === 0) {
-        // ignore empty/zero values (keeps output cleaner)
-        continue;
+      // Categoria è un link: Airtable restituisce array di recordId.
+      const catIds = Array.isArray(f[FIELD_CATEGORIA]) ? f[FIELD_CATEGORIA] : (f[FIELD_CATEGORIA] ? [f[FIELD_CATEGORIA]] : []);
+      const catId = String(catIds?.[0] || "").trim();
+      const categoria = (catIdToName.get(catId) || "").trim() || "Senza categoria";
+
+      // Se presenti, usiamo i campi formula Importo Fisso/Variabile (spec Airtable).
+      const fisso = FIELD_IMPORTO_FISSO ? (asNumber(f[FIELD_IMPORTO_FISSO]) ?? 0) : 0;
+      const variabile = FIELD_IMPORTO_VARIABILE ? (asNumber(f[FIELD_IMPORTO_VARIABILE]) ?? 0) : 0;
+      const hasFormulaSplit = Boolean(FIELD_IMPORTO_FISSO || FIELD_IMPORTO_VARIABILE);
+
+      let importoTot = 0;
+      let addFisse = 0;
+      let addVariabili = 0;
+
+      if (hasFormulaSplit) {
+        importoTot = (asNumber(fisso) ?? 0) + (asNumber(variabile) ?? 0);
+        addFisse = asNumber(fisso) ?? 0;
+        addVariabili = asNumber(variabile) ?? 0;
+      } else {
+        importoTot = asNumber(f[FIELD_IMPORTO]) ?? 0;
+        const tipo = FIELD_TIPO_SPESA ? classifyFixedVariable(f[FIELD_TIPO_SPESA]) : "";
+        if (tipo === "fisse") addFisse = importoTot;
+        else addVariabili = importoTot;
       }
 
-      const tipo = FIELD_TIPO ? classifyFixedVariable(f[FIELD_TIPO]) : "";
+      if (!Number.isFinite(importoTot) || importoTot === 0) continue;
 
       let agg = byCategoria.get(categoria);
       if (!agg) {
@@ -198,10 +220,9 @@ export default async function handler(req, res) {
         byCategoria.set(categoria, agg);
       }
 
-      agg.totale += importo;
-      if (tipo === "fisse") agg.fisse += importo;
-      else if (tipo === "variabili") agg.variabili += importo;
-      else agg.variabili += importo; // default: treat as variable if classification missing
+      agg.totale += importoTot;
+      agg.fisse += addFisse;
+      agg.variabili += addVariabili;
     }
 
     const out = Array.from(byCategoria.values()).map((x) => {

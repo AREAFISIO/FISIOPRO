@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { memGetOrSet, setPrivateCache } from "./_common.js";
+import { airtableListAll } from "./_airtableClient.js";
 
 function escAirtableString(s) {
   return String(s ?? "")
@@ -51,6 +52,85 @@ async function inferTableFieldKeys(tableEnc, cacheKey) {
     const first = data?.records?.[0]?.fields || {};
     return Object.keys(first || {});
   });
+}
+
+// ------------------------------------------------------------
+// Reusable Airtable helper (requested for finance dashboards)
+// ------------------------------------------------------------
+function isUnknownFieldError(msg) {
+  const s = String(msg || "").toLowerCase();
+  return s.includes("unknown field name") || s.includes("unknown field names");
+}
+
+function escAirtableStringLiteral(v) {
+  return String(v ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r|\n/g, " ")
+    .trim();
+}
+
+export function airtableRecordToJson(record) {
+  const r = record || {};
+  const fields = r.fields && typeof r.fields === "object" ? r.fields : {};
+  // "JSON pulito": id + fields flat (comodo per frontend/dashboard)
+  return { id: r.id, createdTime: r.createdTime, ...fields };
+}
+
+// fetchAirtable(tableName, options)
+// - gestione errori
+// - parsing record Airtable → JSON pulito
+// - predisposizione multi-clinica (?clinica=ID): tenta filtro su campo "Clinica" e fallback se non esiste
+export async function fetchAirtable(tableName, options = {}) {
+  const t = String(tableName || "").trim();
+  if (!t) throw new Error("missing_tableName");
+
+  const {
+    view,
+    fields,
+    filterByFormula,
+    sort,
+    pageSize = 100,
+    maxRecords = 5000,
+    clinicaId,
+    clinicField = process.env.AIRTABLE_CLINICA_FIELD || "Clinica",
+  } = options || {};
+
+  const clinicFormula = clinicaId ? `{${String(clinicField).trim() || "Clinica"}}="${escAirtableStringLiteral(clinicaId)}"` : "";
+  const mergedFormula =
+    [filterByFormula, clinicFormula].filter((x) => String(x || "").trim()).length > 0
+      ? `AND(${[filterByFormula, clinicFormula].filter((x) => String(x || "").trim()).join(",")})`
+      : "";
+
+  let records;
+  try {
+    records = await airtableListAll({
+      tableName: t,
+      view: view || undefined,
+      fields: Array.isArray(fields) ? fields : undefined,
+      filterByFormula: mergedFormula || undefined,
+      sort: Array.isArray(sort) ? sort : undefined,
+      pageSize,
+      maxRecords,
+    });
+  } catch (e) {
+    // Safe fallback: if base doesn't have clinic field yet, return aggregated.
+    if (clinicaId && isUnknownFieldError(e?.message)) {
+      records = await airtableListAll({
+        tableName: t,
+        view: view || undefined,
+        fields: Array.isArray(fields) ? fields : undefined,
+        filterByFormula: filterByFormula || undefined,
+        sort: Array.isArray(sort) ? sort : undefined,
+        pageSize,
+        maxRecords,
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  return (records || []).map(airtableRecordToJson);
 }
 
 export default async function handler(req, res) {

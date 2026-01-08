@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Costi per categoria</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .fpFinGrid{
+      display:grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1100px){
+      .fpFinGrid{ grid-template-columns: 1fr; }
+    }
+    .fpChartCard{ padding: 14px; }
+    .fpChartWrap{ height: 340px; }
+    @media (max-width: 700px){
+      .fpChartWrap{ height: 280px; }
+    }
+    .fpTableMeta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap:wrap;
+      margin: 10px 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .fpNeg{ color: var(--warn); font-weight: 900; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Costi per categoria</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" data-role="physio,front,manager">Agenda</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="anamnesi.html" data-role="front,manager">Anamnesi</a>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <a data-nav href="gestione-contabile.html" data-role="manager">Gestione contabile</a>
+
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Costi per categoria <span class="pill" data-user-badge>—</span></div>
+        <div class="actions" data-role="manager">
+          <select class="chip" data-costi-mese aria-label="Filtro mese"></select>
+          <button class="btn" data-costi-refresh>Aggiorna</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" data-role="physio,front">
+      <div class="head"><h2>Accesso riservato</h2><span class="chip">CEO / Manager</span></div>
+      <div class="body">
+        <div class="mini" style="padding:12px;color:var(--muted);">
+          Questa dashboard è visibile solo a CEO o Manager.
+        </div>
+      </div>
+    </section>
+
+    <div data-role="manager">
+      <section class="card">
+        <div class="head">
+          <h2>Analisi</h2>
+          <span class="chip">CFO</span>
+        </div>
+        <div class="body">
+          <div class="fpTableMeta">
+            <div>Totale spese: <strong data-costi-totale>—</strong></div>
+            <div class="muted" data-costi-loading style="display:none;">Caricamento…</div>
+            <div class="muted" data-costi-error style="display:none;"></div>
+          </div>
+
+          <div class="fpFinGrid">
+            <div class="card fpChartCard">
+              <div style="font-weight:900;margin-bottom:10px;">Costi per categoria</div>
+              <div class="fpChartWrap">
+                <canvas data-costi-bar></canvas>
+              </div>
+            </div>
+
+            <div class="card fpChartCard">
+              <div style="font-weight:900;margin-bottom:10px;">Distribuzione %</div>
+              <div class="fpChartWrap">
+                <canvas data-costi-pie></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="tablewrap" style="margin-top:14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Categoria</th>
+                  <th style="text-align:right;">Totale €</th>
+                  <th style="text-align:right;">%</th>
+                </tr>
+              </thead>
+              <tbody data-costi-tbody>
+                <tr><td colspan="3" class="muted">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="rightbar">
+    <div class="righttitle">Azioni</div>
+    <div class="card" style="padding:14px;" data-role="manager">
+      <button class="btn" style="width:100%;" onclick="location.href='dashboard-controllo.html'">Riepilogo mensile</button>
+      <div class="mini" style="margin-top:10px;color:var(--muted);">
+        Suggerimento: usa il filtro mese per la vista “chiusura”.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+
