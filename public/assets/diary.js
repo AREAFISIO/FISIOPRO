@@ -685,6 +685,12 @@
       .replaceAll("'", "&#39;");
   }
 
+  // Attribute-safe escaping (for option values, data-*).
+  // Our HTML escape is already safe for quotes; keep a dedicated helper for readability.
+  function escapeAttr(x) {
+    return escapeHtml(x);
+  }
+
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function timeToMin(s) {
     const m = String(s || "").trim().match(/^(\d{1,2}):(\d{2})$/);
@@ -2292,31 +2298,281 @@
   }
 
   function openDetailsModal(item) {
-    if (!modalBack) return;
-    modalTitle.textContent = item.patient || "Dettagli appuntamento";
+    // Re-query modal elements every time (SPA swaps can detach old nodes).
+    const back = document.querySelector("[data-cal-modal]");
+    const titleEl = document.querySelector("[data-cal-modal-title]");
+    const bodyEl = document.querySelector("[data-cal-modal-body]");
+    if (!back || !titleEl || !bodyEl) return;
 
-    const lines = [];
-    const st = item.startAt ? item.startAt.toLocaleString("it-IT", { weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
-    const en = item.endAt ? item.endAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "";
-    lines.push(["Quando", st + (en ? " → " + en : "")]);
-    if (item.therapist) {
-      const role = roleForOperatorName(item.therapist);
-      lines.push(["Operatore", item.therapist + (role ? " • " + role : "")]);
-    }
-    if (item.service) lines.push(["Prestazione", item.service]);
-    if (item.status) lines.push(["Stato", item.status]);
+    const roleNorm = getUserRoleNorm();
+    const canDelete = roleNorm === "front" || roleNorm === "manager";
 
-    // show a few extra raw fields (useful during mapping)
-    const rawKeys = Object.keys(item.fields || {}).slice(0, 12);
-    if (rawKeys.length) {
-      lines.push(["Campi Airtable", rawKeys.join(", ")]);
-    }
+    titleEl.textContent = "Dettagli appuntamento";
 
-    modalBody.innerHTML = lines
-      .map(([k, v]) => `<div class="fp-kv"><div class="k">${k}</div><div class="v">${String(v || "—")}</div></div>`)
-      .join("");
+    const startAt = item?.startAt instanceof Date ? item.startAt : null;
+    const endAt = item?.endAt instanceof Date ? item.endAt : null;
+    const durMin = startAt && endAt ? Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000)) : 60;
 
-    modalBack.style.display = "flex";
+    let dtLabel = "";
+    try {
+      dtLabel = startAt
+        ? startAt.toLocaleString("it-IT", { weekday: "long", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+        : "";
+    } catch {}
+
+    const guessedLocationName = inferSlotLocation(startAt ? toYmd(startAt) : "", item?.therapist || "") || "";
+
+    bodyEl.innerHTML = `
+      <div class="oe-modal__top" style="margin-top:0;">
+        <div class="oe-modal__topActions">
+          <button class="oe-chipbtn oe-chipbtn--accent" type="button" data-det-repeat>RIPETI</button>
+          <button class="oe-chipbtn" type="button" data-det-notify>NOTIFICHE</button>
+          <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-det-location>LUOGO</button>
+          <button class="oe-chipbtn oe-chipbtn--danger" type="button" data-det-delete ${canDelete ? "" : "disabled"}>${canDelete ? "ELIMINA" : "ELIMINA"}</button>
+        </div>
+        <div class="oe-modal__created" data-det-created></div>
+      </div>
+
+      <div class="oe-modal__patientCenter" style="margin-top:6px;">
+        <div class="oe-modal__patientnameRow">
+          <div class="oe-modal__patientname" data-det-pname>${escapeHtml(item?.patient || "")}</div>
+          <div class="oe-badge" data-det-tag style="display:none"></div>
+        </div>
+        <div class="oe-modal__patientActions">
+          <a class="oe-chipbtn" data-det-call href="#" aria-disabled="true">CHIAMA</a>
+          <a class="oe-chipbtn oe-chipbtn--accent" data-det-wa href="#" aria-disabled="true">+39… WhatsApp</a>
+          <a class="oe-chipbtn" data-det-email href="#" aria-disabled="true">EMAIL</a>
+          <a class="oe-modal__patientlink" data-det-plink href="/pages/paziente.html?id=${encodeURIComponent(String(item?.patientId || ""))}">Apri scheda paziente</a>
+        </div>
+      </div>
+
+      <div class="oe-modal__section" style="padding-top:12px;">
+        <div class="oe-modal__dt">${escapeHtml(dtLabel)}</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr; gap:12px;">
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Esito appuntamento</span>
+          <select class="select" data-det-status><option value="">Carico…</option></select>
+        </label>
+      </div>
+
+      <div style="height:10px;"></div>
+
+      <div style="display:grid; grid-template-columns: 1.6fr 1fr 1.2fr; gap:12px;">
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Voce prezzario</span>
+          <select class="select" data-det-service><option value="">Carico…</option></select>
+        </label>
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Durata (min)</span>
+          <input class="input" type="number" min="0" step="1" data-det-duration value="${String(durMin)}" />
+        </label>
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Agenda</span>
+          <select class="select" data-det-operator><option value="">Carico…</option></select>
+        </label>
+        <label class="field" style="gap:6px; grid-column: 1 / -1;">
+          <span class="fpFormLabel">Luogo</span>
+          <select class="select" data-det-locationSel><option value="">Carico…</option></select>
+        </label>
+      </div>
+
+      <div class="oe-modal__checks" style="padding-top:12px;">
+        <label class="oe-check"><input type="checkbox" data-det-confirm-patient /> <span>Confermato dal paziente</span></label>
+        <label class="oe-check"><input type="checkbox" data-det-confirm-platform /> <span>Conferma in InBuoneMani</span></label>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px;">
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Note interne</span>
+          <textarea class="textarea" maxlength="255" data-det-internal></textarea>
+          <div class="oe-counter"><span data-det-count-internal>0</span> / 255</div>
+        </label>
+        <label class="field" style="gap:6px;">
+          <span class="fpFormLabel">Note visibili al paziente</span>
+          <textarea class="textarea" maxlength="255" data-det-patient></textarea>
+          <div class="oe-counter"><span data-det-count-patient>0</span> / 255</div>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:14px;">
+        <button class="btn" type="button" data-det-cancel>Annulla</button>
+        <button class="btn primary" type="button" data-det-save>Salva</button>
+      </div>
+    `;
+
+    const q = (sel) => bodyEl.querySelector(sel);
+    const elStatus = q("[data-det-status]");
+    const elService = q("[data-det-service]");
+    const elOperator = q("[data-det-operator]");
+    const elLocation = q("[data-det-locationSel]");
+    const elInternal = q("[data-det-internal]");
+    const elPatient = q("[data-det-patient]");
+    const elConfP = q("[data-det-confirm-patient]");
+    const elConfPl = q("[data-det-confirm-platform]");
+    const btnSave = q("[data-det-save]");
+    const btnCancel = q("[data-det-cancel]");
+    const btnDelete = q("[data-det-delete]");
+    const btnLoc = q("[data-det-location]");
+
+    // Prefill notes/status/confirm flags from available fields.
+    const f = item?.fields || {};
+    const currentStatus = String(item?.status || "").trim();
+    const internalNote = String(f["Nota rapida"] ?? f["Nota rapida (interna)"] ?? f["Note interne"] ?? "").trim();
+    const patientNote = String(f["Note"] ?? f["Note paziente"] ?? "").trim();
+    const confByPatient = Boolean(f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false);
+    const confInPlatform = Boolean(f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false);
+
+    if (elInternal) elInternal.value = internalNote;
+    if (elPatient) elPatient.value = patientNote;
+    if (elConfP) elConfP.checked = confByPatient;
+    if (elConfPl) elConfPl.checked = confInPlatform;
+
+    const updateCounters = () => {
+      const ci = q("[data-det-count-internal]");
+      const cp = q("[data-det-count-patient]");
+      if (ci && elInternal) ci.textContent = String((elInternal.value || "").length);
+      if (cp && elPatient) cp.textContent = String((elPatient.value || "").length);
+    };
+    if (elInternal) elInternal.oninput = updateCounters;
+    if (elPatient) elPatient.oninput = updateCounters;
+    updateCounters();
+
+    // Load selects
+    (async () => {
+      try {
+        const [services, locations] = await Promise.all([loadServices().catch(() => []), loadLocations().catch(() => [])]);
+        // Services
+        if (elService) {
+          elService.innerHTML = `<option value="">—</option>` + (services || []).map((s) =>
+            `<option value="${escapeAttr(s.id)}">${escapeHtml(s.name || s.id)}</option>`
+          ).join("");
+          const want = (services || []).find((s) => String(s.name || "").trim() === String(item?.service || "").trim())?.id || "";
+          if (want) elService.value = want;
+        }
+        // Operators
+        if (elOperator) {
+          const ops = knownOperators || [];
+          elOperator.innerHTML = `<option value="">—</option>` + ops.map((o) =>
+            `<option value="${escapeAttr(o.id)}">${escapeHtml(o.name || o.id)}</option>`
+          ).join("");
+          const opId = operatorNameToId.get(String(item?.therapist || "").trim()) || "";
+          if (opId) elOperator.value = opId;
+        }
+        // Locations
+        if (elLocation) {
+          elLocation.innerHTML = `<option value="">—</option>` + (locations || []).map((l) =>
+            `<option value="${escapeAttr(l.id)}">${escapeHtml(l.name || l.id)}</option>`
+          ).join("");
+          const locId =
+            (locations || []).find((l) => String(l.name || "").trim() === String(guessedLocationName || "").trim())?.id ||
+            "";
+          if (locId) elLocation.value = locId;
+        }
+        // Status options
+        if (elStatus) {
+          const st = await apiGet("/api/appointment-field-options?field=Stato appuntamento").catch(() => ({ items: [] }));
+          const items = st.items || [];
+          elStatus.innerHTML = `<option value="">—</option>` + items.map((x) =>
+            `<option value="${escapeAttr(x.id)}">${escapeHtml(x.name || x.id)}</option>`
+          ).join("");
+          if (currentStatus) elStatus.value = currentStatus;
+        }
+      } catch (e) {
+        console.warn("Details modal options not available", e);
+      }
+    })();
+
+    // Patient contacts
+    (async () => {
+      const callA = q("[data-det-call]");
+      const waA = q("[data-det-wa]");
+      const emailA = q("[data-det-email]");
+      const setLink = (a, href, text) => {
+        if (!a) return;
+        a.textContent = text || a.textContent;
+        a.href = href || "#";
+        if (href) a.removeAttribute("aria-disabled");
+        else a.setAttribute("aria-disabled", "true");
+      };
+      setLink(callA, "", "CHIAMA");
+      setLink(waA, "", "+39… WhatsApp");
+      setLink(emailA, "", "EMAIL");
+      const pid = String(item?.patientId || "").trim();
+      if (!pid) return;
+      try {
+        const p = await apiGet(`/api/patient?id=${encodeURIComponent(pid)}`);
+        const telRaw = String(p.Telefono || "").trim();
+        const tel = telRaw.replace(/[^\d+]/g, "");
+        const telHref = tel ? `tel:${tel}` : "";
+        const waHref = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
+        const email = String(p.Email || "").trim();
+        const emailHref = email ? `mailto:${email}` : "";
+        setLink(callA, telHref, "CHIAMA");
+        setLink(waA, waHref, telRaw ? `${telRaw} WhatsApp` : "+39… WhatsApp");
+        setLink(emailA, emailHref, email || "EMAIL");
+      } catch (e) {
+        console.warn("Patient contact not available", e);
+      }
+    })();
+
+    const close = () => { back.style.display = "none"; };
+    if (btnCancel) btnCancel.onclick = close;
+
+    if (btnLoc) btnLoc.onclick = () => { try { elLocation?.focus?.(); } catch {} };
+
+    if (btnDelete) btnDelete.onclick = async () => {
+      if (!canDelete) return;
+      if (!confirm("Eliminare questo appuntamento?")) return;
+      try {
+        btnDelete.disabled = true;
+        await fetch(`/api/appointments?id=${encodeURIComponent(String(item.id))}`, { method: "DELETE", credentials: "include" });
+        close();
+        load({ nocache: true }).catch(() => {});
+      } catch (e) {
+        console.error(e);
+        alert("Errore eliminazione appuntamento");
+      } finally {
+        btnDelete.disabled = false;
+      }
+    };
+
+    if (btnSave) btnSave.onclick = async () => {
+      try {
+        btnSave.disabled = true;
+        const payload = {
+          status: elStatus ? String(elStatus.value || "") : "",
+          serviceId: elService ? String(elService.value || "") : "",
+          collaboratoreId: elOperator ? String(elOperator.value || "") : "",
+          sedeId: elLocation ? String(elLocation.value || "") : "",
+          durata: q("[data-det-duration]") ? String(q("[data-det-duration]").value || "") : "",
+          confirmed_by_patient: Boolean(elConfP?.checked),
+          confirmed_in_platform: Boolean(elConfPl?.checked),
+          notaRapida: elInternal ? String(elInternal.value || "") : "",
+          note: elPatient ? String(elPatient.value || "") : "",
+        };
+
+        const res = await fetch(`/api/appointments?id=${encodeURIComponent(String(item.id))}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+
+        close();
+        load({ nocache: true }).catch(() => {});
+      } catch (e) {
+        console.error(e);
+        alert(e.message || "Errore salvataggio appuntamento");
+      } finally {
+        btnSave.disabled = false;
+      }
+    };
+
+    back.style.display = "flex";
   }
 
   function openCreateModal(ctx) {
@@ -3237,10 +3493,14 @@
       };
 
       const onClick = () => openDetailsModal(it);
+      // If drag is enabled, "click to open details" is handled by mouseup logic.
+      // But when slot-edit mode is enabled, we still want a normal click to open the appointment.
+      ev.onclick = () => {
+        if (dragEnabled && !editHoursMode) return;
+        onClick();
+      };
 
-      if (!dragEnabled) {
-        ev.onclick = onClick;
-      } else {
+      if (dragEnabled) {
         ev.addEventListener("mousedown", (e) => {
           if (editHoursMode) return; // don't conflict with slot-edit mode
           if (e.button !== 0) return;
