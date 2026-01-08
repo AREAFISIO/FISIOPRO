@@ -126,6 +126,17 @@ function pickLocationName(fields) {
   return String(f.Nome ?? f["Nome sede"] ?? f.Sede ?? f.Name ?? "").trim();
 }
 
+function toBool(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  const s = norm(v).toLowerCase();
+  if (!s) return false;
+  if (s === "1" || s === "true" || s === "yes" || s === "si" || s === "sì" || s === "ok") return true;
+  if (s === "0" || s === "false" || s === "no") return false;
+  // Airtable checkbox sometimes returns true/false, but if a base uses text, treat any non-empty as true.
+  return true;
+}
+
 async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) {
   const tableEnc = enc(tableName);
   const all = (ids || []).filter((x) => typeof x === "string" && x.startsWith("rec"));
@@ -249,6 +260,31 @@ async function resolveSchema(tableEnc, tableName) {
     [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
   );
 
+  const FIELD_CONFIRMED_BY_PATIENT = await resolveFieldName(
+    tableEnc,
+    `appts:field:confirmedByPatient:${tableName}`,
+    [
+      process.env.AGENDA_CONFIRMED_BY_PATIENT_FIELD,
+      "Confermato dal paziente",
+      "Conferma del paziente",
+      "Conferma paziente",
+      "Paziente confermato",
+      "Confermato paziente",
+    ].filter(Boolean),
+  );
+  const FIELD_CONFIRMED_IN_PLATFORM = await resolveFieldName(
+    tableEnc,
+    `appts:field:confirmedInPlatform:${tableName}`,
+    [
+      process.env.AGENDA_CONFIRMED_IN_PLATFORM_FIELD,
+      "Conferma in InBuoneMani",
+      "Conferma in piattaforma",
+      "Confermato in piattaforma",
+      "Confermato in InBuoneMani",
+      "InBuoneMani",
+    ].filter(Boolean),
+  );
+
   const FIELD_QUICK_NOTE = await resolveFieldName(
     tableEnc,
     `appts:field:quick:${tableName}`,
@@ -302,6 +338,8 @@ async function resolveSchema(tableEnc, tableName) {
     FIELD_SERVICE,
     FIELD_LOCATION,
     FIELD_DURATION,
+    FIELD_CONFIRMED_BY_PATIENT,
+    FIELD_CONFIRMED_IN_PLATFORM,
     FIELD_QUICK_NOTE,
     FIELD_NOTES,
     FIELD_TIPI_EROGATI,
@@ -377,6 +415,7 @@ function mapAppointmentFromRecord({
 
   return {
     id: r.id,
+    created_at: String(r.createdTime || ""),
     patient_id: patient_id || "",
     patient_name: patient_name || "",
     start_at,
@@ -396,6 +435,9 @@ function mapAppointmentFromRecord({
 
     duration: durationRaw ?? "",
     duration_label,
+
+    confirmed_by_patient: schema.FIELD_CONFIRMED_BY_PATIENT ? toBool(f[schema.FIELD_CONFIRMED_BY_PATIENT]) : false,
+    confirmed_in_platform: schema.FIELD_CONFIRMED_IN_PLATFORM ? toBool(f[schema.FIELD_CONFIRMED_IN_PLATFORM]) : false,
 
     // Keep backwards-compatible names used by the existing UI
     quick_note: schema.FIELD_QUICK_NOTE ? String(f[schema.FIELD_QUICK_NOTE] ?? "") : "",
@@ -458,6 +500,8 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
     schema.FIELD_SERVICE,
     schema.FIELD_LOCATION,
     schema.FIELD_DURATION,
+    schema.FIELD_CONFIRMED_BY_PATIENT,
+    schema.FIELD_CONFIRMED_IN_PLATFORM,
     schema.FIELD_QUICK_NOTE,
     schema.FIELD_NOTES,
     schema.FIELD_TIPI_EROGATI,
@@ -589,6 +633,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, appointments });
     }
 
+    if (req.method === "DELETE") {
+      const role = normalizeRole(session.role || "");
+      if (role === "physio") return res.status(403).json({ ok: false, error: "forbidden" });
+
+      const id = norm(req.query?.id);
+      if (!id) return res.status(400).json({ ok: false, error: "missing_id" });
+
+      await airtableFetch(`${tableEnc}/${enc(id)}`, { method: "DELETE" });
+      return res.status(200).json({ ok: true });
+    }
+
     if (req.method === "PATCH") {
       const id = norm(req.query?.id);
       if (!id) return res.status(400).json({ ok: false, error: "missing_id" });
@@ -610,6 +665,15 @@ export default async function handler(req, res) {
       }
       if (schema.FIELD_NOTES && ("notes" in body || "note" in body || "patient_note" in body)) {
         fields[schema.FIELD_NOTES] = norm(body.notes ?? body.note ?? body.patient_note);
+      }
+
+      if (schema.FIELD_CONFIRMED_BY_PATIENT && ("confirmed_by_patient" in body || "confirmedByPatient" in body || "confermatoDalPaziente" in body)) {
+        const v = body.confirmed_by_patient ?? body.confirmedByPatient ?? body.confermatoDalPaziente;
+        fields[schema.FIELD_CONFIRMED_BY_PATIENT] = Boolean(v);
+      }
+      if (schema.FIELD_CONFIRMED_IN_PLATFORM && ("confirmed_in_platform" in body || "confirmedInPlatform" in body || "confermaInPiattaforma" in body)) {
+        const v = body.confirmed_in_platform ?? body.confirmedInPlatform ?? body.confermaInPiattaforma;
+        fields[schema.FIELD_CONFIRMED_IN_PLATFORM] = Boolean(v);
       }
 
       // Date/time fields (drag & drop support)

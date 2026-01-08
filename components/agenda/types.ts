@@ -1,5 +1,6 @@
 export type Appointment = {
   id: string;
+  created_at?: string;
 
   patient_id: string;
   patient_name: string;
@@ -35,4 +36,7 @@ export type Appointment = {
 
   confirmed_by_patient?: boolean;
   confirmed_in_platform?: boolean;
+
+  // UI-only helper (not persisted)
+  __deleted?: boolean;
 };
