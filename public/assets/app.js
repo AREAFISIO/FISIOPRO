@@ -369,6 +369,7 @@ async function initNotesPage() {
   const summaryEl = document.querySelector("[data-fp-notes-summary]");
   const refreshBtn = document.querySelector("[data-fp-notes-refresh]");
   const enableNotifyBtn = document.querySelector("[data-fp-notes-enable-notify]");
+  const ruleBoxes = Array.from(document.querySelectorAll("[data-fp-notes-rule]"));
 
   const setActiveRangeBtn = (val) => {
     document.querySelectorAll("[data-fp-notes-range]").forEach((b) => {
@@ -378,6 +379,44 @@ async function initNotesPage() {
 
   const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
   const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
+
+  const rulesKey = "fp_notes_rules_v1";
+  const defaultRules = {
+    contacts: true,
+    consent: true,
+    insurance: true,
+    confirmPatient: true,
+    confirmPlatform: true,
+    missingPatient: true,
+  };
+  const loadRules = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(rulesKey) || "null");
+      const obj = raw && typeof raw === "object" ? raw : {};
+      return { ...defaultRules, ...obj };
+    } catch {
+      return { ...defaultRules };
+    }
+  };
+  const saveRules = (next) => {
+    try { localStorage.setItem(rulesKey, JSON.stringify(next)); } catch {}
+  };
+  const getRulesFromUI = () => {
+    const cur = loadRules();
+    ruleBoxes.forEach((b) => {
+      const k = String(b.getAttribute("data-fp-notes-rule") || "").trim();
+      if (!k) return;
+      cur[k] = Boolean(b.checked);
+    });
+    return cur;
+  };
+  const syncRulesUI = (rules) => {
+    ruleBoxes.forEach((b) => {
+      const k = String(b.getAttribute("data-fp-notes-rule") || "").trim();
+      if (!k) return;
+      b.checked = Boolean(rules?.[k]);
+    });
+  };
 
   const computeRange = (rangeKey) => {
     const now = new Date();
@@ -505,6 +544,9 @@ async function initNotesPage() {
 
   const load = async () => {
     if (!groupsEl) return;
+    const rules = getRulesFromUI();
+    saveRules(rules);
+
     const rangeKey = getRange();
     setActiveRangeBtn(rangeKey);
     const { start, end, label } = computeRange(rangeKey);
@@ -519,61 +561,74 @@ async function initNotesPage() {
     const appts = (data.appointments || []).slice();
     appts.sort((a, b) => String(a.start_at || "").localeCompare(String(b.start_at || ""), "it"));
 
-    const missingPatient = appts.filter((a) => !a.patient_id);
-    const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient);
-    const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform);
+    const missingPatient = rules.missingPatient ? appts.filter((a) => !a.patient_id) : [];
+    const needConfirmPatient = rules.confirmPatient ? appts.filter((a) => a.patient_id && !a.confirmed_by_patient) : [];
+    const needConfirmPlatform = rules.confirmPlatform ? appts.filter((a) => a.patient_id && !a.confirmed_in_platform) : [];
 
     // Fetch patient-level data only for patients in range (bounded).
     const uniquePatientIds = Array.from(new Set(appts.map((a) => String(a.patient_id || "")).filter(Boolean)));
     const maxPatients = 60; // safety cap (keeps page responsive in large ranges)
     const patientIds = uniquePatientIds.slice(0, maxPatients);
 
-    await mapWithConcurrency(patientIds, 10, async (pid) => {
-      // Preload minimal info used by rules (best-effort).
-      await getPatient(pid);
-      return true;
-    });
+    if (rules.contacts || rules.consent || rules.insurance) {
+      await mapWithConcurrency(patientIds, 10, async (pid) => {
+        // Preload minimal info used by rules (best-effort).
+        await getPatient(pid);
+        return true;
+      });
+    }
 
     const missingContacts = [];
-    for (const a of appts) {
-      if (!a.patient_id) continue;
-      const p = patientCache.get(String(a.patient_id)) || null;
-      const tel = normalizeTel(p?.Telefono);
-      const email = String(p?.Email || "").trim();
-      if (!tel && !email) missingContacts.push(a);
+    if (rules.contacts) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const p = patientCache.get(String(a.patient_id)) || null;
+        const tel = normalizeTel(p?.Telefono);
+        const email = String(p?.Email || "").trim();
+        if (!tel && !email) missingContacts.push(a);
+      }
     }
 
     // Consent/anamnesi + insurance checks (bounded)
-    await mapWithConcurrency(patientIds, 8, async (pid) => {
-      await Promise.allSettled([getAnamnesi(pid), getInsurance(pid)]);
-      return true;
-    });
+    if (rules.consent || rules.insurance) {
+      await mapWithConcurrency(patientIds, 8, async (pid) => {
+        const ps = [];
+        if (rules.consent) ps.push(getAnamnesi(pid));
+        if (rules.insurance) ps.push(getInsurance(pid));
+        await Promise.allSettled(ps);
+        return true;
+      });
+    }
 
     const missingConsent = [];
-    for (const a of appts) {
-      if (!a.patient_id) continue;
-      const an = anamnesiCache.get(String(a.patient_id)) || null;
-      const items = an?.items || [];
-      const hasConsent = items.some((x) => Boolean(x?.consenso) || String(x?.dataConsenso || "").trim());
-      if (!hasConsent) missingConsent.push(a);
+    if (rules.consent) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const an = anamnesiCache.get(String(a.patient_id)) || null;
+        const items = an?.items || [];
+        const hasConsent = items.some((x) => Boolean(x?.consenso) || String(x?.dataConsenso || "").trim());
+        if (!hasConsent) missingConsent.push(a);
+      }
     }
 
     const openInsurance = [];
-    for (const a of appts) {
-      if (!a.patient_id) continue;
-      const ins = insuranceCache.get(String(a.patient_id)) || null;
-      const items = ins?.items || [];
-      if (!items.length) continue;
-      const hasOpen = items.some((x) => !isClosedStatus(x?.stato));
-      if (hasOpen) openInsurance.push(a);
+    if (rules.insurance) {
+      for (const a of appts) {
+        if (!a.patient_id) continue;
+        const ins = insuranceCache.get(String(a.patient_id)) || null;
+        const items = ins?.items || [];
+        if (!items.length) continue;
+        const hasOpen = items.some((x) => !isClosedStatus(x?.stato));
+        if (hasOpen) openInsurance.push(a);
+      }
     }
 
     if (summaryEl) {
       summaryEl.textContent =
         `${label} • ` +
-        `Nuovi pazienti da agganciare: ${missingPatient.length} • ` +
-        `Conferme paziente: ${needConfirmPatient.length} • ` +
-        `Conferme piattaforma: ${needConfirmPlatform.length}` +
+        (rules.missingPatient ? `Nuovi pazienti da agganciare: ${missingPatient.length} • ` : "") +
+        (rules.confirmPatient ? `Conferme paziente: ${needConfirmPatient.length} • ` : "") +
+        (rules.confirmPlatform ? `Conferme piattaforma: ${needConfirmPlatform.length}` : "").replace(/\s+•\s*$/, "") +
         (uniquePatientIds.length > maxPatients ? ` • Pazienti analizzati: ${maxPatients}/${uniquePatientIds.length}` : "");
     }
 
@@ -610,6 +665,22 @@ async function initNotesPage() {
             try { sessionStorage.removeItem("fp_inbox_badge_v1"); } catch {}
             await load();
             await updateInboxBadge();
+          },
+        });
+        actions.push({
+          kind: "button",
+          label: "Nota interna",
+          primary: false,
+          onClick: async () => {
+            const prev = String(a.internal_note || a.quick_note || "").trim();
+            const txt = prompt("Nota interna (visibile solo internamente):", prev);
+            if (txt === null) return;
+            await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ quick_note: String(txt || "").trim() }),
+            });
+            toast("Nota salvata");
+            await load();
           },
         });
       }
@@ -733,6 +804,15 @@ async function initNotesPage() {
     });
   });
   refreshBtn && (refreshBtn.onclick = () => load().catch(() => {}));
+
+  // Rules UI: initialize + reload on change
+  if (ruleBoxes.length) {
+    const saved = loadRules();
+    syncRulesUI(saved);
+    ruleBoxes.forEach((b) => {
+      b.addEventListener("change", () => load().catch(() => {}));
+    });
+  }
 
   if (enableNotifyBtn) {
     const updateBtnLabel = () => {
