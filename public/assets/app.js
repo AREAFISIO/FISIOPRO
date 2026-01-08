@@ -167,6 +167,10 @@ function isAgendaPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/agenda.html") || p.endsWith("/agenda.html");
 }
+function isDashboardPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
+}
 function pad2(n){ return String(n).padStart(2,"0"); }
 function toISODate(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
 function parseISODate(s){
@@ -228,6 +232,76 @@ function buildWaHref(phoneRaw) {
   // wa.me vuole solo numeri (senza +)
   const digits = p.replace(/[^\d]/g, "");
   return digits ? `https://wa.me/${digits}` : "";
+}
+
+// =====================
+// DASHBOARD (KPI "Oggi")
+// =====================
+function normalizeApptType(v) {
+  return String(v ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+function parseDateSafe(v) {
+  const d = new Date(String(v || ""));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function overlapMinutesForDay(appt, dayStart, dayEnd) {
+  const s = parseDateSafe(appt?.start_at);
+  if (!s) return 0;
+
+  let e = parseDateSafe(appt?.end_at);
+  if (!e) {
+    const raw = appt?.duration;
+    const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+    if (Number.isFinite(n) && n > 0) e = new Date(s.getTime() + n * 60_000);
+  }
+  if (!e) return 0;
+
+  const start = s < dayStart ? dayStart : s;
+  const end = e > dayEnd ? dayEnd : e;
+  const ms = end.getTime() - start.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.max(0, Math.round(ms / 60_000));
+}
+
+async function initDashboard() {
+  if (!isDashboardPage()) return;
+
+  const valueEl = document.querySelector("[data-kpi-today]");
+  const miniEl = document.querySelector("[data-kpi-today-mini]");
+  if (!valueEl) return;
+
+  valueEl.textContent = "—";
+  if (miniEl) miniEl.textContent = "Caricamento…";
+
+  const now = new Date();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  try {
+    const data = await api(
+      `/api/appointments?start=${encodeURIComponent(dayStart.toISOString())}&end=${encodeURIComponent(dayEnd.toISOString())}`,
+    );
+    const appts = Array.isArray(data?.appointments) ? data.appointments : [];
+
+    const wantedType = "appuntamento paziente";
+    const filtered = appts.filter((a) => normalizeApptType(a?.appointment_type) === wantedType);
+
+    let minutes = 0;
+    for (const a of filtered) minutes += overlapMinutesForDay(a, dayStart, dayEnd);
+
+    const slots = minutes <= 0 ? 0 : Math.ceil(minutes / 60);
+    valueEl.textContent = String(slots);
+    if (miniEl) miniEl.textContent = `Slot da 60' • solo "Appuntamento paziente"`;
+  } catch (e) {
+    console.error(e);
+    if (miniEl) miniEl.textContent = "Impossibile caricare gli appuntamenti di oggi.";
+  }
 }
 
 function includesChannelPref(raw, filter) {
@@ -1058,6 +1132,7 @@ async function runRouteInits() {
   await initAnagrafica();
   await initPatientPage();
   await ensureDiaryLoaded();
+  await initDashboard();
 }
 
 function removeInnerMenuIcons() {
