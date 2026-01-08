@@ -3,7 +3,7 @@ import { asLinkArray, enc, norm, readJsonBody, filterByLinkedRecordId } from "./
 
 export default async function handler(req, res) {
   ensureRes(res);
-  const user = requireRoles(req, res, ["front", "manager"]);
+  const user = requireRoles(req, res, ["front", "back", "manager"]);
   if (!user) return;
 
   try {

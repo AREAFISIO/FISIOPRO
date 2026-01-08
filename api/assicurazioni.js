@@ -4,7 +4,7 @@ import { enc, norm, readJsonBody } from "./_common.js";
 // ASSICURAZIONI (catalogo compagnie)
 export default async function handler(req, res) {
   ensureRes(res);
-  const user = requireRoles(req, res, ["front", "manager"]);
+  const user = requireRoles(req, res, ["front", "back", "manager"]);
   if (!user) return;
 
   try {

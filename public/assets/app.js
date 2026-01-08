@@ -368,6 +368,7 @@ async function initNotesPage() {
   const groupsEl = document.querySelector("[data-fp-notes-groups]");
   const summaryEl = document.querySelector("[data-fp-notes-summary]");
   const refreshBtn = document.querySelector("[data-fp-notes-refresh]");
+  const enableNotifyBtn = document.querySelector("[data-fp-notes-enable-notify]");
 
   const setActiveRangeBtn = (val) => {
     document.querySelectorAll("[data-fp-notes-range]").forEach((b) => {
@@ -442,6 +443,66 @@ async function initNotesPage() {
     });
   };
 
+  const normalizeTel = (v) => String(v || "").trim().replace(/[^\d+]/g, "");
+
+  const mapWithConcurrency = async (items, limit, fn) => {
+    const arr = Array.from(items || []);
+    const out = new Array(arr.length);
+    const cap = Math.max(1, Math.min(Number(limit) || 8, 16));
+    let idx = 0;
+    const worker = async () => {
+      while (idx < arr.length) {
+        const i = idx++;
+        try { out[i] = await fn(arr[i], i); } catch (e) { out[i] = null; }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(cap, arr.length) }, worker));
+    return out;
+  };
+
+  const patientCache = new Map();   // patientId -> { Telefono, Email, ... }
+  const anamnesiCache = new Map();  // patientId -> { ok, items }
+  const insuranceCache = new Map(); // patientId -> { items }
+
+  const getPatient = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (patientCache.has(pid)) return patientCache.get(pid);
+    const p = await api(`/api/patient?id=${encodeURIComponent(pid)}`);
+    patientCache.set(pid, p || null);
+    return p || null;
+  };
+  const getAnamnesi = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (anamnesiCache.has(pid)) return anamnesiCache.get(pid);
+    const a = await api(`/api/anamnesi?patientId=${encodeURIComponent(pid)}&maxRecords=50`);
+    anamnesiCache.set(pid, a || null);
+    return a || null;
+  };
+  const getInsurance = async (patientId) => {
+    const pid = String(patientId || "").trim();
+    if (!pid) return null;
+    if (insuranceCache.has(pid)) return insuranceCache.get(pid);
+    const ins = await api(`/api/insurance?patientId=${encodeURIComponent(pid)}`);
+    insuranceCache.set(pid, ins || null);
+    return ins || null;
+  };
+
+  const isClosedStatus = (statoRaw) => {
+    const s = String(statoRaw || "").trim().toLowerCase();
+    if (!s) return false;
+    return (
+      s.includes("chius") ||
+      s.includes("conclus") ||
+      s.includes("liquidat") ||
+      s.includes("pagat") ||
+      s.includes("ok") ||
+      s === "chiusa" ||
+      s === "chiuso"
+    );
+  };
+
   const load = async () => {
     if (!groupsEl) return;
     const rangeKey = getRange();
@@ -462,12 +523,58 @@ async function initNotesPage() {
     const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient);
     const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform);
 
+    // Fetch patient-level data only for patients in range (bounded).
+    const uniquePatientIds = Array.from(new Set(appts.map((a) => String(a.patient_id || "")).filter(Boolean)));
+    const maxPatients = 60; // safety cap (keeps page responsive in large ranges)
+    const patientIds = uniquePatientIds.slice(0, maxPatients);
+
+    await mapWithConcurrency(patientIds, 10, async (pid) => {
+      // Preload minimal info used by rules (best-effort).
+      await getPatient(pid);
+      return true;
+    });
+
+    const missingContacts = [];
+    for (const a of appts) {
+      if (!a.patient_id) continue;
+      const p = patientCache.get(String(a.patient_id)) || null;
+      const tel = normalizeTel(p?.Telefono);
+      const email = String(p?.Email || "").trim();
+      if (!tel && !email) missingContacts.push(a);
+    }
+
+    // Consent/anamnesi + insurance checks (bounded)
+    await mapWithConcurrency(patientIds, 8, async (pid) => {
+      await Promise.allSettled([getAnamnesi(pid), getInsurance(pid)]);
+      return true;
+    });
+
+    const missingConsent = [];
+    for (const a of appts) {
+      if (!a.patient_id) continue;
+      const an = anamnesiCache.get(String(a.patient_id)) || null;
+      const items = an?.items || [];
+      const hasConsent = items.some((x) => Boolean(x?.consenso) || String(x?.dataConsenso || "").trim());
+      if (!hasConsent) missingConsent.push(a);
+    }
+
+    const openInsurance = [];
+    for (const a of appts) {
+      if (!a.patient_id) continue;
+      const ins = insuranceCache.get(String(a.patient_id)) || null;
+      const items = ins?.items || [];
+      if (!items.length) continue;
+      const hasOpen = items.some((x) => !isClosedStatus(x?.stato));
+      if (hasOpen) openInsurance.push(a);
+    }
+
     if (summaryEl) {
       summaryEl.textContent =
         `${label} • ` +
         `Nuovi pazienti da agganciare: ${missingPatient.length} • ` +
         `Conferme paziente: ${needConfirmPatient.length} • ` +
-        `Conferme piattaforma: ${needConfirmPlatform.length}`;
+        `Conferme piattaforma: ${needConfirmPlatform.length}` +
+        (uniquePatientIds.length > maxPatients ? ` • Pazienti analizzati: ${maxPatients}/${uniquePatientIds.length}` : "");
     }
 
     const mkApptActions = (a) => {
@@ -535,6 +642,18 @@ async function initNotesPage() {
           href: `paziente.html?id=${encodeURIComponent(a.patient_id)}`,
           primary: false,
         });
+        actions.push({
+          kind: "link",
+          label: "Anamnesi/consensi",
+          href: `anamnesi.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
+        actions.push({
+          kind: "link",
+          label: "Pratiche assicurative",
+          href: `pratiche-assicurative.html?patientId=${encodeURIComponent(a.patient_id)}`,
+          primary: false,
+        });
       }
       if (!a.patient_id) {
         actions.push({ kind: "link", label: "Crea paziente", href: "nuovo-paziente.html", primary: true });
@@ -543,6 +662,24 @@ async function initNotesPage() {
     };
 
     const groups = [
+      {
+        title: "Contatti mancanti (rischio perdita paziente)",
+        items: missingContacts.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: inserire telefono/email in scheda paziente prima dell'appuntamento.",
+          badge: "☎️",
+          actions: mkApptActions(a),
+        })),
+      },
+      {
+        title: "Consenso informato / anamnesi mancanti",
+        items: missingConsent.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: raccogliere consensi e aggiornare anamnesi (privacy ecc.).",
+          badge: "📝",
+          actions: mkApptActions(a),
+        })),
+      },
       {
         title: "Nuovi pazienti (appuntamento senza scheda)",
         items: missingPatient.map((a) => ({
@@ -570,6 +707,15 @@ async function initNotesPage() {
           actions: mkApptActions(a),
         })),
       },
+      {
+        title: "Pratiche assicurative aperte (verifica stato)",
+        items: openInsurance.map((a) => ({
+          title: apptLabel(a),
+          meta: "Azione: controlla pratica assicurativa e documentazione prima/durante la visita.",
+          badge: "🛡️",
+          actions: mkApptActions(a),
+        })),
+      },
     ].filter((g) => g.items.length);
 
     if (!groups.length) {
@@ -587,6 +733,33 @@ async function initNotesPage() {
     });
   });
   refreshBtn && (refreshBtn.onclick = () => load().catch(() => {}));
+
+  if (enableNotifyBtn) {
+    const updateBtnLabel = () => {
+      try {
+        const p = typeof Notification !== "undefined" ? Notification.permission : "unsupported";
+        enableNotifyBtn.textContent =
+          p === "granted" ? "Notifiche attive" :
+          p === "denied" ? "Notifiche bloccate" :
+          "Abilita notifiche";
+        enableNotifyBtn.disabled = p === "granted";
+      } catch {}
+    };
+    updateBtnLabel();
+    enableNotifyBtn.onclick = async () => {
+      try {
+        if (typeof Notification === "undefined") {
+          alert("Notifiche non supportate su questo browser.");
+          return;
+        }
+        const p = await Notification.requestPermission();
+        updateBtnLabel();
+        if (p === "granted") toast("Notifiche abilitate");
+      } catch {
+        // ignore
+      }
+    };
+  }
 
   await load();
 }

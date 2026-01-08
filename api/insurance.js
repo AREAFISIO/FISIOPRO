@@ -9,7 +9,7 @@ function filterByPatientRecordId(patientRecordId) {
 }
 
 export default async function handler(req, res) {
-  const user = requireRoles(req, res, ["front", "manager"]);
+  const user = requireRoles(req, res, ["front", "back", "manager"]);
   if (!user) return;
 
   try {
@@ -21,10 +21,10 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(INSURANCE_TABLE);
     const qs = new URLSearchParams({
       filterByFormula: filterByPatientRecordId(patientId),
-      sort[0][field]: "Data",
-      sort[0][direction]: "desc",
       pageSize: "50",
     });
+    qs.append("sort[0][field]", "Data");
+    qs.append("sort[0][direction]", "desc");
 
     const data = await airtableFetch(`${table}?${qs.toString()}`);
 
