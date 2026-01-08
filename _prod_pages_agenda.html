@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Agenda</title>
+  <!-- cache-bust -->
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20251231c" />
+  <style>
+    /* Agenda shell (keeps your management system look) */
+    body { overflow: hidden; }
+    .app { --leftW: 230px; --rightWCollapsed: 72px; --rightWExpanded: 320px; --rightW: var(--rightWCollapsed); grid-template-columns: var(--leftW) 1fr var(--rightW); }
+
+    :root{
+      --fpDayHeadH: 58px;
+      --fpCancelH: 42px;
+      --fpOpHeadH: 34px;
+
+      /* Theme-aware inks/lines for Agenda grid */
+      --fp-ink: var(--text);
+      --fp-ink-muted: var(--muted);
+      --fp-grid-line: color-mix(in srgb, var(--text) 10%, transparent);
+      --fp-grid-line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+      --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, var(--fp-grid-line-strong));
+      /* Vertical lines (thin) + day separators (visible but softer) */
+      --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 28%, rgba(13,23,44,.34));
+      /* Softer separator between days: blue-tinted, less "black bar" */
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 34%, rgba(255,255,255,.10));
+      --fp-day-sep-shadow: color-mix(in srgb, var(--fp-day-sep) 55%, transparent);
+      --fp-col-bg: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panel) 96%, transparent),
+        color-mix(in srgb, var(--panel-2) 96%, transparent)
+      );
+      --fp-timecol-bg: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--panelSolid) 98%, transparent),
+        color-mix(in srgb, var(--panelSolid2) 98%, transparent)
+      );
+      --fp-event-bg: color-mix(in srgb, var(--accent-2) 10%, var(--btnBg));
+      --fp-event-border: color-mix(in srgb, var(--accent-2) 34%, var(--border));
+      --fp-event-shadow: 0 18px 60px rgba(0,0,0,.35);
+    }
+
+    /* Pro = light: make grid/lines slightly more visible + a touch more blue */
+    body.fp-theme-pro{
+      --fp-grid-line: color-mix(in srgb, var(--accent-2) 10%, rgba(13,23,44,.12));
+      --fp-grid-line-strong: color-mix(in srgb, var(--accent-2) 14%, rgba(13,23,44,.18));
+      --fp-grid-line-hour: color-mix(in srgb, var(--accent-2) 22%, rgba(13,23,44,.22));
+      /* Pro (light): separators need definition but stay elegant */
+      --fp-vert-line: color-mix(in srgb, rgba(45,108,255,.92) 26%, rgba(13,23,44,.28));
+      --fp-day-sep: color-mix(in srgb, var(--accent-2) 32%, rgba(13,23,44,.22));
+      --fp-day-sep-shadow: color-mix(in srgb, var(--fp-day-sep) 55%, transparent);
+      --fp-event-bg: color-mix(in srgb, var(--accent-2) 14%, rgba(45,108,255,.06));
+      --fp-event-border: color-mix(in srgb, var(--accent-2) 42%, rgba(13,23,44,.18));
+    }
+
+    .calWrap{
+      height: calc(100vh - 120px);
+      border:1px solid var(--border);
+      border-radius: 18px;
+      background: color-mix(in srgb, var(--cardBg) 92%, transparent);
+      overflow:hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .calTop{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent-2) 10%, transparent),
+        color-mix(in srgb, var(--accent-2) 4%, transparent)
+      );
+    }
+    .calTop .left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .calTitle{ font-weight:900; letter-spacing:-.2px; }
+    .calSub{ color: var(--muted); font-size: 13px; }
+
+    .calChips{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .chip.btnlike{ cursor:pointer; user-select:none; }
+    .chip.btnlike.active{
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+      color: var(--text);
+    }
+
+    /* Operator selector bar (like screenshot) */
+    .opsBar{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      padding: 10px 12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      cursor:pointer;
+      user-select:none;
+      min-height: 44px;
+    }
+    .opsLeft{ display:flex; align-items:center; gap:10px; min-width: 0; }
+    .opsDots{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .opsDot{
+      width: 26px; height: 26px; border-radius: 999px;
+      display:grid; place-items:center;
+      font-weight: 900; font-size: 12px;
+      color: rgba(10,18,32,.90);
+      border: 1px solid rgba(255,255,255,.25);
+    }
+    .opsText{ color: var(--fp-ink-muted); font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .opsCaret{ opacity: .8; }
+
+    /* Operator dropdown */
+    .opsBack{
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      display:none;
+      z-index: 60;
+      padding: 18px;
+    }
+    .opsMenu{
+      width: 620px; max-width: 96vw;
+      margin: 10vh auto 0;
+      border-radius: 16px;
+      background: var(--panelSolid);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .opsMenuTop{
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--text) 6%, transparent),
+        color-mix(in srgb, var(--text) 2%, transparent)
+      );
+    }
+    .opsToggle{ display:flex; align-items:center; gap:10px; }
+    .opsToggleLabel{ font-weight: 800; }
+    .opsMenuBody{ max-height: 52vh; overflow:auto; }
+    .opsRow{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--btnBg) 72%, transparent);
+    }
+    .opsRow:last-child{ border-bottom:none; }
+    .opsRowLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .opsCheck{
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+    }
+    .opsCheck.on{
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    }
+    .opsName{ font-weight: 800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .opsMini{ color: var(--muted); font-size: 13px; }
+    .opsMenuFoot{ padding: 12px 14px; display:flex; justify-content:flex-end; gap:10px; border-top: 1px solid var(--border); }
+
+    /* Minimal switch */
+    .switch{ position: relative; display:inline-block; width: 46px; height: 26px; }
+    .switch input{ opacity:0; width:0; height:0; }
+    .slider{
+      position:absolute; inset:0;
+      cursor:pointer;
+      background: color-mix(in srgb, var(--text) 10%, transparent);
+      border: 1px solid var(--border);
+      transition: .2s;
+      border-radius: 999px;
+    }
+    .slider:before{
+      content:"";
+      position:absolute;
+      height: 20px; width: 20px;
+      left: 3px; top: 2px;
+      background: color-mix(in srgb, var(--text) 92%, transparent);
+      transition: .2s;
+      border-radius: 999px;
+    }
+    .switch input:checked + .slider{
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    }
+    .switch input:checked + .slider:before{
+      transform: translateX(20px);
+      background: color-mix(in srgb, var(--accent) 92%, transparent);
+    }
+
+    .calGridOuter{ height: 100%; overflow:auto; }
+
+    .calGrid{
+      position: relative;
+      display:grid;
+      grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+      min-width: 0;
+    }
+
+    .calHead{
+      position: sticky; top: 0;
+      z-index: 5;
+      display: contents;
+    }
+    .calHead .corner{
+      position: sticky; top:0; left:0;
+      z-index: 7;
+      background: var(--panelSolid);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
+      height: var(--fpDayHeadH);
+    }
+    .calHead .dayHead{
+      position: sticky; top:0;
+      z-index: 6;
+      height: var(--fpDayHeadH);
+      display:flex; flex-direction:column; justify-content:center;
+      gap:4px; padding: 8px 10px;
+      background: var(--panelSolid);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--fp-vert-line);
+    }
+    /* Operator header row needs different sticky top in multi-user */
+    .dayHead.opHead{
+      top: calc(var(--fpDayHeadH) + var(--fpCancelH));
+      height: var(--fpOpHeadH);
+    }
+    /* Cancelled-band row (between date row and operator row) */
+    .cancelHead{
+      position: sticky;
+      top: var(--fpDayHeadH);
+      z-index: 6;
+      height: var(--fpCancelH);
+      padding: 6px 10px;
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--accent-2) 10%, var(--panelSolid)),
+        color-mix(in srgb, var(--accent-2) 4%, var(--panelSolid))
+      );
+      border-bottom: 1px solid var(--fp-grid-line-strong);
+      border-right: 1px solid var(--fp-vert-line);
+      display:flex;
+      align-items:center;
+      overflow:hidden;
+    }
+    .cancelWrap{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      min-width:0;
+    }
+    .cancelChip{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      padding: 5px 8px;
+      border-radius: 12px;
+      border: 1px solid color-mix(in srgb, var(--accent-2) 26%, var(--border));
+      background: var(--btnBg);
+      color: var(--text);
+      font-weight: 900;
+      font-size: 12px;
+      max-width: 220px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .cancelChip .k{
+      opacity:.9;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .cancelChip .t{
+      opacity:.85;
+      font-weight: 900;
+    }
+    .cancelChip .p{
+      opacity:.88;
+      font-weight: 900;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* Operator label inside the operator header row */
+    .opName{
+      color: var(--fp-ink);
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      max-width: 140px;
+      opacity: .92;
+    }
+    @media (max-width: 1060px){
+      .opName{ max-width: 96px; }
+    }
+    .dayHead .d1{ font-weight:900; font-size: 13px; letter-spacing:.08em; text-transform:uppercase; color: var(--fp-ink-muted); }
+    .dayHead .d2{ font-weight:900; font-size: 15px; }
+
+    .timeCol{
+      position: relative;
+      border-right: 1px solid var(--fp-vert-line);
+      background: var(--fp-timecol-bg);
+    }
+    .timeTick{
+      position:absolute; left:0; right:0;
+      transform: translateY(-7px);
+      color: var(--fp-ink);
+      font-size: 13px;
+      font-weight: 900;
+      padding-left: 10px;
+      pointer-events:none;
+      text-shadow: 0 2px 12px rgba(0,0,0,.35);
+    }
+    body.fp-theme-pro .timeTick{ text-shadow: none; }
+
+    .dayCol{
+      position: relative;
+      border-right: 1px solid var(--fp-vert-line);
+      background: var(--fp-col-bg);
+    }
+
+    /* Stronger day separators (between days) */
+    .daySep{
+      border-left: 2px solid var(--fp-day-sep);
+      box-shadow: -1px 0 0 var(--fp-day-sep-shadow);
+    }
+    .daySepHead{
+      border-left: 2px solid var(--fp-day-sep) !important;
+      box-shadow: -1px 0 0 var(--fp-day-sep-shadow);
+    }
+    .gridLine{
+      position:absolute; left:0; right:0;
+      border-top: 1px solid var(--fp-grid-line);
+      pointer-events:none;
+    }
+    .gridLine.hour{ border-top-color: var(--fp-grid-line-hour); }
+
+    .slotHover{
+      position:absolute;
+      left:0; right:0;
+      height: 18px; /* SLOT_PX (sincronizzato in diary.js) */
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 22%, transparent),
+        color-mix(in srgb, var(--accent-2) 16%, transparent)
+      );
+      outline: 2px solid color-mix(in srgb, var(--accent) 42%, transparent);
+      box-shadow: inset 0 0 0 1px var(--fp-grid-line), 0 10px 26px color-mix(in srgb, var(--accent) 14%, transparent);
+      pointer-events:none;
+      display:none;
+      border-radius: 8px;
+    }
+
+    .event{
+      position:absolute;
+      /* Wider block (requested) */
+      left: 6px;
+      right: 6px;
+      border-radius: 8px; /* più simile allo slotHover */
+      border: 1px solid var(--fp-event-border);
+      border-left-width: 4px;
+      border-left-color: color-mix(in srgb, var(--accent-2) 65%, var(--fp-event-border));
+      background: var(--fp-event-bg);
+      padding: 8px 10px;
+      cursor:pointer;
+      overflow:hidden;
+    }
+    .event.isHover{
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+    .event.isDragging{
+      cursor: grabbing;
+      opacity: .78;
+      box-shadow: var(--fp-event-shadow);
+    }
+    .event .t{ font-weight:900; font-size: 13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .event .m{ margin-top:4px; font-size: 12px; color: var(--fp-ink-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .event .b{ margin-top:6px; display:flex; gap:8px; align-items:center; color: var(--fp-ink-muted); font-size: 12px; }
+    .dot{ width:10px; height:10px; border-radius:999px; background: var(--accent); box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent); }
+
+    /* Modal */
+    .fp-modalBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none; align-items:center; justify-content:center;
+      z-index: 50;
+      padding: 16px;
+    }
+    .fp-modal{
+      width: 860px; max-width: 96vw;
+      border-radius: 18px;
+      background: var(--panelSolid);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      /* Let native controls follow the active theme */
+      color: var(--text);
+      color-scheme: light dark;
+      overflow:hidden;
+      max-height: calc(100vh - 32px);
+      display:flex;
+      flex-direction:column;
+    }
+    .fp-modalHead{ padding: 14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .fp-modalTitle{ font-weight:900; font-size: 19px; }
+    .fp-modalBody{
+      padding: 16px;
+      color: var(--text);
+      font-size: 16px;
+      line-height:1.55;
+      overflow:auto;
+      min-height:0; /* allow flex child to scroll */
+    }
+    .fp-kv{ display:grid; grid-template-columns: 160px 1fr; gap:10px; padding: 8px 0; border-bottom:1px dashed var(--border); }
+    .fp-kv:last-child{ border-bottom:none; }
+    .fp-kv .k{ color: var(--muted); }
+
+    .fp-kv .v{ color: var(--text); }
+
+    /* Make create/edit form more readable */
+    .fpFormLabel{
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+    .fp-modalBody .input,
+    .fp-modalBody .select,
+    .fp-modalBody .textarea{
+      padding: 12px 14px;
+      border-radius: 14px;
+      font-size: 16px;
+      /* Theme-aware fields */
+      background: var(--btnBg);
+      border-color: var(--border);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .fp-modalBody .btn{ padding: 12px 16px; border-radius: 14px; font-size: 16px; }
+    .fp-modalBody .input::placeholder,
+    .fp-modalBody .textarea::placeholder{ color: var(--muted); }
+    .fp-modalBody .input:focus,
+    .fp-modalBody .select:focus,
+    .fp-modalBody .textarea:focus{
+      outline: none;
+      border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+      background: var(--btnBgHover);
+    }
+    /* Keep dropdown options readable on dark UI */
+    .fp-modalBody select.select option{
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    /* Hover card appuntamento */
+    .fpHover{
+      position: fixed;
+      z-index: 80;
+      width: 320px;
+      max-width: calc(100vw - 24px);
+      background: var(--panelSolid);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      padding: 12px 12px 10px;
+      pointer-events: none;
+      display:none;
+    }
+    .fpHover .t{ font-weight: 900; font-size: 16px; color: var(--text); }
+    .fpHover .r{ margin-top:6px; color: var(--text); font-size: 13px; display:flex; gap:8px; align-items:center; }
+    .fpHover .k{ color: var(--muted); min-width: 92px; }
+    .fpHover .note{ margin-top:10px; border-top:1px dashed var(--border); padding-top:10px; color: var(--muted); font-size: 12px; }
+
+    /* Right slim bar styles moved to app.css */
+
+    /* Settings modal (user preferences) */
+    .prefsBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      z-index: 70;
+      padding: 18px;
+    }
+    .prefsPanel{
+      width: 920px; max-width: 96vw;
+      margin: 6vh auto 0;
+      border-radius: 18px;
+      background: var(--panelSolid);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      color-scheme: light dark;
+      overflow:hidden;
+      max-height: calc(100vh - 12vh);
+      display:flex;
+      flex-direction:column;
+    }
+    .prefsHead{
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--text) 6%, transparent),
+        color-mix(in srgb, var(--text) 2%, transparent)
+      );
+    }
+    .prefsTitle{ display:flex; align-items:center; gap:10px; font-weight: 900; font-size: 18px; }
+    .prefsBody{
+      padding: 16px;
+      overflow:auto;
+      min-height: 0; /* allow flex child to scroll */
+    }
+    .prefsGrid{
+      display:grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 14px;
+      align-items:start;
+    }
+    @media (max-width: 980px){ .prefsGrid{ grid-template-columns: 1fr; } }
+    .prefsCard{
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--btnBg) 85%, transparent);
+      padding: 14px;
+    }
+    .prefsRow{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .prefsRow:last-child{ border-bottom:none; }
+    .prefsLabel{ font-weight: 800; }
+    .prefsSub{ color: var(--muted); font-size: 13px; margin-top:6px; line-height:1.4; }
+    .prefsRight{ display:flex; align-items:center; gap:10px; }
+    .colorSwatch{
+      width: 46px; height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      overflow:hidden;
+    }
+    .colorSwatch input{
+      width:100%; height:100%;
+      border:none; outline:none;
+      background: transparent;
+      padding:0;
+    }
+    .selectSmall{
+      height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
+      padding: 0 10px;
+    }
+    .prefsFoot{
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      display:flex; justify-content:flex-end; gap:10px;
+    }
+
+    /* Operator role badge (used in dropdown lists) */
+    .opsRole{
+      margin-left: 10px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+
+    /* Inline picker for default agendas */
+    .prefPicker{
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--btnBg) 80%, transparent);
+      overflow:hidden;
+      display:none;
+    }
+    .prefPickerTop{
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .prefPickerTop .mini{
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .prefPickerSearch{
+      flex:1;
+      min-width: 0;
+      height: 34px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
+      padding: 0 10px;
+    }
+    .prefPickerBody{
+      max-height: 260px;
+      overflow:auto;
+    }
+    .prefPickRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor:pointer;
+      background: color-mix(in srgb, var(--btnBg) 72%, transparent);
+    }
+    .prefPickRow:hover{ background: color-mix(in srgb, var(--btnBgHover) 85%, transparent); }
+    .prefPickRow:last-child{ border-bottom:none; }
+    .prefPickLeft{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .prefPickCheck{
+      width: 20px; height: 20px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+      color: var(--text);
+      font-weight: 900;
+    }
+    .prefPickCheck.on{
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    }
+    .prefPickName{
+      font-weight: 900;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .prefPickMini{ color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="app" data-diary>
+  <aside class="sidebar">
+    <div class="brand"><div class="dot"></div><div><div class="title">AreA FISIO</div><div class="sub">Agenda</div></div></div>
+    <nav class="nav">
+      <div class="section">Generale</div>
+      <a data-nav href="dashboard.html" data-role="physio,front,manager">Dashboard</a>
+      <a data-nav href="anagrafica.html" data-role="physio,front,manager">Pazienti</a>
+      <a data-nav href="agenda.html" class="active" data-role="physio,front,manager">Agenda</a>
+
+      <div class="section">Front Office</div>
+      <a data-nav href="vendite.html" data-role="front,manager">Vendite</a>
+      <a data-nav href="erogato.html" data-role="front,manager">Erogato</a>
+      <a data-nav href="pratiche-assicurative.html" data-role="front,manager">Assicurazioni</a>
+      <a data-nav href="login.html">Logout</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Agenda <span class="pill" data-login-name>—</span></div>
+        <div class="actions">
+          <button class="btn" data-cal-today>Oggi</button>
+          <button class="btn" data-cal-prev>Indietro</button>
+          <button class="btn" data-cal-next>Avanti</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="head">
+        <h2 style="display:none;">Diario</h2>
+        <span class="chip" style="display:none;"></span>
+      </div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="search">Cerca <input data-cal-q placeholder="Paziente, prestazione, operatore..." /></div>
+          <div class="opsBar" data-ops-bar title="Seleziona operatori">
+            <div class="opsLeft">
+              <div class="opsDots" data-ops-dots></div>
+              <div class="opsText" data-ops-text>Operatori</div>
+            </div>
+            <div class="opsCaret">▾</div>
+          </div>
+        </div>
+
+        <div class="calWrap">
+          <div class="calTop">
+            <div class="left">
+              <div>
+                <div class="calTitle" data-cal-month>—</div>
+                <div class="calSub" data-cal-week>—</div>
+              </div>
+            </div>
+            <div class="calChips">
+              <span class="chip btnlike active" data-cal-view="7days">7 giorni</span>
+              <span class="chip btnlike" data-cal-view="5days">5 giorni</span>
+              <span class="chip btnlike" data-cal-view="day">Giorno</span>
+            </div>
+          </div>
+
+          <div class="calGridOuter">
+            <div class="calGrid" data-cal-grid>
+              <!-- header + columns injected by diary.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar slim">
+    <button class="rbBtn" data-open-prefs title="Impostazioni utente">
+      <span class="rbIcon">⚙️</span>
+    </button>
+    <button class="rbBtn" data-open-hours title="Modifica orari a slot">
+      <span class="rbIcon">🕒</span>
+    </button>
+  </aside>
+</div>
+
+<div class="toast"></div>
+
+<div class="fp-modalBack" data-cal-modal>
+  <div class="fp-modal">
+    <div class="fp-modalHead">
+      <div class="fp-modalTitle" data-cal-modal-title>Dettagli</div>
+      <button class="btn" data-cal-modal-close>Chiudi</button>
+    </div>
+    <div class="fp-modalBody" data-cal-modal-body></div>
+  </div>
+</div>
+
+<div class="opsBack" data-ops-back>
+  <div class="opsMenu" role="dialog" aria-modal="true">
+    <div class="opsMenuTop">
+      <div class="opsToggle">
+        <span class="opsToggleLabel">Vista multi utente</span>
+        <label class="switch">
+          <input type="checkbox" data-ops-multi />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="btn" data-ops-close>Chiudi</button>
+    </div>
+    <div class="opsMenuBody" data-ops-list></div>
+    <div class="opsMenuFoot">
+      <button class="btn" data-ops-all>Seleziona tutti</button>
+      <button class="btn primary" data-ops-apply>Applica</button>
+    </div>
+  </div>
+</div>
+
+<div class="prefsBack" data-prefs-back>
+  <div class="prefsPanel" role="dialog" aria-modal="true">
+    <div class="prefsHead">
+      <div class="prefsTitle"><span style="font-size:18px;">🗓️</span> Impostazioni Agenda</div>
+      <button class="btn" data-prefs-close>Chiudi</button>
+    </div>
+    <div class="prefsBody">
+      <div class="prefsGrid">
+        <div class="prefsCard">
+          <div class="prefsRow">
+            <div>
+              <div class="prefsLabel">Slot agenda</div>
+              <div class="prefsSub">Griglia oraria (consigliato 30 min; puoi usare 60 min).</div>
+            </div>
+            <div class="prefsRight">
+              <select class="selectSmall" data-pref-slot>
+                <option value="30">30 min</option>
+                <option value="60">60 min</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="prefsRow">
+            <div>
+              <div class="prefsLabel">Colore utente</div>
+              <div class="prefsSub">Colore della tua agenda (badge e colonna).</div>
+            </div>
+            <div class="prefsRight">
+              <div class="colorSwatch"><input type="color" data-pref-color /></div>
+            </div>
+          </div>
+
+          <div class="prefsRow" data-pref-opcolors-section style="align-items:flex-start;">
+            <div style="min-width:0;">
+              <div class="prefsLabel">Colori collaboratori</div>
+              <div class="prefsSub">Imposta il colore per ogni collaboratore. Il colore verrà usato per appuntamenti e disponibilità (come guida).</div>
+            </div>
+            <div class="prefsRight" style="flex-direction:column; align-items:stretch; gap:8px; min-width:min(420px, 72vw);">
+              <div data-pref-opcolors style="border:1px solid rgba(255,255,255,.10); border-radius:14px; background:rgba(255,255,255,.03); overflow:hidden;"></div>
+              <div class="prefsSub" data-pref-opcolors-hint style="margin-top:0;">Visibile e modificabile da Front Office e Manager (salvato sul browser dell’utente).</div>
+            </div>
+          </div>
+
+          <div class="prefsRow">
+            <div>
+              <div class="prefsLabel">Vista multi utente</div>
+              <div class="prefsSub">Di default mostra solo la tua agenda; qui puoi attivare la vista multi-operatore.</div>
+            </div>
+            <div class="prefsRight">
+              <label class="switch">
+                <input type="checkbox" data-pref-multi />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="prefsRow" data-pref-default-section style="align-items:flex-start;">
+            <div style="min-width:0;">
+              <div class="prefsLabel">Agende visualizzate di default</div>
+              <div class="prefsSub">Compare solo se attivi la vista multi utente. Queste agende verranno mostrate di default.</div>
+            </div>
+            <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:8px;">
+              <div class="opsDots" data-pref-default-dots></div>
+              <button class="btn" data-pref-pick type="button">Seleziona</button>
+            </div>
+          </div>
+
+          <div class="prefsRow" data-pref-double-section style="align-items:flex-start;">
+            <div style="min-width:0;">
+              <div class="prefsLabel">Agende doppie (colonna extra)</div>
+              <div class="prefsSub">Compare solo se attivi la vista multi utente. Seleziona gli operatori per cui vuoi una colonna aggiuntiva.</div>
+            </div>
+            <div class="prefsRight" style="flex-direction:column; align-items:flex-end; gap:8px;">
+              <div class="opsDots" data-pref-double-dots></div>
+              <button class="btn" data-pref-double-pick type="button">Seleziona</button>
+            </div>
+          </div>
+
+          <div class="prefPicker" data-pref-default-picker>
+            <div class="prefPickerTop">
+              <div class="mini">Agende</div>
+              <input class="prefPickerSearch" data-pref-default-search placeholder="Cerca operatore..." />
+              <button class="btn" data-pref-default-close type="button">Chiudi</button>
+            </div>
+            <div class="prefPickerBody" data-pref-default-list></div>
+          </div>
+
+          <div class="prefPicker" data-pref-double-picker>
+            <div class="prefPickerTop">
+              <div class="mini">Agende doppie</div>
+              <input class="prefPickerSearch" data-pref-double-search placeholder="Cerca operatore..." />
+              <button class="btn" data-pref-double-close type="button">Chiudi</button>
+            </div>
+            <div class="prefPickerBody" data-pref-double-list></div>
+          </div>
+        </div>
+
+        <div class="prefsCard">
+          <div class="prefsRow">
+            <div>
+              <div class="prefsLabel">Visualizza tipologia prestazione in agenda</div>
+              <div class="prefsSub">Mostra/nasconde la prestazione nei blocchi.</div>
+            </div>
+            <div class="prefsRight">
+              <label class="switch">
+                <input type="checkbox" data-pref-show-service />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="prefsRow">
+            <div>
+              <div class="prefsLabel">Calendario navigazione (vista giornaliera)</div>
+              <div class="prefsSub">Impostazione salvata (vista giornaliera in arrivo).</div>
+            </div>
+            <div class="prefsRight">
+              <label class="switch">
+                <input type="checkbox" data-pref-day-nav />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="prefsFoot">
+      <button class="btn" data-prefs-reset>Reset</button>
+      <button class="btn primary" data-prefs-save>Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- cache-bust -->
+  <script src="../assets/app.js?v=fpui-20251231c"></script>
+<script src="../assets/diary.js?v=fpui-20251231c"></script>
+</body>
+</html>
+
