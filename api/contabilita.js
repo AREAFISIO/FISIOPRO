@@ -11,7 +11,7 @@ import {
 
 export default async function handler(req, res) {
   ensureRes(res);
-  const user = requireRoles(req, res, ["manager"]);
+  const user = requireRoles(req, res, ["back", "manager"]);
   if (!user) return;
 
   try {
