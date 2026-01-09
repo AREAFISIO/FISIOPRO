@@ -131,6 +131,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     ${section("Operativo")}
     ${link("operativo.html", "Oggi", "physio,front,back,manager")}
     ${link("agenda.html", "Agenda", "physio,front,back,manager")}
+    ${link("fatturazione.html", "Fatturazione", "front,manager")}
     ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
 
     ${section("Pazienti")}

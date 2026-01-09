@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Fatturazione</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    body{ overflow:auto; }
+    .app{ grid-template-columns: 300px 1fr; }
+    .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
+    .tabbtn{ padding:10px 12px; border-radius: 12px; border:1px solid var(--border); background: rgba(255,255,255,.03); cursor:pointer; font-weight: 900; }
+    .tabbtn.active{ background: rgba(255,255,255,.10); }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .field{ display:flex; flex-direction:column; gap:6px; min-width: 220px; }
+    .field label{ font-size: 13px; color: var(--muted); font-weight: 800; }
+    .field input, .field select{ padding: 10px 12px; border-radius: 12px; border:1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text); }
+    .hint{ color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .list{ margin-top: 10px; border:1px solid var(--border); border-radius: 14px; overflow:hidden; }
+    .list .item{ display:flex; justify-content:space-between; gap:10px; padding: 12px; border-top:1px solid var(--border); cursor:pointer; background: rgba(255,255,255,.02); }
+    .list .item:first-child{ border-top:none; }
+    .list .item:hover{ background: rgba(255,255,255,.05); }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    table{ width:100%; border-collapse: collapse; }
+    th,td{ padding: 10px; border-bottom:1px solid var(--border); text-align:left; font-size: 14px; }
+    th{ font-size: 12px; color: var(--muted); letter-spacing: .2px; text-transform: uppercase; }
+    .actions-inline{ display:flex; gap:8px; flex-wrap:wrap; }
+    .btn.small{ padding: 8px 10px; border-radius: 10px; font-size: 13px; }
+    .step{ border:1px solid var(--border); border-radius: 16px; padding: 12px; background: rgba(255,255,255,.03); }
+    .step h3{ margin: 0 0 8px; font-size: 16px; }
+    .hr{ height:1px; background: var(--border); margin: 12px 0; }
+    .okbox{ padding: 10px 12px; border-radius: 12px; border:1px solid rgba(46,160,67,.35); background: rgba(46,160,67,.10); }
+    .warnbox{ padding: 10px 12px; border-radius: 12px; border:1px solid rgba(210,153,34,.35); background: rgba(210,153,34,.10); }
+    .errbox{ padding: 10px 12px; border-radius: 12px; border:1px solid rgba(248,81,73,.35); background: rgba(248,81,73,.10); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Fatturazione</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="padding:10px 10px 14px;">
+      <div class="toprow">
+        <div class="h1">Fatturazione <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <a class="btn" href="/pages/front-office.html" data-role="front,manager">Front Office</a>
+          <button class="btn" type="button" id="oauthBtn" data-role="front,manager" style="display:none;">Collega Fatture in Cloud</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <h2>Sezione Fatturazione</h2>
+        <div class="tabs">
+          <button class="tabbtn active" data-tab="create">Crea fattura</button>
+          <button class="tabbtn" data-tab="issued">Fatture emesse</button>
+          <button class="tabbtn" data-tab="clients">Clienti</button>
+        </div>
+      </div>
+      <div class="body">
+        <div id="globalMsg" class="warnbox" style="display:none;"></div>
+
+        <!-- TAB 1 -->
+        <section id="tab-create">
+          <div class="step">
+            <h3>Step 1 — Seleziona paziente</h3>
+            <div class="row">
+              <div class="field" style="min-width:320px;">
+                <label>Cerca paziente</label>
+                <input id="patientSearch" placeholder="Nome, cognome, email o telefono…" />
+              </div>
+              <button class="btn" type="button" id="btnSearch">Cerca</button>
+              <div class="hint">Suggerimento: scrivi 3+ caratteri.</div>
+            </div>
+            <div id="patientResults" class="list" style="display:none;"></div>
+            <div class="hr"></div>
+            <div id="patientSelected" style="display:none;">
+              <div class="okbox">
+                <div><b>Paziente selezionato:</b> <span id="selName"></span> <span class="mono" id="selId" style="opacity:.75;"></span></div>
+                <div class="hint" id="selEmail"></div>
+              </div>
+              <div style="height:10px;"></div>
+              <div class="row">
+                <div class="field">
+                  <label>Codice Fiscale (opzionale)</label>
+                  <input id="cfInput" placeholder="RSSMRA..." />
+                </div>
+                <button class="btn" type="button" id="btnCheckClient">Verifica cliente FIC</button>
+                <button class="btn primary" type="button" id="btnCreateClient" style="display:none;">Crea cliente su FIC</button>
+              </div>
+              <div id="clientBox" class="hint" style="margin-top:10px;"></div>
+            </div>
+          </div>
+
+          <div style="height:12px;"></div>
+
+          <div class="step">
+            <h3>Step 2 — Prestazioni</h3>
+            <div class="hint">Righe precompilate: puoi aggiungere/modificare.</div>
+            <div style="height:10px;"></div>
+            <div id="rowsBox"></div>
+            <div style="height:10px;"></div>
+            <button class="btn" type="button" id="btnAddRow">+ Aggiungi riga</button>
+          </div>
+
+          <div style="height:12px;"></div>
+
+          <div class="step">
+            <h3>Step 3 — Conferma</h3>
+            <div class="row">
+              <div class="field">
+                <label>Tipo documento</label>
+                <select id="docType">
+                  <option value="fattura">Fattura</option>
+                  <option value="ricevuta">Ricevuta</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Data documento</label>
+                <input id="docDate" type="date" />
+              </div>
+              <div class="field" style="min-width:320px;">
+                <label>Note (opzionale)</label>
+                <input id="docNote" placeholder="Es. Sedute fisioterapia…" />
+              </div>
+              <button class="btn primary" type="button" id="btnCreateInvoice">Crea fattura</button>
+            </div>
+            <div id="createOut" style="margin-top:12px;"></div>
+          </div>
+        </section>
+
+        <!-- TAB 2 -->
+        <section id="tab-issued" style="display:none;">
+          <div class="row" style="justify-content:space-between;">
+            <div class="hint">Elenco tracciato in Airtable (tabella FATTURE).</div>
+            <button class="btn" type="button" id="btnReloadIssued">Ricarica</button>
+          </div>
+          <div style="height:10px;"></div>
+          <div class="list" style="overflow:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Numero</th>
+                  <th>Data</th>
+                  <th>Importo</th>
+                  <th>Stato</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="issuedTbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- TAB 3 -->
+        <section id="tab-clients" style="display:none;">
+          <div class="row" style="justify-content:space-between;">
+            <div class="hint">Clienti sincronizzati con Fatture in Cloud (tabella CLIENTI_FIC).</div>
+            <button class="btn" type="button" id="btnReloadClients">Ricarica</button>
+          </div>
+          <div style="height:10px;"></div>
+          <div class="list" style="overflow:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Email</th>
+                  <th>CF</th>
+                  <th>FIC Client ID</th>
+                  <th>Sync</th>
+                </tr>
+              </thead>
+              <tbody id="clientsTbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="toast" style="display:none;"></div>
+  </main>
+</div>
+
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+<script>
+  const $ = (sel) => document.querySelector(sel);
+  const api = window.fpApi;
+
+  // Hard gate: physio must not see this section
+  (async function guardRole(){
+    try {
+      const me = await api("/api/auth-me");
+      const role = (me?.user?.role || me?.session?.role || "");
+      if (role !== "front" && role !== "manager") location.replace("/pages/index.html");
+    } catch {
+      location.replace("/");
+    }
+  })();
+
+  // Tabs
+  document.querySelectorAll(".tabbtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tabbtn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.getAttribute("data-tab");
+      $("#tab-create").style.display = tab === "create" ? "block" : "none";
+      $("#tab-issued").style.display = tab === "issued" ? "block" : "none";
+      $("#tab-clients").style.display = tab === "clients" ? "block" : "none";
+      if (tab === "issued") loadIssued();
+      if (tab === "clients") loadClients();
+    });
+  });
+
+  // OAuth button (always available)
+  $("#oauthBtn").addEventListener("click", () => location.href = "/api/fic/oauth/start");
+  // show it (roleGuard will hide for non-allowed)
+  $("#oauthBtn").style.display = "inline-flex";
+
+  // Wizard state
+  let selectedPatient = null; // { id, name, email, nome, cognome }
+  let selectedClienteFic = null; // { airtableId, ficClientId }
+
+  function showGlobal(msg, type){
+    const el = $("#globalMsg");
+    el.style.display = msg ? "block" : "none";
+    el.className = (type === "err") ? "errbox" : (type === "ok") ? "okbox" : "warnbox";
+    el.textContent = msg || "";
+  }
+
+  // Default rows
+  function addRow(pref = {}){
+    const wrap = document.createElement("div");
+    wrap.className = "row";
+    wrap.style.marginBottom = "8px";
+    wrap.innerHTML = `
+      <div class="field" style="min-width:320px;">
+        <label>Descrizione</label>
+        <input data-row-desc placeholder="Seduta fisioterapia" />
+      </div>
+      <div class="field" style="min-width:120px;">
+        <label>Q.tà</label>
+        <input data-row-qty type="number" min="1" step="1" value="1" />
+      </div>
+      <div class="field" style="min-width:160px;">
+        <label>Prezzo (netto)</label>
+        <input data-row-price type="number" min="0" step="0.01" placeholder="0.00" />
+      </div>
+      <div class="field" style="min-width:160px;">
+        <label>IVA %</label>
+        <input data-row-iva type="number" min="0" step="0.01" value="0" />
+      </div>
+      <button class="btn small" type="button" data-row-del>Rimuovi</button>
+    `;
+    const set = (sel, val) => { const el = wrap.querySelector(sel); if (el && val !== undefined) el.value = val; };
+    set("[data-row-desc]", pref.descrizione || "Seduta fisioterapia");
+    set("[data-row-qty]", pref.qty ?? 1);
+    set("[data-row-price]", pref.prezzo ?? 0);
+    set("[data-row-iva]", pref.ivaPercent ?? 0);
+    wrap.querySelector("[data-row-del]").addEventListener("click", () => wrap.remove());
+    $("#rowsBox").appendChild(wrap);
+  }
+
+  $("#btnAddRow").addEventListener("click", () => addRow({ descrizione: "Prestazione", qty: 1, prezzo: 0, ivaPercent: 0 }));
+  addRow({ descrizione: "Seduta fisioterapia", qty: 1, prezzo: 0, ivaPercent: 0 });
+
+  // Patient search
+  async function doSearch(){
+    const q = ($("#patientSearch").value || "").trim();
+    if (q.length < 3) {
+      $("#patientResults").style.display = "none";
+      return;
+    }
+    const data = await api(`/api/airtable?op=searchPatients&q=${encodeURIComponent(q)}`);
+    const items = data?.items || [];
+    const box = $("#patientResults");
+    box.innerHTML = "";
+    if (!items.length) {
+      box.style.display = "block";
+      box.innerHTML = `<div class="item"><div>Nessun risultato</div><div></div></div>`;
+      return;
+    }
+    items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `<div><b>${(it.name||"").toString()}</b><div class="hint">${(it.email||"").toString()} • ${(it.phone||"").toString()}</div></div><div class="mono" style="opacity:.7;">${it.id}</div>`;
+      div.addEventListener("click", async () => {
+        selectedPatient = { id: it.id, name: it.name, email: it.email || "" };
+        selectedClienteFic = null;
+        $("#patientResults").style.display = "none";
+        $("#patientSelected").style.display = "block";
+        $("#selName").textContent = it.name || "";
+        $("#selId").textContent = `(${it.id})`;
+        $("#selEmail").textContent = it.email ? `Email: ${it.email}` : "";
+        $("#clientBox").textContent = "Premi “Verifica cliente FIC”.";
+        $("#btnCreateClient").style.display = "none";
+
+        // Get normalized Nome/Cognome from patient API (if available)
+        try {
+          const p = await api(`/api/patient?id=${encodeURIComponent(it.id)}`);
+          selectedPatient.nome = p?.Nome || "";
+          selectedPatient.cognome = p?.Cognome || "";
+          if (!selectedPatient.email) selectedPatient.email = p?.Email || "";
+          $("#selName").textContent = [selectedPatient.cognome, selectedPatient.nome].filter(Boolean).join(" ") || (it.name || "");
+          $("#selEmail").textContent = selectedPatient.email ? `Email: ${selectedPatient.email}` : "";
+        } catch {}
+      });
+      box.appendChild(div);
+    });
+    box.style.display = "block";
+  }
+
+  $("#btnSearch").addEventListener("click", doSearch);
+  $("#patientSearch").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doSearch(); }});
+
+  // Check/create client
+  $("#btnCheckClient").addEventListener("click", async () => {
+    if (!selectedPatient?.id) return;
+    $("#clientBox").textContent = "Verifica in corso…";
+    $("#btnCreateClient").style.display = "none";
+    try {
+      const r = await api(`/api/fic/clienti?patientId=${encodeURIComponent(selectedPatient.id)}`);
+      if (r?.item?.ficClientId) {
+        selectedClienteFic = { airtableId: r.item.airtableId, ficClientId: r.item.ficClientId };
+        $("#clientBox").textContent = `Cliente già presente: FIC Client ID ${r.item.ficClientId}`;
+        return;
+      }
+      $("#clientBox").textContent = "Cliente NON presente. Puoi crearlo su Fatture in Cloud.";
+      $("#btnCreateClient").style.display = "inline-flex";
+    } catch (e) {
+      const msg = String(e?.message || "");
+      if (msg.includes("fic_not_connected")) {
+        showGlobal("Fatture in Cloud non è collegato. Premi “Collega Fatture in Cloud”.", "warn");
+      }
+      $("#clientBox").textContent = `Errore: ${msg || "impossibile verificare"}`;
+    }
+  });
+
+  $("#btnCreateClient").addEventListener("click", async () => {
+    if (!selectedPatient?.id) return;
+    $("#clientBox").textContent = "Creazione cliente…";
+    $("#btnCreateClient").disabled = true;
+    try {
+      const body = {
+        patientId: selectedPatient.id,
+        nome: selectedPatient.nome || "",
+        cognome: selectedPatient.cognome || "",
+        email: selectedPatient.email || "",
+        codiceFiscale: ($("#cfInput").value || "").trim(),
+      };
+      const r = await api("/api/fic/clienti", { method: "POST", body: JSON.stringify(body) });
+      selectedClienteFic = { airtableId: r.airtableId, ficClientId: r.ficClientId };
+      $("#clientBox").textContent = `Cliente creato: FIC Client ID ${r.ficClientId}`;
+      $("#btnCreateClient").style.display = "none";
+    } catch (e) {
+      $("#clientBox").textContent = `Errore: ${String(e?.message || "server_error")}`;
+    } finally {
+      $("#btnCreateClient").disabled = false;
+    }
+  });
+
+  function collectRows(){
+    const rows = [];
+    $("#rowsBox").querySelectorAll(".row").forEach(r => {
+      const descrizione = (r.querySelector("[data-row-desc]")?.value || "").trim();
+      const qty = Number(r.querySelector("[data-row-qty]")?.value || 1) || 1;
+      const prezzo = Number(r.querySelector("[data-row-price]")?.value || 0) || 0;
+      const ivaPercent = Number(r.querySelector("[data-row-iva]")?.value || 0) || 0;
+      if (!descrizione) return;
+      rows.push({ descrizione, qty, prezzo, ivaPercent });
+    });
+    return rows;
+  }
+
+  async function createInvoice(){
+    $("#createOut").innerHTML = "";
+    if (!selectedPatient?.id) {
+      $("#createOut").innerHTML = `<div class="errbox">Seleziona prima un paziente (Step 1).</div>`;
+      return;
+    }
+    if (!selectedClienteFic?.airtableId) {
+      $("#createOut").innerHTML = `<div class="errbox">Crea/associa prima il cliente su FIC (Step 1).</div>`;
+      return;
+    }
+    const righe = collectRows();
+    if (!righe.length) {
+      $("#createOut").innerHTML = `<div class="errbox">Inserisci almeno una riga prestazione (Step 2).</div>`;
+      return;
+    }
+    const payload = {
+      clienteAirtableId: selectedClienteFic.airtableId,
+      tipoDocumento: ($("#docType").value || "fattura"),
+      data: ($("#docDate").value || ""),
+      note: ($("#docNote").value || ""),
+      righe: righe.map(r => ({ descrizione: r.descrizione, qty: r.qty, prezzo: r.prezzo, ivaPercent: r.ivaPercent })),
+    };
+    $("#btnCreateInvoice").disabled = true;
+    $("#btnCreateInvoice").textContent = "Creazione…";
+    try {
+      const r = await api("/api/fic/fatture", { method: "POST", body: JSON.stringify(payload) });
+      const pdfUrl = r.pdfUrl;
+      $("#createOut").innerHTML = `
+        <div class="okbox">
+          <div><b>Documento creato</b> • ID: <span class="mono">${r.documentId}</span></div>
+          <div class="hint">Numero: ${r.numero || "—"} • Anno: ${r.anno || "—"} • Stato: ${r.stato || "—"}</div>
+          <div style="height:10px;"></div>
+          <div class="actions-inline">
+            <a class="btn small" target="_blank" rel="noopener" href="${pdfUrl}">Apri PDF</a>
+            <a class="btn small" target="_blank" rel="noopener" href="${pdfUrl}?download=1">Scarica PDF</a>
+            <button class="btn small" type="button" id="btnPrint">Stampa</button>
+          </div>
+        </div>
+      `;
+      $("#btnPrint").addEventListener("click", () => {
+        const w = window.open(pdfUrl, "_blank", "noopener");
+        if (!w) return;
+        const t = setInterval(() => {
+          try {
+            if (w.document?.readyState === "complete") {
+              clearInterval(t);
+              w.focus();
+              w.print();
+            }
+          } catch {
+            // ignore cross-origin viewer quirks
+          }
+        }, 400);
+      });
+    } catch (e) {
+      $("#createOut").innerHTML = `<div class="errbox">Errore: ${String(e?.message || "server_error")}</div>`;
+    } finally {
+      $("#btnCreateInvoice").disabled = false;
+      $("#btnCreateInvoice").textContent = "Crea fattura";
+    }
+  }
+
+  $("#btnCreateInvoice").addEventListener("click", createInvoice);
+  // default date = today
+  $("#docDate").value = new Date().toISOString().slice(0,10);
+
+  // Tab 2: issued
+  async function loadIssued(){
+    const tbody = $("#issuedTbody");
+    tbody.innerHTML = `<tr><td colspan="5" class="hint">Caricamento…</td></tr>`;
+    try{
+      const data = await api("/api/fic/fatture");
+      const items = data?.items || [];
+      if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="hint">Nessun documento trovato.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = "";
+      items.forEach(it => {
+        const tr = document.createElement("tr");
+        const pdf = it.pdfUrl || (it.ficDocumentId ? `/api/fic/fatture/${encodeURIComponent(it.ficDocumentId)}/pdf` : "#");
+        tr.innerHTML = `
+          <td><span class="mono">${it.numero || "—"}</span> <span style="opacity:.7;">/${it.anno || ""}</span></td>
+          <td>${(it.data || "").toString().slice(0,10) || "—"}</td>
+          <td>${(it.importoTotale ?? "—")}</td>
+          <td>${it.stato || "—"}</td>
+          <td>
+            <div class="actions-inline">
+              <a class="btn small" target="_blank" rel="noopener" href="${pdf}">Apri PDF</a>
+              <button class="btn small" type="button" data-print>Stampa</button>
+            </div>
+          </td>
+        `;
+        tr.querySelector("[data-print]").addEventListener("click", () => {
+          const w = window.open(pdf, "_blank", "noopener");
+          if (!w) return;
+          const t = setInterval(() => {
+            try {
+              if (w.document?.readyState === "complete") {
+                clearInterval(t);
+                w.focus();
+                w.print();
+              }
+            } catch {}
+          }, 400);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch(e){
+      tbody.innerHTML = `<tr><td colspan="5" class="hint">Errore: ${String(e?.message || "server_error")}</td></tr>`;
+    }
+  }
+  $("#btnReloadIssued").addEventListener("click", loadIssued);
+
+  // Tab 3: clients
+  async function loadClients(){
+    const tbody = $("#clientsTbody");
+    tbody.innerHTML = `<tr><td colspan="5" class="hint">Caricamento…</td></tr>`;
+    try{
+      const data = await api("/api/fic/clienti");
+      const items = data?.items || [];
+      if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="hint">Nessun cliente sincronizzato.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = "";
+      items.forEach(it => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><b>${[it.cognome, it.nome].filter(Boolean).join(" ") || "—"}</b></td>
+          <td>${it.email || "—"}</td>
+          <td class="mono">${it.codiceFiscale || "—"}</td>
+          <td class="mono">${it.ficClientId || "—"}</td>
+          <td>${it.ultimaSync ? it.ultimaSync.toString().slice(0,10) : "—"}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch(e){
+      tbody.innerHTML = `<tr><td colspan="5" class="hint">Errore: ${String(e?.message || "server_error")}</td></tr>`;
+    }
+  }
+  $("#btnReloadClients").addEventListener("click", loadClients);
+
+  // Deep link: after oauth
+  (function(){
+    const p = new URLSearchParams(location.search);
+    if (p.get("oauth") === "ok") {
+      showGlobal("Collegamento Fatture in Cloud completato. Ora puoi creare clienti e fatture.", "ok");
+    }
+  })();
+</script>
+</body>
+</html>
+
