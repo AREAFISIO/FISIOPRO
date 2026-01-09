@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Manager • Riepilogo mensile</title>
+
+  <link rel="stylesheet" href="/assets/app.css?v=fpui-20260108a" />
+  <script src="/assets/session-timeout.js"></script>
+
+  <style>
+    html { visibility: hidden; }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1100px){ .grid2{ grid-template-columns: 1fr; } }
+
+    .fpChartWrap{ height: 320px; }
+    @media (max-width: 700px){ .fpChartWrap{ height: 260px; } }
+
+    .rowBad td{ background: rgba(255,77,109,.10); }
+    .rowGood td{ background: rgba(34,230,195,.08); }
+
+    .statusChip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .statusOk{ color: rgba(34,230,195,1); background: rgba(34,230,195,.08); }
+    .statusBad{ color: rgba(255,77,109,1); background: rgba(255,77,109,.10); }
+
+    tr[data-month]{ cursor: pointer; }
+    tr[data-month]:hover td{ background: rgba(255,255,255,.04); }
+  </style>
+
+  <script>
+    // =========================
+    // CONTROLLO ACCESSI (Manager)
+    // - richiesto: /api/auth-check
+    // =========================
+    (function () {
+      async function authCheck() {
+        const r = await fetch("/api/auth-check", { credentials: "include" });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data?.ok || data?.role !== "Manager") return { ok: false };
+
+        const u = data.user || {};
+        window.FP_USER = {
+          email: String(u.email || "").toLowerCase(),
+          nome: u.nome || "",
+          cognome: u.cognome || "",
+          role: "manager",
+          roleLabel: u.roleLabel || "Manager",
+        };
+        window.FP_SESSION = { role: "manager", email: window.FP_USER.email };
+        return { ok: true, user: window.FP_USER, session: window.FP_SESSION };
+      }
+
+      window.fpAuthMe = async function fpAuthMe() {
+        if (window.__FP_AUTH_ME_DATA?.ok) return window.__FP_AUTH_ME_DATA;
+        if (window.__FP_AUTH_ME_PROMISE) return await window.__FP_AUTH_ME_PROMISE;
+        window.__FP_AUTH_ME_PROMISE = (async () => {
+          const data = await authCheck().catch(() => ({ ok: false }));
+          window.__FP_AUTH_ME_DATA = data;
+          return data;
+        })();
+        return await window.__FP_AUTH_ME_PROMISE;
+      };
+
+      (async function () {
+        const data = await window.fpAuthMe();
+        if (!data?.ok) return window.location.replace("/pages/login.html");
+        document.documentElement.style.visibility = "visible";
+      })();
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">AreA FISIO</div>
+          <div class="sub">Manager</div>
+        </div>
+      </div>
+      <nav class="nav"></nav>
+    </aside>
+
+    <main class="main" style="padding:18px 18px 30px;">
+      <div class="topbar" style="position:sticky; top:0; z-index:10;">
+        <div class="toprow">
+          <div class="h1">Riepilogo mensile <span class="pill" data-user-badge>—</span></div>
+          <div class="actions">
+            <button class="btn" onclick="location.href='/manager/dashboard.html'">Dashboard</button>
+            <button class="btn" onclick="location.href='/manager/costi-per-categoria.html'">Costi per categoria</button>
+            <button class="btn" onclick="location.href='/pages/manager.html'">Torna a Manager</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <!-- Tabella centrale -->
+        <section class="card">
+          <div class="head"><h2>Budget vs Reale</h2><span class="chip">Controllo di gestione</span></div>
+          <div class="body">
+            <div class="muted" data-riep-loading style="display:none;">Caricamento…</div>
+            <div class="muted" data-riep-error style="display:none;"></div>
+            <div class="tablewrap" style="margin-top:10px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mese</th>
+                    <th style="text-align:right;">Budget</th>
+                    <th style="text-align:right;">Reale</th>
+                    <th style="text-align:right;">Scostamento</th>
+                    <th>Stato</th>
+                  </tr>
+                </thead>
+                <tbody data-riep-tbody>
+                  <tr><td colspan="5" class="muted">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="mini" style="margin-top:10px;color:var(--muted);">
+              Regola: scostamento &gt; 0 = rosso (fuori controllo). Scostamento ≤ 0 = verde.
+            </div>
+          </div>
+        </section>
+
+        <!-- Grafico a barre (mese selezionato) -->
+        <aside class="card">
+          <div class="head"><h2>Mese selezionato</h2><span class="chip">Bar chart</span></div>
+          <div class="body">
+            <div class="muted" data-sel-label>Seleziona un mese dalla tabella.</div>
+            <div class="fpChartWrap" style="margin-top:10px;">
+              <canvas data-riep-bar></canvas>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <aside class="rightbar">
+      <div class="righttitle">Azioni</div>
+      <div class="card" style="padding:14px;">
+        <button class="btn" style="width:100%;" data-riep-refresh>Aggiorna</button>
+        <div class="mini" style="margin-top:10px;color:var(--muted);">
+          Click su una riga per aggiornare il grafico.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/app.js?v=fpui-20260108a"></script>
+
+  <script>
+    (function () {
+      const $ = (sel) => document.querySelector(sel);
+      const tbody = $("[data-riep-tbody]");
+      const loadingEl = $("[data-riep-loading]");
+      const errorEl = $("[data-riep-error]");
+      const refreshBtn = $("[data-riep-refresh]");
+      const canvas = $("[data-riep-bar]");
+      const selLabel = $("[data-sel-label]");
+
+      const fmtEuro = (n) => {
+        const v = (typeof n === "number" && isFinite(n)) ? n : Number(n || 0);
+        try {
+          return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+        } catch {
+          return `${Math.round(v)} €`;
+        }
+      };
+
+      function show(el, msg) { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = msg; }
+      function hide(el) { if (!el) return; el.style.display = "none"; }
+
+      let items = [];
+      let chart = null;
+      let selected = null; // { mese, budget, reale, scost }
+
+      function renderSelected() {
+        if (!selected) {
+          selLabel && (selLabel.textContent = "Seleziona un mese dalla tabella.");
+          if (chart?.destroy) { try { chart.destroy(); } catch {} }
+          chart = null;
+          return;
+        }
+
+        selLabel && (selLabel.textContent = `${selected.mese}: Budget vs Reale`);
+        if (!canvas || !window.Chart) return;
+
+        if (chart?.destroy) { try { chart.destroy(); } catch {} }
+        chart = new window.Chart(canvas.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels: ["Budget", "Reale"],
+            datasets: [{
+              label: selected.mese,
+              data: [selected.budget, selected.reale],
+              backgroundColor: ["rgba(74,163,255,.65)", "rgba(34,230,195,.65)"],
+              borderColor: ["rgba(74,163,255,1)", "rgba(34,230,195,1)"],
+              borderWidth: 1,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => fmtEuro(ctx.parsed.y || 0) } }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (v) => fmtEuro(Number(v || 0)),
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function rowStatus(scost) {
+        const bad = Number(scost || 0) > 0;
+        return bad
+          ? `<span class="statusChip statusBad">Critico</span>`
+          : `<span class="statusChip statusOk">OK</span>`;
+      }
+
+      function renderTable() {
+        if (!tbody) return;
+        if (!items.length) {
+          tbody.innerHTML = `<tr><td colspan="5" class="muted">Nessun dato.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = items.map((x) => {
+          const bad = Number(x.scost || 0) > 0;
+          const cls = bad ? "rowBad" : "rowGood";
+          return `
+            <tr class="${cls}" data-month="${String(x.mese).replaceAll('"', "&quot;")}">
+              <td><strong>${x.mese}</strong></td>
+              <td style="text-align:right;">${fmtEuro(x.budget)}</td>
+              <td style="text-align:right;">${fmtEuro(x.reale)}</td>
+              <td style="text-align:right;"><strong>${fmtEuro(x.scost)}</strong></td>
+              <td>${rowStatus(x.scost)}</td>
+            </tr>
+          `;
+        }).join("");
+
+        tbody.querySelectorAll("tr[data-month]").forEach((tr) => {
+          tr.addEventListener("click", () => {
+            const m = tr.getAttribute("data-month");
+            selected = items.find((i) => i.mese === m) || null;
+            renderSelected();
+          });
+        });
+      }
+
+      async function load() {
+        hide(errorEl);
+        show(loadingEl, "Caricamento…");
+        try {
+          const r = await fetch("/api/riepilogo-mensile", { credentials: "include" });
+          const data = await r.json().catch(() => ([]));
+          if (!r.ok) throw new Error((data && data.error) || "riepilogo_failed");
+
+          const arr = Array.isArray(data) ? data : [];
+          items = arr
+            .map((x) => ({
+              mese: String(x?.Mese || "").trim(),
+              budget: Number(x?.["Totale Mensile"] || 0),
+              reale: Number(x?.["Totale Reale"] || 0),
+              scost: Number(x?.Scostamento || 0),
+            }))
+            .filter((x) => x.mese)
+            .sort((a, b) => a.mese.localeCompare(b.mese, "it"));
+
+          // Default selection: ultimo mese disponibile
+          selected = items.length ? items[items.length - 1] : null;
+
+          renderTable();
+          renderSelected();
+          hide(loadingEl);
+        } catch (e) {
+          console.error(e);
+          items = [];
+          selected = null;
+          renderTable();
+          renderSelected();
+          hide(loadingEl);
+          show(errorEl, "Impossibile caricare i dati (verifica Airtable / permessi).");
+        }
+      }
+
+      refreshBtn && refreshBtn.addEventListener("click", load);
+      load();
+    })();
+  </script>
+</body>
+</html>
+

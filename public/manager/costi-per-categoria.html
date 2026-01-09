@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Manager • Costi per categoria</title>
+
+  <link rel="stylesheet" href="/assets/app.css?v=fpui-20260108a" />
+  <script src="/assets/session-timeout.js"></script>
+
+  <style>
+    html { visibility: hidden; }
+
+    .filters{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items:center;
+    }
+    .filters .chip, .filters .btn{
+      height: 36px;
+    }
+    .filters input.chip{
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1100px){ .grid2{ grid-template-columns: 1fr; } }
+
+    .fpChartWrap{ height: 340px; }
+    @media (max-width: 700px){ .fpChartWrap{ height: 280px; } }
+
+    .metaRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap:wrap;
+      margin: 10px 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+
+  <script>
+    // =========================
+    // CONTROLLO ACCESSI (Manager)
+    // - richiesto: /api/auth-check
+    // =========================
+    (function () {
+      async function authCheck() {
+        const r = await fetch("/api/auth-check", { credentials: "include" });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data?.ok || data?.role !== "Manager") return { ok: false };
+
+        const u = data.user || {};
+        window.FP_USER = {
+          email: String(u.email || "").toLowerCase(),
+          nome: u.nome || "",
+          cognome: u.cognome || "",
+          role: "manager",
+          roleLabel: u.roleLabel || "Manager",
+        };
+        window.FP_SESSION = { role: "manager", email: window.FP_USER.email };
+        return { ok: true, user: window.FP_USER, session: window.FP_SESSION };
+      }
+
+      window.fpAuthMe = async function fpAuthMe() {
+        if (window.__FP_AUTH_ME_DATA?.ok) return window.__FP_AUTH_ME_DATA;
+        if (window.__FP_AUTH_ME_PROMISE) return await window.__FP_AUTH_ME_PROMISE;
+        window.__FP_AUTH_ME_PROMISE = (async () => {
+          const data = await authCheck().catch(() => ({ ok: false }));
+          window.__FP_AUTH_ME_DATA = data;
+          return data;
+        })();
+        return await window.__FP_AUTH_ME_PROMISE;
+      };
+
+      (async function () {
+        const data = await window.fpAuthMe();
+        if (!data?.ok) return window.location.replace("/pages/login.html");
+        document.documentElement.style.visibility = "visible";
+      })();
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">AreA FISIO</div>
+          <div class="sub">Manager</div>
+        </div>
+      </div>
+      <nav class="nav"></nav>
+    </aside>
+
+    <main class="main" style="padding:18px 18px 30px;">
+      <div class="topbar" style="position:sticky; top:0; z-index:10;">
+        <div class="toprow">
+          <div class="h1">Costi per categoria <span class="pill" data-user-badge>—</span></div>
+          <div class="actions">
+            <button class="btn" onclick="location.href='/manager/dashboard.html'">Dashboard</button>
+            <button class="btn" onclick="location.href='/manager/riepilogo-mensile.html'">Riepilogo mensile</button>
+            <button class="btn" onclick="location.href='/pages/manager.html'">Torna a Manager</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtri -->
+      <section class="card" style="margin-bottom:14px;">
+        <div class="head"><h2>Filtri</h2><span class="chip">CFO</span></div>
+        <div class="body">
+          <div class="filters">
+            <label class="mini" style="color:var(--muted);">Mese</label>
+            <input class="chip" type="month" data-f-mese aria-label="Seleziona mese" />
+
+            <label class="mini" style="color:var(--muted);">Da</label>
+            <input class="chip" type="date" data-f-start aria-label="Data inizio" />
+            <label class="mini" style="color:var(--muted);">A</label>
+            <input class="chip" type="date" data-f-end aria-label="Data fine" />
+
+            <label class="mini" style="color:var(--muted);">Clinica</label>
+            <input class="chip" type="text" data-f-clinica placeholder="Tutte" aria-label="Clinica" style="min-width:180px;" />
+
+            <label class="mini" style="color:var(--muted);">Natura</label>
+            <select class="chip" data-f-natura aria-label="Natura costo">
+              <option value="">Tutte</option>
+              <option value="Fissa">Fissa</option>
+              <option value="Variabile">Variabile</option>
+            </select>
+
+            <button class="btn" data-f-refresh>Aggiorna</button>
+          </div>
+
+          <div class="mini" style="margin-top:10px;color:var(--muted);">
+            Esclusi sempre: <strong>Macro Neutre</strong>, <strong>Giroconti</strong>, <strong>Finanziamenti</strong>.
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="head"><h2>Analisi</h2><span class="chip">Strategico</span></div>
+        <div class="body">
+          <div class="metaRow">
+            <div>Totale costi: <strong data-c-totale>—</strong></div>
+            <div class="muted" data-c-loading style="display:none;">Caricamento…</div>
+            <div class="muted" data-c-error style="display:none;"></div>
+          </div>
+
+          <div class="grid2">
+            <div class="card" style="padding:14px;">
+              <div style="font-weight:950;margin-bottom:10px;">Costi per Macro</div>
+              <div class="fpChartWrap"><canvas data-c-bar></canvas></div>
+            </div>
+            <div class="card" style="padding:14px;">
+              <div style="font-weight:950;margin-bottom:10px;">Incidenza %</div>
+              <div class="fpChartWrap"><canvas data-c-pie></canvas></div>
+            </div>
+          </div>
+
+          <div class="tablewrap" style="margin-top:14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Macro</th>
+                  <th style="text-align:right;">Totale €</th>
+                  <th style="text-align:right;">%</th>
+                  <th>Natura Costo</th>
+                </tr>
+              </thead>
+              <tbody data-c-tbody>
+                <tr><td colspan="4" class="muted">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="rightbar">
+      <div class="righttitle">Note</div>
+      <div class="card" style="padding:14px;">
+        <div class="mini" style="color:var(--muted); line-height:1.5;">
+          Questa vista è decisionale: evidenzia dove “pesano” i costi e come si distribuiscono.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/app.js?v=fpui-20260108a"></script>
+
+  <script>
+    (function () {
+      const $ = (sel) => document.querySelector(sel);
+
+      const meseEl = $("[data-f-mese]");
+      const startEl = $("[data-f-start]");
+      const endEl = $("[data-f-end]");
+      const clinicaEl = $("[data-f-clinica]");
+      const naturaEl = $("[data-f-natura]");
+      const refreshBtn = $("[data-f-refresh]");
+
+      const totalEl = $("[data-c-totale]");
+      const loadingEl = $("[data-c-loading]");
+      const errorEl = $("[data-c-error]");
+      const tbody = $("[data-c-tbody]");
+      const barCanvas = $("[data-c-bar]");
+      const pieCanvas = $("[data-c-pie]");
+
+      let barChart = null;
+      let pieChart = null;
+
+      const fmtEuro = (n) => {
+        const v = (typeof n === "number" && isFinite(n)) ? n : Number(n || 0);
+        try {
+          return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+        } catch {
+          return `${Math.round(v)} €`;
+        }
+      };
+      const fmtPct = (n) => `${Math.round(Number(n || 0) * 10) / 10}%`;
+
+      function show(el, msg) { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = msg; }
+      function hide(el) { if (!el) return; el.style.display = "none"; }
+
+      function norm(s) {
+        return String(s || "").toLowerCase().replace(/[^a-z0-9àèéìòù]+/g, " ").trim();
+      }
+      function isExcludedMacro(name) {
+        const s = norm(name);
+        return s.includes("neutr") || s.includes("girocont") || s.includes("finanz");
+      }
+
+      function destroyCharts() {
+        if (barChart?.destroy) { try { barChart.destroy(); } catch {} }
+        if (pieChart?.destroy) { try { pieChart.destroy(); } catch {} }
+        barChart = null;
+        pieChart = null;
+      }
+
+      function buildPalette(n) {
+        const base = [
+          "rgba(34,230,195,.75)",
+          "rgba(74,163,255,.75)",
+          "rgba(255,140,0,.75)",
+          "rgba(255,77,109,.75)",
+          "rgba(41,211,154,.75)",
+          "rgba(180,120,255,.75)",
+          "rgba(255,210,77,.75)",
+          "rgba(140,200,255,.75)",
+        ];
+        const out = [];
+        for (let i = 0; i < n; i++) out.push(base[i % base.length]);
+        return out;
+      }
+
+      function toRows(raw, naturaFilter) {
+        const arr = Array.isArray(raw) ? raw : [];
+
+        const rows = arr.map((x) => {
+          const macro = String(x?.macro || x?.categoria || "").trim() || "Senza macro";
+          const totale = Number(x?.totale || 0);
+          const fisse = Number(x?.fisse || 0);
+          const variabili = Number(x?.variabili || 0);
+          const naturaCosto = String(x?.naturaCosto || "").trim()
+            || (fisse > 0 && variabili === 0 ? "Fissa" : variabili > 0 && fisse === 0 ? "Variabile" : (fisse > 0 && variabili > 0 ? "Mista" : "N/A"));
+
+          // Fallback: se filtro Natura è selezionato e API non filtra, applichiamo lato client.
+          let effectiveTotale = totale;
+          if (naturaFilter === "Fissa") effectiveTotale = fisse || 0;
+          if (naturaFilter === "Variabile") effectiveTotale = variabili || 0;
+
+          return { macro, totale: effectiveTotale, naturaCosto };
+        });
+
+        return rows
+          .filter((r) => r.macro && !isExcludedMacro(r.macro))
+          .filter((r) => Number(r.totale || 0) > 0)
+          .sort((a, b) => Number(b.totale || 0) - Number(a.totale || 0));
+      }
+
+      function renderTable(rows) {
+        if (!tbody) return;
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="4" class="muted">Nessun dato.</td></tr>`;
+          return;
+        }
+        const tot = rows.reduce((s, r) => s + Number(r.totale || 0), 0);
+        tbody.innerHTML = rows.map((r) => {
+          const pct = tot > 0 ? (Number(r.totale || 0) / tot) * 100 : 0;
+          return `
+            <tr>
+              <td><strong>${r.macro.replaceAll("<", "&lt;")}</strong></td>
+              <td style="text-align:right;">${fmtEuro(r.totale)}</td>
+              <td style="text-align:right;">${fmtPct(pct)}</td>
+              <td>${r.naturaCosto}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      function renderCharts(rows) {
+        destroyCharts();
+        if (!window.Chart || !barCanvas || !pieCanvas) return;
+
+        const labels = rows.map((r) => r.macro);
+        const values = rows.map((r) => Number(r.totale || 0));
+        const colors = buildPalette(labels.length);
+
+        barChart = new window.Chart(barCanvas.getContext("2d"), {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [{
+              label: "Costi",
+              data: values,
+              backgroundColor: colors,
+              borderColor: colors.map((c) => c.replace(",.75)", ",1)")),
+              borderWidth: 1,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => fmtEuro(ctx.parsed.y || 0) } },
+            },
+            scales: {
+              y: { ticks: { callback: (v) => fmtEuro(Number(v || 0)) } }
+            }
+          }
+        });
+
+        pieChart = new window.Chart(pieCanvas.getContext("2d"), {
+          type: "pie",
+          data: {
+            labels,
+            datasets: [{
+              data: values,
+              backgroundColor: colors,
+              borderColor: "rgba(255,255,255,.15)",
+              borderWidth: 1,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom" },
+              tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmtEuro(ctx.parsed || 0)}` } },
+            }
+          }
+        });
+      }
+
+      function buildQuery() {
+        const qs = new URLSearchParams();
+        const mese = String(meseEl?.value || "").trim(); // YYYY-MM
+        const start = String(startEl?.value || "").trim(); // YYYY-MM-DD
+        const end = String(endEl?.value || "").trim(); // YYYY-MM-DD
+        const clinica = String(clinicaEl?.value || "").trim();
+        const natura = String(naturaEl?.value || "").trim();
+
+        // Prefer range if both start/end are set; otherwise use month.
+        if (start && end) { qs.set("start", start); qs.set("end", end); }
+        else if (mese) qs.set("mese", mese);
+
+        if (clinica) qs.set("clinica", clinica);
+        if (natura) qs.set("natura", natura);
+        return qs;
+      }
+
+      async function load() {
+        hide(errorEl);
+        show(loadingEl, "Caricamento…");
+        totalEl && (totalEl.textContent = "—");
+        tbody && (tbody.innerHTML = `<tr><td colspan="4" class="muted">—</td></tr>`);
+
+        try {
+          const qs = buildQuery();
+          const url = "/api/costi-per-categoria" + (qs.toString() ? `?${qs.toString()}` : "");
+          const r = await fetch(url, { credentials: "include" });
+          const data = await r.json().catch(() => ([]));
+          if (!r.ok) throw new Error((data && data.error) || "costi_failed");
+
+          const naturaFilter = String(naturaEl?.value || "").trim();
+          const rows = toRows(data, naturaFilter);
+          const tot = rows.reduce((s, r) => s + Number(r.totale || 0), 0);
+          totalEl && (totalEl.textContent = fmtEuro(tot));
+
+          renderCharts(rows);
+          renderTable(rows);
+
+          hide(loadingEl);
+        } catch (e) {
+          console.error(e);
+          destroyCharts();
+          hide(loadingEl);
+          show(errorEl, "Impossibile caricare i dati (verifica Airtable / permessi).");
+        }
+      }
+
+      refreshBtn && refreshBtn.addEventListener("click", load);
+
+      // Default mese: mese corrente (type=month richiede YYYY-MM)
+      (function initDefaults() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        if (meseEl && !meseEl.value) meseEl.value = `${y}-${m}`;
+      })();
+
+      load();
+    })();
+  </script>
+</body>
+</html>
+
