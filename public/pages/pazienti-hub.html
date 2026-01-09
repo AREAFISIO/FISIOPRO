@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Pazienti</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .two-col{ display:grid; grid-template-columns: 1.5fr 1fr; gap:14px; }
+    @media (max-width: 1100px){ .two-col{ grid-template-columns: 1fr; } }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Pazienti</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="position:sticky; top:0; z-index:10;">
+      <div class="toprow">
+        <div class="h1">Pazienti <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="location.href='note.html'">Apri Note & Alert</button>
+          <button class="btn primary" onclick="location.href='nuovo-paziente.html'" data-role="front,back,manager">Nuovo paziente</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <section class="card">
+        <div class="head"><h2>Flusso paziente</h2><span class="chip">workflow</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='anagrafica.html'">
+            <div><h3>Ricerca / Anagrafica</h3><p>Cerca paziente, apri scheda, contatti, note.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='anamnesi.html'">
+            <div><h3>Anamnesi e consensi</h3><p>Privacy, consenso informato, stato anamnesi.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='archivio-documenti.html'">
+            <div><h3>Archivio documenti</h3><p>PDF, allegati, consensi e documentazione.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pratiche-assicurative.html'">
+            <div><h3>Pratiche assicurative</h3><p>Stati pratica e documenti richiesti.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card" style="align-self:start;">
+        <div class="head"><h2>Operativo</h2><span class="chip">rapido</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>Agenda</h3><p>Appuntamenti e gestione giornaliera.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='note.html'">
+            <div><h3>Note & Alert</h3><p>Alert anti-errori: contatti, consensi, pagamenti.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+

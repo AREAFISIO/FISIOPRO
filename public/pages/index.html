@@ -19,7 +19,7 @@
         const role = (data?.user?.role || data?.session?.role || "").toString();
         if (role === "physio") location.replace("/agenda.html");
         else if (role === "front") location.replace("/pages/dashboard.html");
-        else if (role === "back") location.replace("/pages/gestione-contabile.html");
+        else if (role === "back") location.replace("/pages/back-office.html");
         else location.replace("/pages/dashboard.html");
       } catch {
         location.replace("/");

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Operativo</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .grid2{ display:grid; grid-template-columns: 1.4fr 1fr; gap:14px; }
+    @media (max-width: 1100px){ .grid2{ grid-template-columns:1fr; } }
+    .kpiRow{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:12px;
+    }
+    @media (max-width: 1100px){ .kpiRow{ grid-template-columns:1fr; } }
+    .kpi{
+      padding:14px;
+      border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      box-shadow: var(--shadow);
+    }
+    .kpi .label{ color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .kpi .value{ font-size: 28px; font-weight: 950; margin-top: 6px; letter-spacing: -.2px; }
+    .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Operativo</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="position:sticky; top:0; z-index:10;">
+      <div class="toprow">
+        <div class="h1">Operativo (Oggi) <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" data-op-refresh>Aggiorna</button>
+          <button class="btn primary" onclick="location.href='agenda.html'">Apri Agenda</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpiRow" style="margin-bottom:14px;">
+      <div class="kpi">
+        <div class="label">Appuntamenti oggi</div>
+        <div class="value" data-op-kpi-appts>—</div>
+        <div class="mini" data-op-kpi-appts-mini>—</div>
+      </div>
+      <div class="kpi" data-role="front,back,manager">
+        <div class="label">Alert operativi</div>
+        <div class="value" data-op-kpi-alerts>—</div>
+        <div class="mini" data-op-kpi-alerts-mini>—</div>
+      </div>
+      <div class="kpi" data-role="front,back,manager">
+        <div class="label">Pagamenti da chiudere</div>
+        <div class="value" data-op-kpi-billing>—</div>
+        <div class="mini" data-op-kpi-billing-mini>—</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <section class="card">
+        <div class="head"><h2>Azioni rapide</h2><span class="chip">workflow</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>Agenda</h3><p>Gestisci appuntamenti e giornata.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='note.html'" data-role="front,back,manager">
+            <div><h3>Note & Alert</h3><p>Zero perdite: contatti, consensi, conferme, pagamenti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pazienti-hub.html'">
+            <div><h3>Pazienti</h3><p>Anagrafica, consensi, documenti.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card" style="align-self:start;">
+        <div class="head"><h2>Stato</h2><span class="chip">live</span></div>
+        <div class="body" style="padding-top:6px;">
+          <div class="muted" data-op-loading style="display:none;">Caricamento…</div>
+          <div class="muted" data-op-error style="display:none;"></div>
+          <div style="margin-top:10px;" data-op-summary class="muted"></div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+

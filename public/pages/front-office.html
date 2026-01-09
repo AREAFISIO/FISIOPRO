@@ -102,40 +102,45 @@
 
     <div class="two-col">
       <section class="card soft">
-        <div class="head"><h2>ANAGRAFICA E MODULISTICA</h2><span class="chip" style="border-color:rgba(0,0,0,.08);background:rgba(0,0,0,.03);color:#0b2c3d;">Front Office</span></div>
+        <div class="head"><h2>WORKFLOW FRONT OFFICE</h2><span class="chip" style="border-color:rgba(0,0,0,.08);background:rgba(0,0,0,.03);color:#0b2c3d;">operativo</span></div>
         <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>1) Prendi appuntamento</h3><p>Agenda: inserisci/gestisci l’appuntamento.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='note.html'">
+            <div><h3>2) Note & Alert (anti-errori)</h3><p>Conferme, contatti mancanti, consensi, pagamenti da chiudere.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pazienti-hub.html'">
+            <div><h3>3) Dati paziente (in sede)</h3><p>Ricerca, scheda paziente, contatti, note.</p></div><div class="go">→</div>
+          </div>
           <div class="tile" onclick="location.href='anamnesi.html'">
-            <div><h3>Anamnesi</h3><p>Stato anamnesi e consensi</p></div><div class="go">→</div>
+            <div><h3>4) Privacy / consensi / anamnesi</h3><p>Stato consensi e anamnesi.</p></div><div class="go">→</div>
           </div>
           <div class="tile" onclick="location.href='archivio-documenti.html'">
-            <div><h3>Archivio documenti</h3><p>PDF, allegati, consensi</p></div><div class="go">→</div>
-          </div>
-
-          <div style="height:8px;"></div>
-          <h2 style="margin:0; font-size:16px; letter-spacing:.06em;">VENDITE ED EROGATI</h2>
-
-          <div class="tile" onclick="location.href='vendite.html'">
-            <div><h3>Vendite</h3><p>Creazione e controllo vendite</p></div><div class="go">→</div>
-          </div>
-          <div class="tile" onclick="location.href='erogato.html'">
-            <div><h3>Erogato</h3><p>Prestazioni erogate e pagamenti</p></div><div class="go">→</div>
+            <div><h3>5) Documentazione</h3><p>Archivio documenti e allegati.</p></div><div class="go">→</div>
           </div>
           <div class="tile" onclick="location.href='pratiche-assicurative.html'">
-            <div><h3>Assicurazioni</h3><p>Pratiche e stati</p></div><div class="go">→</div>
+            <div><h3>6) Pratiche assicurative</h3><p>Stati pratica e documenti richiesti.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='vendite.html'">
+            <div><h3>7) Vendite</h3><p>Creazione e controllo vendite.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='erogato.html'">
+            <div><h3>8) Erogato / pagamenti</h3><p>Prestazioni erogate e stato pagamenti.</p></div><div class="go">→</div>
           </div>
         </div>
       </section>
 
       <aside class="card soft" style="align-self:start;">
-        <div class="head"><h2>Dashboard operativa</h2></div>
+        <div class="head"><h2>Scorciatoie</h2></div>
         <div class="body" style="padding-top:6px;">
+          <div class="tile" onclick="location.href='nuovo-paziente.html'">
+            <div><h3>Nuovo paziente</h3><p>Creazione rapida anagrafica.</p></div><div class="go">→</div>
+          </div>
+          <div style="height:12px;"></div>
           <div style="color: rgba(11,44,61,.70); line-height:1.7;">
-            <div><b>Link rapidi</b></div>
-            <div style="margin-top:10px;">OsteoEasy</div>
-            <div>FattureInCloud</div>
-            <div style="height:1px; background:rgba(0,0,0,.10); margin:14px 0;"></div>
-            <div><b>Note</b></div>
-            <div style="margin-top:8px;">Qui metteremo alert: consensi mancanti, pratiche in scadenza, pagamenti sospesi.</div>
+            <div><b>Nota</b></div>
+            <div style="margin-top:8px;">Il menù a sinistra resta minimale: le funzioni sono qui dentro, ordinate per lavoro.</div>
           </div>
         </div>
       </aside>

@@ -124,55 +124,26 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   const section = (title, dataRole = "") =>
     `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
 
-  // Keep it fast: search + few high-signal items, ordered by "flow".
+  // Keep it extremely simple: few generic hubs.
   nav.innerHTML = `
-    <div class="fpNavSearch">
-      <input type="search" placeholder="Cerca nel menù… (es. agenda, vendite, contabile)" data-fp-nav-search />
-      <small>Ordine: appuntamento → accoglienza → paziente → documenti/pratiche → vendite/pagamenti → controllo</small>
-    </div>
-
-    ${section("Operatività (oggi)")}
+    ${section("Operativo")}
+    ${link("operativo.html", "Oggi", "physio,front,back,manager")}
     ${link("agenda.html", "Agenda", "physio,front,back,manager")}
-    ${link("front-office.html", "Front Office (hub)", "front,back,manager")}
     ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
-    ${link("dashboard.html", "Dashboard", "front,back,manager")}
-    ${link("anagrafica.html", "Pazienti", "physio,front,back,manager")}
-    ${link("nuovo-paziente.html", "Nuovo paziente", "front,back,manager")}
 
-    ${section("Accoglienza e documentazione")}
-    ${link("anamnesi.html", "Anamnesi / consensi", "front,back,manager")}
-    ${link("archivio-documenti.html", "Archivio documenti", "front,back,manager")}
-    ${link("pratiche-assicurative.html", "Pratiche assicurative", "front,back,manager")}
+    ${section("Pazienti")}
+    ${link("pazienti-hub.html", "Pazienti", "physio,front,back,manager")}
 
-    ${section("Vendite e pagamenti")}
-    ${link("vendite.html", "Vendite", "front,back,manager")}
-    ${link("erogato.html", "Erogato", "front,back,manager")}
-
-    ${section("Back Office", "back,manager")}
-    ${link("gestione-contabile.html", "Gestione contabile", "back,manager")}
-
-    ${section("Manager", "manager")}
-    ${link("dashboard-costi.html", "Costi per categoria", "manager")}
-    ${link("dashboard-controllo.html", "Riepilogo mensile", "manager")}
+    ${section("Ruolo")}
+    ${link("front-office.html", "Front Office", "front,manager")}
+    ${link("back-office.html", "Back Office", "back,manager")}
+    ${link("manager.html", "Manager", "manager")}
 
     ${section("Sessione")}
     ${link("login.html", "Logout")}
   `;
 
   nav.setAttribute("data-fp-unified-nav", "1");
-
-  // Simple client-side filter for speed.
-  const input = nav.querySelector("[data-fp-nav-search]");
-  if (input) {
-    input.addEventListener("input", () => {
-      const q = String(input.value || "").trim().toLowerCase();
-      nav.querySelectorAll("a[data-nav]").forEach((a) => {
-        const txt = String(a.textContent || "").toLowerCase();
-        a.style.display = !q || txt.includes(q) ? "" : "none";
-      });
-      nav.querySelectorAll(".section").forEach((s) => (s.style.display = "")); // keep sections visible
-    });
-  }
 }
 
 // Inject "Controllo di Gestione" section into the persistent sidebar.
@@ -285,6 +256,10 @@ function isAgendaPage() {
 function isDashboardPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
+}
+function isOperativoPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/operativo.html") || p.endsWith("/operativo.html");
 }
 
 function isSalesPage() {
@@ -1085,6 +1060,92 @@ async function initAnamnesiPage() {
       <td>${latest.dataConsenso ? fmtItDate(latest.dataConsenso) : "—"}</td>
     </tr>
   `;
+}
+
+// =====================
+// OPERATIVO (Oggi hub)
+// =====================
+async function initOperativoPage() {
+  if (!isOperativoPage()) return;
+
+  const loadingEl = document.querySelector("[data-op-loading]");
+  const errorEl = document.querySelector("[data-op-error]");
+  const summaryEl = document.querySelector("[data-op-summary]");
+  const btnRefresh = document.querySelector("[data-op-refresh]");
+
+  const kAppts = document.querySelector("[data-op-kpi-appts]");
+  const kApptsMini = document.querySelector("[data-op-kpi-appts-mini]");
+  const kAlerts = document.querySelector("[data-op-kpi-alerts]");
+  const kAlertsMini = document.querySelector("[data-op-kpi-alerts-mini]");
+  const kBilling = document.querySelector("[data-op-kpi-billing]");
+  const kBillingMini = document.querySelector("[data-op-kpi-billing-mini]");
+
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const end = new Date(start); end.setDate(end.getDate() + 1);
+
+  const load = async () => {
+    const data = await window.fpWithLoading({
+      loadingEl,
+      errorEl,
+      run: () => api(`/api/appointments?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`),
+      loadingText: "Caricamento operativo…",
+    });
+
+    const appts = data.appointments || [];
+    const total = appts.length;
+    const missingPatient = appts.filter((a) => !a.patient_id).length;
+    const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient).length;
+    const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform).length;
+
+    const isCompletedish = (statoRaw) => {
+      const s = String(statoRaw || "").trim().toLowerCase();
+      if (!s) return false;
+      return (
+        s.includes("eseguit") ||
+        s.includes("complet") ||
+        s.includes("termin") ||
+        s.includes("chius") ||
+        s.includes("fatto") ||
+        s.includes("erogat") ||
+        s === "ok"
+      );
+    };
+    const isPast = (iso) => {
+      const d = new Date(String(iso || ""));
+      if (Number.isNaN(d.getTime())) return false;
+      return d.getTime() < Date.now();
+    };
+    const billing = appts
+      .filter((a) => a.patient_id && isPast(a.start_at))
+      .filter((a) => isCompletedish(a.status) || Boolean(a.confirmed_by_patient) || Boolean(a.confirmed_in_platform))
+      .filter((a) => !String(a.erogato_id || "").trim() && !String(a.vendita_id || "").trim())
+      .length;
+
+    // Alerts KPI: reuse the same definition as the inbox badge
+    const alerts = missingPatient + needConfirmPatient + needConfirmPlatform + billing;
+
+    if (kAppts) kAppts.textContent = String(total);
+    if (kApptsMini) kApptsMini.textContent = `Senza scheda paziente: ${missingPatient}`;
+    if (kAlerts) kAlerts.textContent = String(alerts);
+    if (kAlertsMini) kAlertsMini.textContent = `Conferme: ${needConfirmPatient + needConfirmPlatform} • Pagamenti: ${billing}`;
+    if (kBilling) kBilling.textContent = String(billing);
+    if (kBillingMini) kBillingMini.textContent = `Appuntamenti svolti senza vendita/erogato`;
+
+    if (summaryEl) {
+      summaryEl.textContent =
+        `Oggi: ${total} appuntamenti • ` +
+        `Nuovi pazienti: ${missingPatient} • ` +
+        `Conferme: ${needConfirmPatient + needConfirmPlatform} • ` +
+        `Pagamenti da chiudere: ${billing}`;
+    }
+
+    // Keep sidebar badge in sync
+    try { sessionStorage.removeItem("fp_inbox_badge_v1"); } catch {}
+    await updateInboxBadge();
+  };
+
+  btnRefresh && (btnRefresh.onclick = () => load().catch(() => {}));
+  await load();
 }
 function isDashboardCostiPage() {
   const p = location.pathname || "";
@@ -2350,6 +2411,7 @@ async function runRouteInits() {
 
   await updateInboxBadge();
   await initNotesPage();
+  await initOperativoPage();
   await initSalesPage();
   await initErogatoPage();
   await initInsurancePage();
