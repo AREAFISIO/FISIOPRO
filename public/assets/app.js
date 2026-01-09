@@ -119,8 +119,10 @@ function ensureUnifiedSidebarMenu(roleRaw) {
 
   const role = String(roleRaw || "").trim() || String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
 
+  // Use absolute /pages/* so SPA router always handles it reliably.
+  const pageHref = (p) => (String(p || "").startsWith("/pages/") ? String(p) : `/pages/${String(p || "").replace(/^\/+/, "")}`);
   const link = (href, label, dataRole = "", extraHtml = "") =>
-    `<a data-nav href="${href}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
+    `<a data-nav href="${pageHref(href)}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
   const section = (title, dataRole = "") =>
     `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
 
