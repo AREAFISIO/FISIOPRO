@@ -131,7 +131,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
 
     ${section("Pazienti")}
-    ${link("anagrafica.html", "Anagrafica", "physio,front,back,manager")}
+    ${link("pazienti-hub.html", "Pazienti", "physio,front,back,manager")}
 
     ${section("Ruolo")}
     ${link("front-office.html", "Front Office", "front,manager")}
