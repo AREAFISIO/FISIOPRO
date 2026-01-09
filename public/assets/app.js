@@ -374,6 +374,10 @@ async function initNotesPage() {
   const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
   const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
 
+  // Allow deep-linking: /pages/note.html?range=today|48h|7d
+  const rangeFromUrl = String(getQueryParam("range") || "").trim();
+  if (rangeFromUrl) setRange(rangeFromUrl);
+
   const rulesKey = (() => {
     const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
     return `fp_notes_rules_v1_${email}`;
@@ -912,9 +916,19 @@ async function initSalesPage() {
   if (!tbody) return;
   const loadingEl = document.querySelector("[data-sales-loading]");
   const errorEl = document.querySelector("[data-sales-error]");
+  const pickerHost = document.querySelector("[data-fp-patient-picker]");
   const patientId = getQueryParam("patientId") || "";
   if (!patientId) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Seleziona un paziente per vedere le vendite.</td></tr>`;
+    mountPatientPicker({
+      container: pickerHost,
+      label: "Cerca paziente",
+      onPick: (pid) => {
+        const href = `/pages/vendite.html?patientId=${encodeURIComponent(pid)}`;
+        if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+        else location.href = href;
+      },
+    });
     return;
   }
 
@@ -950,9 +964,19 @@ async function initErogatoPage() {
   if (!tbody) return;
   const loadingEl = document.querySelector("[data-erogato-loading]");
   const errorEl = document.querySelector("[data-erogato-error]");
+  const pickerHost = document.querySelector("[data-fp-patient-picker]");
   const patientId = getQueryParam("patientId") || "";
   if (!patientId) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Seleziona un paziente per vedere l’erogato.</td></tr>`;
+    mountPatientPicker({
+      container: pickerHost,
+      label: "Cerca paziente",
+      onPick: (pid) => {
+        const href = `/pages/erogato.html?patientId=${encodeURIComponent(pid)}`;
+        if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+        else location.href = href;
+      },
+    });
     return;
   }
 
@@ -987,9 +1011,19 @@ async function initInsurancePage() {
   if (!tbody) return;
   const loadingEl = document.querySelector("[data-insurance-loading]");
   const errorEl = document.querySelector("[data-insurance-error]");
+  const pickerHost = document.querySelector("[data-fp-patient-picker]");
   const patientId = getQueryParam("patientId") || "";
   if (!patientId) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Seleziona un paziente per vedere le pratiche.</td></tr>`;
+    mountPatientPicker({
+      container: pickerHost,
+      label: "Cerca paziente",
+      onPick: (pid) => {
+        const href = `/pages/pratiche-assicurative.html?patientId=${encodeURIComponent(pid)}`;
+        if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+        else location.href = href;
+      },
+    });
     return;
   }
 
@@ -1024,9 +1058,19 @@ async function initAnamnesiPage() {
   if (!tbody) return;
   const loadingEl = document.querySelector("[data-anamnesi-loading]");
   const errorEl = document.querySelector("[data-anamnesi-error]");
+  const pickerHost = document.querySelector("[data-fp-patient-picker]");
   const patientId = getQueryParam("patientId") || "";
   if (!patientId) {
-    tbody.innerHTML = `<tr><td colspan="4" class="muted">Apri da una scheda paziente o da Note & Alert (manca patientId).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="muted">Seleziona un paziente per vedere lo stato anamnesi/consensi.</td></tr>`;
+    mountPatientPicker({
+      container: pickerHost,
+      label: "Cerca paziente",
+      onPick: (pid) => {
+        const href = `/pages/anamnesi.html?patientId=${encodeURIComponent(pid)}`;
+        if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+        else location.href = href;
+      },
+    });
     return;
   }
 
@@ -1150,6 +1194,17 @@ async function initOperativoPage() {
   };
 
   btnRefresh && (btnRefresh.onclick = () => load().catch(() => {}));
+
+  // Make KPIs clickable (go straight to what to do)
+  const openNotesToday = () => {
+    try { sessionStorage.setItem("fp_notes_range", "today"); } catch {}
+    const href = "/pages/note.html?range=today";
+    if (typeof window.fpNavigate === "function") window.fpNavigate(href);
+    else location.href = href;
+  };
+  kAlerts?.closest?.(".kpi")?.addEventListener("click", openNotesToday);
+  kBilling?.closest?.(".kpi")?.addEventListener("click", openNotesToday);
+
   await load();
 }
 function isDashboardCostiPage() {
@@ -1361,6 +1416,77 @@ function buildPalette(n) {
 
 function getQueryParam(name) {
   try { return new URL(location.href).searchParams.get(name); } catch { return null; }
+}
+
+// ---------------------
+// Patient search (reused across pages)
+// ---------------------
+const __fpPatientSearchCache = new Map(); // qLower -> [{id,label,phone,email}]
+let __fpPatientSearchT = null;
+async function fpSearchPatientsFull(qRaw) {
+  const q = String(qRaw || "").trim();
+  if (!q) return [];
+  const key = q.toLowerCase();
+  if (__fpPatientSearchCache.has(key)) return __fpPatientSearchCache.get(key) || [];
+  const data = await api(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(q)}&maxRecords=60&pageSize=30`);
+  const items = (data.items || []).map((x) => {
+    const nome = String(x.Nome || "").trim();
+    const cognome = String(x.Cognome || "").trim();
+    const full = [nome, cognome].filter(Boolean).join(" ").trim() || String(x["Cognome e Nome"] || "").trim();
+    return { id: x.id, label: full || "Paziente", phone: x.Telefono || "", email: x.Email || "" };
+  });
+  __fpPatientSearchCache.set(key, items);
+  return items;
+}
+
+function mountPatientPicker({ container, label = "Cerca paziente", onPick } = {}) {
+  if (!container) return;
+  container.innerHTML = `
+    <div class="toolbar" style="margin-top:0;">
+      <div class="search" style="width:min(520px, 100%);">
+        ${label} <input data-fp-pick-q placeholder="Nome, cognome, telefono…" />
+      </div>
+    </div>
+    <div class="fpPatientResults" data-fp-pick-results></div>
+  `;
+  const input = container.querySelector("[data-fp-pick-q]");
+  const results = container.querySelector("[data-fp-pick-results]");
+  if (!input || !results) return;
+
+  const render = (items) => {
+    const list = items || [];
+    if (!list.length) {
+      results.style.display = "none";
+      results.innerHTML = "";
+      return;
+    }
+    results.style.display = "block";
+    results.innerHTML = list.map((p) => `
+      <div class="fpPatientRow" data-pid="${String(p.id || "")}">
+        <div class="name">${String(p.label || "Paziente")}</div>
+        <div class="meta">${[p.phone || "", p.email || ""].filter(Boolean).join(" • ")}</div>
+      </div>
+    `).join("");
+  };
+
+  const run = async () => {
+    const q = String(input.value || "").trim();
+    if (q.length < 2) { render([]); return; }
+    const items = await fpSearchPatientsFull(q).catch(() => []);
+    render(items);
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(__fpPatientSearchT);
+    __fpPatientSearchT = setTimeout(() => run().catch(() => {}), 200);
+  });
+
+  results.addEventListener("click", (e) => {
+    const row = e.target?.closest?.("[data-pid]");
+    const pid = row ? String(row.getAttribute("data-pid") || "") : "";
+    if (!pid) return;
+    if (typeof onPick === "function") onPick(pid);
+  });
 }
 
 function setQueryParamAndNavigate(name, value) {
