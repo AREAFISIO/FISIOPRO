@@ -1171,6 +1171,10 @@
     if (Array.isArray(f.Paziente) && f.Paziente.length && typeof f.Paziente[0] === "string") {
       patientId = String(f.Paziente[0] || "").trim();
     }
+    if (!patientId) {
+      const pid = pickField(f, ["patient_id", "PatientId", "PazienteId", "paziente_id"]);
+      patientId = String(pid || "").trim();
+    }
 
     let startAt = null;
     let endAt = null;
@@ -1688,7 +1692,8 @@
 
   async function apiGet(url) {
     // Prevent indefinite hangs (Airtable/network stalls can otherwise leave UI on "Carico…" forever).
-    const timeoutMs = 15_000;
+    // Agenda can be heavy on cold starts; keep a safer ceiling.
+    const timeoutMs = 25_000;
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       try { ctrl.abort(); } catch {}
@@ -1807,9 +1812,14 @@
     // Fetch operators + agenda in parallel (reduces initial load latency).
     const opsPromise = apiGet("/api/operators").catch(() => null);
     const nocache = opts && opts.nocache ? "&nocache=1" : "";
-    const agendaPromise = apiGet(`/api/agenda?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${nocache}`);
+    // Use the lighter endpoint to avoid timeouts.
+    const startISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0).toISOString();
+    const endExclusive = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+    endExclusive.setDate(endExclusive.getDate() + days);
+    const endISO = endExclusive.toISOString();
+    const apptsPromise = apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
 
-    const [ops, data] = await Promise.all([opsPromise, agendaPromise]);
+    const [ops, data] = await Promise.all([opsPromise, apptsPromise]);
 
     if (ops?.items) {
       const items = (ops.items || []);
@@ -1835,7 +1845,27 @@
     if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
     if (prefDoublePicker && prefDoublePicker.style.display !== "none") renderDoublePickerList();
 
-    rawItems = (data.items || []).map(normalizeItem).filter((x) => x.startAt);
+    // Normalize appointments to the legacy shape expected by the renderer.
+    rawItems = (data.appointments || []).map((a) => {
+      const ap = a || {};
+      return normalizeItem({
+        id: ap.id,
+        operator: ap.therapist_name || "",
+        fields: {
+          start_at: ap.start_at || "",
+          end_at: ap.end_at || "",
+          therapist_name: ap.therapist_name || "",
+          service_name: ap.service_name || "",
+          status: ap.status || "",
+          patient_name: ap.patient_name || "",
+          patient_id: ap.patient_id || "",
+          // Keep link-like keys if downstream expects them
+          erogato_id: ap.erogato_id || "",
+          vendita_id: ap.vendita_id || "",
+          internal_note: ap.internal_note || ap.quick_note || "",
+        },
+      });
+    }).filter((x) => x.startAt);
     if (!knownTherapists.length) knownTherapists = getTherapists(rawItems);
     rebuildSlotLocationIndex();
 

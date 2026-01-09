@@ -119,8 +119,10 @@ function ensureUnifiedSidebarMenu(roleRaw) {
 
   const role = String(roleRaw || "").trim() || String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
 
+  // Use absolute /pages/* so SPA router always handles it reliably.
+  const pageHref = (p) => (String(p || "").startsWith("/pages/") ? String(p) : `/pages/${String(p || "").replace(/^\/+/, "")}`);
   const link = (href, label, dataRole = "", extraHtml = "") =>
-    `<a data-nav href="${href}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
+    `<a data-nav href="${pageHref(href)}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
   const section = (title, dataRole = "") =>
     `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
 
@@ -372,7 +374,10 @@ async function initNotesPage() {
   const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
   const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
 
-  const rulesKey = "fp_notes_rules_v1";
+  const rulesKey = (() => {
+    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+    return `fp_notes_rules_v1_${email}`;
+  })();
   const defaultRules = {
     contacts: true,
     consent: true,
