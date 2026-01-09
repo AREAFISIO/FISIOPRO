@@ -18,9 +18,10 @@
             })();
         const role = (data?.user?.role || data?.session?.role || "").toString();
         if (role === "physio") location.replace("/agenda.html");
-        else if (role === "front") location.replace("/pages/dashboard.html");
-        else if (role === "back") location.replace("/pages/back-office.html");
-        else location.replace("/pages/dashboard.html");
+        else if (role === "front") location.replace("/pages/operativo.html");
+        else if (role === "back") location.replace("/pages/operativo.html");
+        else if (role === "manager") location.replace("/pages/manager.html");
+        else location.replace("/pages/operativo.html");
       } catch {
         location.replace("/");
       }

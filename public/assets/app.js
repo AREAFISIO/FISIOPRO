@@ -374,7 +374,10 @@ async function initNotesPage() {
   const getRange = () => String(sessionStorage.getItem("fp_notes_range") || "48h");
   const setRange = (v) => { try { sessionStorage.setItem("fp_notes_range", String(v)); } catch {} };
 
-  const rulesKey = "fp_notes_rules_v1";
+  const rulesKey = (() => {
+    const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
+    return `fp_notes_rules_v1_${email}`;
+  })();
   const defaultRules = {
     contacts: true,
     consent: true,
