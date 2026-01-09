@@ -127,6 +127,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   // Keep it extremely simple: few generic hubs.
   nav.innerHTML = `
     ${section("Operativo")}
+    ${link("operativo.html", "Oggi", "physio,front,back,manager")}
     ${link("agenda.html", "Agenda", "physio,front,back,manager")}
     ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
 
@@ -255,6 +256,10 @@ function isAgendaPage() {
 function isDashboardPage() {
   const p = location.pathname || "";
   return p.endsWith("/pages/dashboard.html") || p.endsWith("/dashboard.html");
+}
+function isOperativoPage() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/operativo.html") || p.endsWith("/operativo.html");
 }
 
 function isSalesPage() {
@@ -1055,6 +1060,92 @@ async function initAnamnesiPage() {
       <td>${latest.dataConsenso ? fmtItDate(latest.dataConsenso) : "—"}</td>
     </tr>
   `;
+}
+
+// =====================
+// OPERATIVO (Oggi hub)
+// =====================
+async function initOperativoPage() {
+  if (!isOperativoPage()) return;
+
+  const loadingEl = document.querySelector("[data-op-loading]");
+  const errorEl = document.querySelector("[data-op-error]");
+  const summaryEl = document.querySelector("[data-op-summary]");
+  const btnRefresh = document.querySelector("[data-op-refresh]");
+
+  const kAppts = document.querySelector("[data-op-kpi-appts]");
+  const kApptsMini = document.querySelector("[data-op-kpi-appts-mini]");
+  const kAlerts = document.querySelector("[data-op-kpi-alerts]");
+  const kAlertsMini = document.querySelector("[data-op-kpi-alerts-mini]");
+  const kBilling = document.querySelector("[data-op-kpi-billing]");
+  const kBillingMini = document.querySelector("[data-op-kpi-billing-mini]");
+
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const end = new Date(start); end.setDate(end.getDate() + 1);
+
+  const load = async () => {
+    const data = await window.fpWithLoading({
+      loadingEl,
+      errorEl,
+      run: () => api(`/api/appointments?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`),
+      loadingText: "Caricamento operativo…",
+    });
+
+    const appts = data.appointments || [];
+    const total = appts.length;
+    const missingPatient = appts.filter((a) => !a.patient_id).length;
+    const needConfirmPatient = appts.filter((a) => a.patient_id && !a.confirmed_by_patient).length;
+    const needConfirmPlatform = appts.filter((a) => a.patient_id && !a.confirmed_in_platform).length;
+
+    const isCompletedish = (statoRaw) => {
+      const s = String(statoRaw || "").trim().toLowerCase();
+      if (!s) return false;
+      return (
+        s.includes("eseguit") ||
+        s.includes("complet") ||
+        s.includes("termin") ||
+        s.includes("chius") ||
+        s.includes("fatto") ||
+        s.includes("erogat") ||
+        s === "ok"
+      );
+    };
+    const isPast = (iso) => {
+      const d = new Date(String(iso || ""));
+      if (Number.isNaN(d.getTime())) return false;
+      return d.getTime() < Date.now();
+    };
+    const billing = appts
+      .filter((a) => a.patient_id && isPast(a.start_at))
+      .filter((a) => isCompletedish(a.status) || Boolean(a.confirmed_by_patient) || Boolean(a.confirmed_in_platform))
+      .filter((a) => !String(a.erogato_id || "").trim() && !String(a.vendita_id || "").trim())
+      .length;
+
+    // Alerts KPI: reuse the same definition as the inbox badge
+    const alerts = missingPatient + needConfirmPatient + needConfirmPlatform + billing;
+
+    if (kAppts) kAppts.textContent = String(total);
+    if (kApptsMini) kApptsMini.textContent = `Senza scheda paziente: ${missingPatient}`;
+    if (kAlerts) kAlerts.textContent = String(alerts);
+    if (kAlertsMini) kAlertsMini.textContent = `Conferme: ${needConfirmPatient + needConfirmPlatform} • Pagamenti: ${billing}`;
+    if (kBilling) kBilling.textContent = String(billing);
+    if (kBillingMini) kBillingMini.textContent = `Appuntamenti svolti senza vendita/erogato`;
+
+    if (summaryEl) {
+      summaryEl.textContent =
+        `Oggi: ${total} appuntamenti • ` +
+        `Nuovi pazienti: ${missingPatient} • ` +
+        `Conferme: ${needConfirmPatient + needConfirmPlatform} • ` +
+        `Pagamenti da chiudere: ${billing}`;
+    }
+
+    // Keep sidebar badge in sync
+    try { sessionStorage.removeItem("fp_inbox_badge_v1"); } catch {}
+    await updateInboxBadge();
+  };
+
+  btnRefresh && (btnRefresh.onclick = () => load().catch(() => {}));
+  await load();
 }
 function isDashboardCostiPage() {
   const p = location.pathname || "";
@@ -2320,6 +2411,7 @@ async function runRouteInits() {
 
   await updateInboxBadge();
   await initNotesPage();
+  await initOperativoPage();
   await initSalesPage();
   await initErogatoPage();
   await initInsurancePage();
