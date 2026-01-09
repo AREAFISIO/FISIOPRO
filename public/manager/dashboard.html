@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Manager • Dashboard</title>
+
+  <link rel="stylesheet" href="/assets/app.css?v=fpui-20260108a" />
+  <script src="/assets/session-timeout.js"></script>
+
+  <style>
+    /* Evita flash di contenuto prima del controllo accessi */
+    html { visibility: hidden; }
+
+    .kpiRow{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap: 12px;
+    }
+    @media (max-width: 1100px){ .kpiRow{ grid-template-columns:1fr; } }
+
+    .kpi{
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      box-shadow: var(--shadow);
+    }
+    .kpi .label{ color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+    .kpi .value{ font-size: 28px; font-weight: 950; margin-top: 6px; letter-spacing: -.2px; }
+    .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 1100px){ .grid2{ grid-template-columns: 1fr; } }
+
+    .fpChartWrap{ height: 320px; }
+    @media (max-width: 700px){ .fpChartWrap{ height: 260px; } }
+
+    .badges{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badgeInfo{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .badgeInfo strong{ color: var(--text); }
+
+    .mutedLine { color: var(--muted); font-size: 13px; line-height: 1.4; }
+  </style>
+
+  <script>
+    // =========================
+    // CONTROLLO ACCESSI (Manager)
+    // - richiesto: /api/auth-check
+    // =========================
+    (function () {
+      async function authCheck() {
+        const r = await fetch("/api/auth-check", { credentials: "include" });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data?.ok || data?.role !== "Manager") return { ok: false };
+
+        // Normalizza shape per app.js (evita /api/auth-me).
+        const u = data.user || {};
+        window.FP_USER = {
+          email: String(u.email || "").toLowerCase(),
+          nome: u.nome || "",
+          cognome: u.cognome || "",
+          role: "manager",
+          roleLabel: u.roleLabel || "Manager",
+        };
+        window.FP_SESSION = { role: "manager", email: window.FP_USER.email };
+        return { ok: true, user: window.FP_USER, session: window.FP_SESSION };
+      }
+
+      window.fpAuthMe = async function fpAuthMe() {
+        if (window.__FP_AUTH_ME_DATA?.ok) return window.__FP_AUTH_ME_DATA;
+        if (window.__FP_AUTH_ME_PROMISE) return await window.__FP_AUTH_ME_PROMISE;
+        window.__FP_AUTH_ME_PROMISE = (async () => {
+          const data = await authCheck().catch(() => ({ ok: false }));
+          window.__FP_AUTH_ME_DATA = data;
+          return data;
+        })();
+        return await window.__FP_AUTH_ME_PROMISE;
+      };
+
+      (async function () {
+        const data = await window.fpAuthMe();
+        if (!data?.ok) return window.location.replace("/pages/login.html");
+        document.documentElement.style.visibility = "visible";
+      })();
+    })();
+  </script>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">AreA FISIO</div>
+          <div class="sub">Manager</div>
+        </div>
+      </div>
+      <nav class="nav"></nav>
+    </aside>
+
+    <main class="main" style="padding:18px 18px 30px;">
+      <div class="topbar" style="position:sticky; top:0; z-index:10;">
+        <div class="toprow">
+          <div class="h1">Dashboard CFO <span class="pill" data-user-badge>—</span></div>
+          <div class="actions">
+            <button class="btn" onclick="location.href='/manager/riepilogo-mensile.html'">Riepilogo mensile</button>
+            <button class="btn" onclick="location.href='/manager/costi-per-categoria.html'">Costi per categoria</button>
+            <button class="btn" onclick="location.href='/pages/manager.html'">Torna a Manager</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI (mese corrente) -->
+      <div class="kpiRow" style="margin-bottom:14px;">
+        <div class="kpi">
+          <div class="label">Totale entrate (mese)</div>
+          <div class="value" data-kpi-entrate>—</div>
+          <div class="mini">Incassi / entrate registrate nel mese corrente.</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Totale costi (mese)</div>
+          <div class="value" data-kpi-costi>—</div>
+          <div class="mini">Uscite registrate nel mese corrente.</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Margine €</div>
+          <div class="value" data-kpi-margine-eur>—</div>
+          <div class="mini">Entrate − costi (mese corrente).</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Margine %</div>
+          <div class="value" data-kpi-margine-pct>—</div>
+          <div class="mini">Margine / entrate (mese corrente).</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <!-- Trend ultimi 6 mesi -->
+        <section class="card">
+          <div class="head"><h2>Trend (ultimi 6 mesi)</h2><span class="chip">Entrate vs Costi</span></div>
+          <div class="body">
+            <div class="mutedLine" data-ovw-loading style="display:none;">Caricamento…</div>
+            <div class="mutedLine" data-ovw-error style="display:none;"></div>
+            <div class="fpChartWrap" style="margin-top:10px;">
+              <canvas data-ovw-line></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Badge informativi -->
+        <aside class="card">
+          <div class="head"><h2>Struttura costi (mese)</h2><span class="chip">Info</span></div>
+          <div class="body">
+            <div class="badges" style="margin-bottom:10px;">
+              <div class="badgeInfo"><span>Costi fissi</span> <strong data-badge-fissi>—</strong></div>
+              <div class="badgeInfo"><span>Costi variabili</span> <strong data-badge-variabili>—</strong></div>
+            </div>
+            <div class="mutedLine">
+              Lettura rapida: se i costi fissi crescono, riduce la resilienza. Se i variabili crescono, valuta leve operative.
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <aside class="rightbar">
+      <div class="righttitle">Azioni</div>
+      <div class="card" style="padding:14px;">
+        <button class="btn" style="width:100%;" data-ovw-refresh>Aggiorna</button>
+        <div class="mini" style="margin-top:10px;color:var(--muted);">
+          Vista CEO: 4 numeri + trend 6 mesi.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast"></div>
+
+  <!-- Chart.js via CDN (obbligatorio) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/assets/app.js?v=fpui-20260108a"></script>
+
+  <script>
+    // =========================
+    // Dashboard CFO (read-only)
+    // =========================
+    (function () {
+      const fmtEuro = (n) => {
+        const v = (typeof n === "number" && isFinite(n)) ? n : Number(n || 0);
+        try {
+          return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+        } catch {
+          return `${Math.round(v)} €`;
+        }
+      };
+      const fmtPct = (n) => {
+        const v = (typeof n === "number" && isFinite(n)) ? n : Number(n || 0);
+        const x = Math.round(v * 10) / 10;
+        return `${x}%`;
+      };
+
+      const $ = (sel) => document.querySelector(sel);
+      const kEntrate = $("[data-kpi-entrate]");
+      const kCosti = $("[data-kpi-costi]");
+      const kMargE = $("[data-kpi-margine-eur]");
+      const kMargP = $("[data-kpi-margine-pct]");
+      const bFissi = $("[data-badge-fissi]");
+      const bVar = $("[data-badge-variabili]");
+      const loadingEl = $("[data-ovw-loading]");
+      const errorEl = $("[data-ovw-error]");
+      const refreshBtn = $("[data-ovw-refresh]");
+      const canvas = $("[data-ovw-line]");
+
+      let chart = null;
+
+      function show(el, msg) { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = msg; }
+      function hide(el) { if (!el) return; el.style.display = "none"; }
+
+      async function load() {
+        hide(errorEl);
+        show(loadingEl, "Caricamento…");
+
+        // reset placeholders
+        kEntrate && (kEntrate.textContent = "—");
+        kCosti && (kCosti.textContent = "—");
+        kMargE && (kMargE.textContent = "—");
+        kMargP && (kMargP.textContent = "—");
+        bFissi && (bFissi.textContent = "—");
+        bVar && (bVar.textContent = "—");
+
+        try {
+          const r = await fetch("/api/overview", { credentials: "include" });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok || !data?.ok) throw new Error(data?.error || "overview_failed");
+
+          const cur = data.currentMonth || {};
+          kEntrate && (kEntrate.textContent = fmtEuro(cur.entrate || 0));
+          kCosti && (kCosti.textContent = fmtEuro(cur.costi || 0));
+          kMargE && (kMargE.textContent = fmtEuro(cur.margineEuro || 0));
+          kMargP && (kMargP.textContent = fmtPct(cur.marginePct || 0));
+
+          bFissi && (bFissi.textContent = fmtPct(cur.pctFissi || 0));
+          bVar && (bVar.textContent = fmtPct(cur.pctVariabili || 0));
+
+          // chart
+          const last = data.last6Months || {};
+          const labels = Array.isArray(last.labels) ? last.labels : [];
+          const entrate = Array.isArray(last.entrate) ? last.entrate : [];
+          const costi = Array.isArray(last.costi) ? last.costi : [];
+
+          if (canvas && window.Chart) {
+            if (chart?.destroy) { try { chart.destroy(); } catch {} }
+            chart = new window.Chart(canvas.getContext("2d"), {
+              type: "line",
+              data: {
+                labels,
+                datasets: [
+                  {
+                    label: "Entrate",
+                    data: entrate,
+                    borderColor: "rgba(41,211,154,1)",
+                    backgroundColor: "rgba(41,211,154,.18)",
+                    tension: .25,
+                    fill: true,
+                    pointRadius: 3,
+                  },
+                  {
+                    label: "Costi",
+                    data: costi,
+                    borderColor: "rgba(255,77,109,1)",
+                    backgroundColor: "rgba(255,77,109,.12)",
+                    tension: .25,
+                    fill: true,
+                    pointRadius: 3,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: true },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => `${ctx.dataset.label}: ${fmtEuro(ctx.parsed.y || 0)}`
+                    }
+                  }
+                },
+                scales: {
+                  y: {
+                    ticks: {
+                      callback: (v) => {
+                        const n = Number(v || 0);
+                        if (!isFinite(n)) return String(v);
+                        return fmtEuro(n);
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          hide(loadingEl);
+        } catch (e) {
+          console.error(e);
+          hide(loadingEl);
+          show(errorEl, "Impossibile caricare i dati (verifica Airtable / permessi).");
+        }
+      }
+
+      refreshBtn && refreshBtn.addEventListener("click", load);
+      load();
+    })();
+  </script>
+</body>
+</html>
+

@@ -160,8 +160,8 @@ function ensureControlloGestioneMenu() {
   if (nav.querySelector("[data-fp-cdg-menu]")) return;
 
   // If links already exist in HTML, don't duplicate.
-  const hasCosti = Boolean(nav.querySelector('a[href$="dashboard-costi.html"]'));
-  const hasCtrl = Boolean(nav.querySelector('a[href$="dashboard-controllo.html"]'));
+  const hasCosti = Boolean(nav.querySelector('a[href$="costi-per-categoria.html"]'));
+  const hasCtrl = Boolean(nav.querySelector('a[href$="riepilogo-mensile.html"]'));
   if (hasCosti && hasCtrl) return;
 
   const marker = document.createElement("div");
@@ -176,13 +176,13 @@ function ensureControlloGestioneMenu() {
   const a1 = document.createElement("a");
   a1.setAttribute("data-nav", "");
   a1.setAttribute("data-role", "manager");
-  a1.href = "dashboard-costi.html";
+  a1.href = "/manager/costi-per-categoria.html";
   a1.textContent = "Costi per categoria";
 
   const a2 = document.createElement("a");
   a2.setAttribute("data-nav", "");
   a2.setAttribute("data-role", "manager");
-  a2.href = "dashboard-controllo.html";
+  a2.href = "/manager/riepilogo-mensile.html";
   a2.textContent = "Riepilogo mensile";
 
   // Insert before Logout link if possible (keeps menu tidy)
