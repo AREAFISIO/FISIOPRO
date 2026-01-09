@@ -393,12 +393,16 @@ body.fp-has-topbar .app{
 .topbar{
   /* non deve rimanere fissa */
   position:relative;top:auto;z-index:1;padding:10px 10px 14px;
-  /* remove horizontal blue band behind headings */
-  background: transparent;
-  backdrop-filter: none;
+  /* Keep content readable when pages use sticky topbar (prevents text “show-through”). */
+  background: var(--topbarBg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--topbarBorder);
+  box-shadow: var(--topbarShadow);
+  border-radius: 16px;
+  margin-bottom: 14px;
 }
-.toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.h1{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.h1{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:800;min-width:0;flex-wrap:wrap}
 .pill{
   padding:6px 10px;
   border-radius:999px;
@@ -406,7 +410,11 @@ body.fp-has-topbar .app{
   background: transparent;
   border: 1px solid rgba(255,255,255,.16);
   color: rgba(255,255,255,.82);
-  font-size:12px
+  font-size:12px;
+  max-width: min(560px, 100%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 

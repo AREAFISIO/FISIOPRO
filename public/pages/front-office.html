@@ -11,6 +11,31 @@
     /* Keep Front Office consistent with global theme */
     body{ overflow:auto; }
     .app{ grid-template-columns: 300px 1fr; }
+
+    /* Prevent header text overlap while scrolling:
+       this page has a sticky in-content .topbar; give it an opaque “glass” surface. */
+    .main > .topbar{
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      background: var(--topbarBg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--topbarBorder);
+      box-shadow: var(--topbarShadow);
+      border-radius: 16px;
+      margin-bottom: 14px;
+    }
+    .main > .topbar .toprow{
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .main > .topbar .h1{ min-width: 0; flex-wrap: wrap; }
+    .main > .topbar .pill{
+      max-width: min(560px, 100%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .tile{
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       padding:16px; border-radius:16px;
@@ -62,7 +87,7 @@
   </aside>
 
   <main class="main" style="padding:18px 18px 30px;">
-    <div class="topbar" style="position:sticky; top:0; z-index:10; padding:10px 10px 14px;">
+    <div class="topbar" style="padding:10px 10px 14px;">
       <div class="toprow">
         <div class="h1">Front Office <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
