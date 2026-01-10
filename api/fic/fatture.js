@@ -91,6 +91,14 @@ export default async function handler(req, res) {
       const tipoDocumento = String(body.tipoDocumento || "fattura").trim().toLowerCase();
       const ficType = tipoDocumento === "ricevuta" ? "receipt" : "invoice";
 
+      // Medical VAT exemption (Art. 10)
+      // Enforced server-side to prevent mistakes from frontend.
+      const esenteArt10 = Boolean(body.esenteArt10);
+      const ART10_REASON = String(process.env.FIC_ART10_EXEMPT_REASON || "Esente IVA art. 10 DPR 633/72").trim();
+      // For e-invoicing, nature "N4" is commonly used for exemptions.
+      // If your FIC account/document type doesn't accept it, set FIC_ART10_VAT_NATURE="" to omit.
+      const ART10_NATURE = String(process.env.FIC_ART10_VAT_NATURE || "N4").trim();
+
       const righe = Array.isArray(body.righe) ? body.righe : [];
       if (!righe.length) return res.status(400).json({ ok: false, error: "missing_righe" });
 
@@ -108,13 +116,20 @@ export default async function handler(req, res) {
         const qty = Number(r.qty ?? r.quantita ?? 1) || 1;
         const net = Number(r.net_price ?? r.prezzo ?? r.importo ?? 0) || 0;
         const iva = r.ivaPercent !== undefined ? Number(r.ivaPercent) : Number(r.iva ?? 0);
-        const vat = Number.isFinite(iva)
-          ? { value: iva }
-          : { value: 0 };
 
-        // Optional exemption reason (if you manage medical exemption)
+        // VAT handling:
+        // - if esenteArt10 => force VAT 0 + exemption reason
+        // - else => use IVA% from row, optional exempt_reason
+        const vat = esenteArt10
+          ? {
+              value: 0,
+              exempt_reason: ART10_REASON,
+              ...(ART10_NATURE ? { nature: ART10_NATURE } : {}),
+            }
+          : (Number.isFinite(iva) ? { value: iva } : { value: 0 });
+
         const exempt = String(r.esenzione || r.exempt_reason || "").trim();
-        if (exempt) vat.exempt_reason = exempt;
+        if (!esenteArt10 && exempt) vat.exempt_reason = exempt;
 
         return {
           name: descr,
