@@ -385,5 +385,369 @@
       "... (altri campi presenti nel CSV)",
       "Erogato"
     ]
+  },
+  "MOVIMENTI CONTO": {
+    "primary": "ID Movimento",
+    "key_fields": [
+      "ID Movimento",
+      "Data",
+      "Descrizione",
+      "Merchant",
+      "Importo",
+      "Valuta",
+      "Direzione",
+      "Qonto Category",
+      "Controparte / IBAN",
+      "Metodo",
+      "Categoria",
+      "Sotto-macro",
+      "Macro",
+      "Tipo",
+      "Natura Costo",
+      "Clinica/Centro di costo",
+      "Regola applicata",
+      "Match confidenza",
+      "Stato",
+      "Motivo verifica",
+      "Fattura collegata",
+      "Pagamento collegato",
+      "Riconciliato",
+      "Note",
+      "Auto-classificato",
+      "Da rivedere"
+    ],
+    "links": {
+      "Fattura collegata": "FATTURE FIC",
+      "Pagamento collegato": "PAGAMENTI FIC",
+      "Macro": "CATEGORIE CONTABILI",
+      "Sotto-macro": "CATEGORIE CONTABILI",
+      "Categoria": "CATEGORIE CONTABILI"
+    },
+    "all_fields": [
+      "ID Movimento",
+      "Data",
+      "Descrizione",
+      "Merchant",
+      "Importo",
+      "Valuta",
+      "Direzione",
+      "Qonto Category",
+      "Controparte / IBAN",
+      "Metodo",
+      "Categoria",
+      "Sotto-macro",
+      "Macro",
+      "Tipo",
+      "Natura Costo",
+      "Clinica/Centro di costo",
+      "Regola applicata",
+      "Match confidenza",
+      "Stato",
+      "Motivo verifica",
+      "Fattura collegata",
+      "Pagamento collegato",
+      "Riconciliato",
+      "Note",
+      "Auto-classificato",
+      "Da rivedere"
+    ]
+  },
+  "FATTURE FIC": {
+    "primary": "ID Fattura",
+    "key_fields": [
+      "ID Fattura",
+      "Data",
+      "Cliente",
+      "Totale",
+      "Stato",
+      "Metodo pagamento",
+      "Scadenza",
+      "Clinica",
+      "Movimenti collegati"
+    ],
+    "links": { "Movimenti collegati": "MOVIMENTI CONTO" },
+    "all_fields": [
+      "ID Fattura",
+      "Data",
+      "Cliente",
+      "Totale",
+      "Stato",
+      "Metodo pagamento",
+      "Scadenza",
+      "Clinica",
+      "Movimenti collegati"
+    ]
+  },
+  "PAGAMENTI FIC": {
+    "primary": "ID Pagamento",
+    "key_fields": [
+      "ID Pagamento",
+      "ID Fattura",
+      "Data pagamento",
+      "Importo",
+      "Metodo",
+      "Movimento banca"
+    ],
+    "links": {
+      "ID Fattura": "FATTURE FIC",
+      "Movimento banca": "MOVIMENTI CONTO"
+    },
+    "all_fields": [
+      "ID Pagamento",
+      "ID Fattura",
+      "Data pagamento",
+      "Importo",
+      "Metodo",
+      "Movimento banca"
+    ]
+  },
+  "FONTI": {
+    "primary": "FONTE",
+    "key_fields": [
+      "FONTE",
+      "Anagrafica",
+      "PROFESSIONISTI",
+      "Assicurazioni",
+      "FONTI",
+      "n° generale",
+      "2024 - n° generale",
+      "2024 - (€) Generale",
+      "Tramite invio diretto con form",
+      "Breve descrizione del tuo problema",
+      "Form",
+      "Telefono",
+      "Gruppi di fonti",
+      "Generale check",
+      "Anno",
+      "Periodo",
+      "Erogato",
+      "Vendite",
+      "Vendite 2"
+    ],
+    "links": {
+      "Anagrafica": "ANAGRAFICA",
+      "Assicurazioni": "ASSICURAZIONI",
+      "Gruppi di fonti": "GRUPPI",
+      "Erogato": "EROGATO",
+      "Vendite": "VENDITE",
+      "Vendite 2": "VENDITE"
+    },
+    "all_fields": [
+      "FONTE",
+      "Anagrafica",
+      "PROFESSIONISTI",
+      "Assicurazioni",
+      "FONTI",
+      "n° generale",
+      "2024 - n° generale",
+      "2024 - (€) Generale",
+      "Tramite invio diretto con form",
+      "Breve descrizione del tuo problema",
+      "Form",
+      "Telefono",
+      "Gruppi di fonti",
+      "Generale check",
+      "Anno",
+      "Periodo",
+      "Erogato",
+      "Vendite",
+      "Vendite 2"
+    ]
+  },
+  "GRUPPI": {
+    "primary": "GRUPPO",
+    "key_fields": [
+      "GRUPPO",
+      "Fonti",
+      "2024 - n° generale",
+      "Assic chek",
+      "2024 - (€) generale",
+      "Anagrafica"
+    ],
+    "links": {
+      "Fonti": "FONTI",
+      "Anagrafica": "ANAGRAFICA"
+    },
+    "all_fields": [
+      "GRUPPO",
+      "Fonti",
+      "2024 - n° generale",
+      "Assic chek",
+      "2024 - (€) generale",
+      "Anagrafica"
+    ]
+  },
+  "INCARICHI": {
+    "primary": "Incarichi",
+    "key_fields": [
+      "Incarichi",
+      "Ambito",
+      "Tipologia",
+      "Ricevente",
+      "PRIORITÀ",
+      "Mandante",
+      "Stato Testuale",
+      "Pagamento",
+      "Fisioterapista",
+      "_paziente_data richiamo",
+      "Anagrafica",
+      "Trattamento",
+      "Settimane post",
+      "Miglioramento",
+      "Scadenza Settimana Corrente",
+      "Riepilogo To do",
+      "Scadenza Passata",
+      "Accertato",
+      "Ultima modifica della data",
+      "Note del fisioterapista",
+      "Consegne",
+      "Formazione",
+      "OGGETTO",
+      "Paziente In Incarico",
+      "ALLEGATO"
+    ],
+    "links": {
+      "Anagrafica": "ANAGRAFICA",
+      "Consegne": "CONSEGNE",
+      "Ricevente": "COLLABORATORI",
+      "Mandante": "COLLABORATORI",
+      "Fisioterapista": "COLLABORATORI"
+    },
+    "all_fields": [
+      "Incarichi",
+      "Ambito",
+      "Tipologia",
+      "Ricevente",
+      "PRIORITÀ",
+      "Mandante",
+      "Stato Testuale",
+      "Pagamento",
+      "Fisioterapista",
+      "_paziente_data richiamo",
+      "Anagrafica",
+      "Trattamento",
+      "Settimane post",
+      "Miglioramento",
+      "Scadenza Settimana Corrente",
+      "Riepilogo To do",
+      "Scadenza Passata",
+      "Accertato",
+      "Ultima modifica della data",
+      "Note del fisioterapista",
+      "Consegne",
+      "Formazione",
+      "OGGETTO",
+      "Paziente In Incarico",
+      "ALLEGATO"
+    ]
+  },
+  "INFORTUNISTICA": {
+    "primary": "Infortunistica",
+    "key_fields": [
+      "Infortunistica",
+      "PREZZO PERCORSO",
+      "NUMERO SEDUTE",
+      "Status",
+      "Anagrafica",
+      "Vendite"
+    ],
+    "links": {
+      "Anagrafica": "ANAGRAFICA",
+      "Vendite": "VENDITE"
+    },
+    "all_fields": [
+      "Infortunistica",
+      "PREZZO PERCORSO",
+      "NUMERO SEDUTE",
+      "Status",
+      "Anagrafica",
+      "Vendite"
+    ]
+  },
+  "PATOLOGIE ORTOPEDICHE": {
+    "primary": "Nome Patologia",
+    "key_fields": [
+      "Nome Patologia",
+      "Sigla",
+      "Tipo",
+      "Macro Area",
+      "Sotto-Area",
+      "Struttura Anatomica",
+      "Nervo Coinvolto",
+      "Lateralità",
+      "Tecnica Chirurgica",
+      "Sport",
+      "Protocol Tags",
+      "Rischio Complicanze",
+      "EROGATO",
+      "CASI CLINICI",
+      "FOLLOW UP CONSIGLIATO",
+      "PATTERN PEDRIATRICO",
+      "WIKIPEDIA",
+      "VALUTAZIONI"
+    ],
+    "links": {
+      "Macro Area": "MACRO AREE",
+      "Nervo Coinvolto": "NERVI",
+      "EROGATO": "EROGATO",
+      "CASI CLINICI": "CASI CLINICI",
+      "VALUTAZIONI": "VALUTAZIONI"
+    },
+    "all_fields": [
+      "Nome Patologia",
+      "Sigla",
+      "Tipo",
+      "Macro Area",
+      "Sotto-Area",
+      "Struttura Anatomica",
+      "Nervo Coinvolto",
+      "Lateralità",
+      "Tecnica Chirurgica",
+      "Sport",
+      "Protocol Tags",
+      "Rischio Complicanze",
+      "EROGATO",
+      "CASI CLINICI",
+      "FOLLOW UP CONSIGLIATO",
+      "PATTERN PEDRIATRICO",
+      "WIKIPEDIA",
+      "VALUTAZIONI"
+    ]
+  },
+  "MACRO AREE": {
+    "primary": "Nome",
+    "key_fields": [
+      "Nome",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ],
+    "links": {
+      "PATOLOGIE ORTOPEDICHE": "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Nome",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ]
+  },
+  "NERVI": {
+    "primary": "Nome",
+    "key_fields": [
+      "Nome",
+      "Lateralità",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ],
+    "links": {
+      "PATOLOGIE ORTOPEDICHE": "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Nome",
+      "Lateralità",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ]
   }
 }
