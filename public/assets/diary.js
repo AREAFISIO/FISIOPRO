@@ -1835,37 +1835,17 @@
     if (monthEl) monthEl.textContent = String(fmtMonth(start) || "").toUpperCase();
     if (weekEl) weekEl.textContent = fmtWeekRange(start, days);
 
-    // Fetch operators + agenda in parallel (reduces initial load latency).
-    const opsPromise = apiGet("/api/operators").catch(() => null);
     const nocache = opts && opts.nocache ? "&nocache=1" : "";
     // Use the lighter endpoint to avoid timeouts.
     const startISO = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0).toISOString();
     const endExclusive = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
     endExclusive.setDate(endExclusive.getDate() + days);
     const endISO = endExclusive.toISOString();
-    const apptsPromise = apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
+    const data = await apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
 
-    const [ops, data] = await Promise.all([opsPromise, apptsPromise]);
-
-    if (ops?.items) {
-      const items = (ops.items || []);
-      knownOperators = items;
-      const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
-      if (names.length) knownTherapists = names;
-      knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
-      operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
-      operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
-
-      // Shared colors (from Airtable via /api/operators)
-      ensureOperatorColorsObject();
-      const nextColors = {};
-      items.forEach((x) => {
-        const id = String(x.id || "").trim();
-        const c = normalizeHexColor(x.color);
-        if (id && c) nextColors[id] = c;
-      });
-      prefs.operatorColors = nextColors;
-    }
+    // NOTE: operators are NOT needed to render the agenda grid.
+    // Loading them on the critical path makes the "first open" slower on cold starts.
+    // We fetch operators in the background after the first render below.
 
     syncLoginName();
     if (prefDefaultPicker && prefDefaultPicker.style.display !== "none") renderDefaultPickerList();
@@ -1920,6 +1900,35 @@
 
     syncOpsBar();
     render();
+
+    // Background: load operators (colors, role labels, selects).
+    // This keeps the first paint fast while still enabling all features shortly after.
+    apiGet("/api/operators")
+      .then((ops) => {
+        if (!ops?.items) return;
+        const items = (ops.items || []);
+        knownOperators = items;
+        const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
+        if (names.length) knownTherapists = names;
+        knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
+        operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
+        operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
+
+        // Shared colors (from Airtable via /api/operators)
+        ensureOperatorColorsObject();
+        const nextColors = {};
+        items.forEach((x) => {
+          const id = String(x.id || "").trim();
+          const c = normalizeHexColor(x.color);
+          if (id && c) nextColors[id] = c;
+        });
+        prefs.operatorColors = nextColors;
+
+        // Update UI
+        syncOpsBar();
+        try { render(); } catch {}
+      })
+      .catch(() => {});
   }
 
   function computeGridRange(start, days) {
