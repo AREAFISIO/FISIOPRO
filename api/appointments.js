@@ -157,7 +157,20 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
     const formula = `OR(${orParts.join(",")})`;
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
     for (const f of fields) qs.append("fields[]", f);
-    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+
+    let data;
+    try {
+      data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    } catch (e) {
+      // Some bases don't have optional fields like "Cognome e Nome".
+      // If Airtable rejects any requested field, retry without fields[] (fetch all fields).
+      if (isUnknownFieldError(e?.message)) {
+        const qs2 = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
+        data = await airtableFetch(`${tableEnc}?${qs2.toString()}`);
+      } else {
+        throw e;
+      }
+    }
     for (const r of data.records || []) {
       const name = String(pickName(r.fields) || "").trim();
       if (name) out[r.id] = name;
@@ -668,6 +681,7 @@ export default async function handler(req, res) {
       const date = norm(req.query?.date);
       const startRaw = norm(req.query?.start);
       const endRaw = norm(req.query?.end);
+      const noCache = String(req.query?.nocache || "") === "1";
 
       let startISO = "";
       let endISO = "";
@@ -685,7 +699,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: "missing_start_end" });
       }
 
-      const { appointments } = await listAppointments({ tableEnc, tableName, schema, startISO, endISO, session });
+      // Short warm-instance cache: speeds up repeated view switches/navigation.
+      // Cache is session-aware (role+email) and range-aware.
+      const role = normalizeRole(session.role || "");
+      const email = String(session.email || "").toLowerCase();
+      const cacheKey = `appts:list:${tableName}:${startISO}:${endISO}:${role}:${email}`;
+      const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session });
+      const { appointments } = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
       return res.status(200).json({ ok: true, appointments });
     }
 

@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro • Agenda</title>
   <!-- cache-bust -->
-  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260110a" />
   <style>
     /* Agenda shell (keeps your management system look) */
     body { overflow: hidden; }
@@ -334,7 +334,27 @@
     .dayCol{
       position: relative;
       border-right: 1px solid var(--fp-vert-line);
-      background: var(--fp-col-bg);
+      /* Base column background + grid lines (drawn via CSS, not DOM nodes) */
+      background-image:
+        var(--fp-col-bg),
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent calc(var(--fp-slot-px, 18px) - 1px),
+          var(--fp-grid-line) calc(var(--fp-slot-px, 18px) - 1px),
+          var(--fp-grid-line) var(--fp-slot-px, 18px)
+        ),
+        repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent calc(var(--fp-hour-px, 36px) - 1px),
+          var(--fp-grid-line-hour) calc(var(--fp-hour-px, 36px) - 1px),
+          var(--fp-grid-line-hour) var(--fp-hour-px, 36px)
+        );
+      background-repeat: no-repeat, repeat, repeat;
+      /* align the repeating grid to start under the header padding */
+      background-position: 0 0, 0 var(--fp-grid-pad-top, 10px), 0 var(--fp-grid-pad-top, 10px);
+      background-size: auto, 100% var(--fp-slot-px, 18px), 100% var(--fp-hour-px, 36px);
     }
 
     /* Stronger day separators (between days) */
@@ -346,12 +366,7 @@
       border-left: 2px solid var(--fp-day-sep) !important;
       box-shadow: -1px 0 0 var(--fp-day-sep-shadow);
     }
-    .gridLine{
-      position:absolute; left:0; right:0;
-      border-top: 1px solid var(--fp-grid-line);
-      pointer-events:none;
-    }
-    .gridLine.hour{ border-top-color: var(--fp-grid-line-hour); }
+    /* Grid lines are now painted via background gradients on .dayCol (faster). */
 
     .slotHover{
       position:absolute;
@@ -919,8 +934,8 @@
 </div>
 
 <!-- cache-bust -->
-  <script src="../assets/app.js?v=fpui-20260108a"></script>
-<script src="../assets/diary.js?v=fpui-20251231c"></script>
+  <script src="../assets/app.js?v=fpui-20260110a"></script>
+<script src="../assets/diary.js?v=fpui-20260110a"></script>
 </body>
 </html>
 
