@@ -108,9 +108,13 @@
     "links": {
       "Paziente": "ANAGRAFICA",
       "Collaboratore": "COLLABORATORI",
+      "Prestazione prevista": "PRESTAZIONI",
+      "VALUTAZIONI": "VALUTAZIONI",
+      "TRATTAMENTI": "TRATTAMENTI",
       "Caso clinico": "CASI CLINICI",
       "Erogato collegato": "EROGATO",
-      "EROGATO": "EROGATO"
+      "EROGATO": "EROGATO",
+      "Vendita collegata": "VENDITE"
     },
     "all_fields": [
       "Appuntamento",
@@ -168,7 +172,8 @@
     "links": {
       "Paziente": "ANAGRAFICA",
       "APPUNTAMENTI": "APPUNTAMENTI",
-      "Erogato correlato": "EROGATO"
+      "Erogato correlato": "EROGATO",
+      "Trattamenti": "TRATTAMENTI"
     },
     "all_fields": [
       "CASO CLINICO",
@@ -312,7 +317,8 @@
       "Collaboratore": "COLLABORATORI",
       "Appuntamento": "APPUNTAMENTI",
       "Caso clinico": "CASI CLINICI",
-      "CASI CLINICI": "CASI CLINICI"
+      "CASI CLINICI": "CASI CLINICI",
+      "Valutazione collegata": "VALUTAZIONI"
     },
     "all_fields": [
       "ID Erogato",
@@ -1089,6 +1095,208 @@
     "all_fields": [
       "Sport",
       "PATOLOGIE ORTOPEDICHE"
+    ]
+  },
+  "TEST CLINICI": {
+    "primary": "NOME",
+    "key_fields": [
+      "NOME",
+      "CATEGORIA",
+      "DISTRETTO",
+      "DESCRIZIONE",
+      "STEP",
+      "VIDEO URL",
+      "VIDEO FILE"
+    ],
+    "links": {},
+    "all_fields": [
+      "NOME",
+      "CATEGORIA",
+      "DISTRETTO",
+      "DESCRIZIONE",
+      "STEP",
+      "VIDEO URL",
+      "VIDEO FILE"
+    ]
+  },
+  "TRATTAMENTI": {
+    "primary": "Id trattamento",
+    "key_fields": [
+      "Id trattamento",
+      "Data",
+      "Paziente",
+      "Collaboratore",
+      "Appuntamento",
+      "Caso clinico",
+      "CASI CLINICI",
+      "Erogato",
+      "Vendita di riferimento",
+      "LISTINO TERAPIE",
+      "Tipo trattamento",
+      "Patologia",
+      "Macro Area",
+      "Sotto-Area",
+      "Struttura Anatomica",
+      "Lateralità",
+      "Sport",
+      "Rischio Complicanze",
+      "Follow-up Consigliato",
+      "Note Fisioterapista",
+      "Trattamento eseguito",
+      "Indicazioni prossima seduta",
+      "BODY T",
+      "TEST T",
+      "Allegati"
+    ],
+    "links": {
+      "Paziente": "ANAGRAFICA",
+      "Collaboratore": "COLLABORATORI",
+      "Appuntamento": "APPUNTAMENTI",
+      "Erogato": "EROGATO",
+      "Caso clinico": "CASI CLINICI",
+      "CASI CLINICI": "CASI CLINICI",
+      "Vendita di riferimento": "VENDITE",
+      "LISTINO TERAPIE": "PRESTAZIONI",
+      "Patologia": "PATOLOGIE ORTOPEDICHE",
+      "Macro Area": "MACRO AREE",
+      "Sotto-Area": "SOTTO AREE",
+      "Struttura Anatomica": "STRUTTURE ANATOMICHE",
+      "Sport": "SPORT",
+      "TEST T": "TEST CLINICI"
+    },
+    "all_fields": [
+      "Id trattamento",
+      "Data",
+      "Paziente",
+      "Collaboratore",
+      "Appuntamento",
+      "Caso clinico",
+      "CASI CLINICI",
+      "Erogato",
+      "Vendita di riferimento",
+      "LISTINO TERAPIE",
+      "Tipo trattamento",
+      "Patologia",
+      "Macro Area",
+      "Sotto-Area",
+      "Struttura Anatomica",
+      "Lateralità",
+      "Sport",
+      "Rischio Complicanze",
+      "Follow-up Consigliato",
+      "Note Fisioterapista",
+      "Trattamento eseguito",
+      "Indicazioni prossima seduta",
+      "BODY T",
+      "TEST T",
+      "Allegati"
+    ]
+  },
+  "VALUTAZIONI": {
+    "primary": "Valutazione",
+    "key_fields": [
+      "Valutazione",
+      "ID Valutazione",
+      "Data valutazione",
+      "Tipo valutazione",
+      "Paziente",
+      "Collaboratore",
+      "Caso clinico",
+      "Appuntamento",
+      "Erogato",
+      "Patologia principale",
+      "Scale",
+      "Indicazioni percorso"
+    ],
+    "links": {
+      "Paziente": "ANAGRAFICA",
+      "Collaboratore": "COLLABORATORI",
+      "Caso clinico": "CASI CLINICI",
+      "Appuntamento": "APPUNTAMENTI",
+      "Erogato": "EROGATO",
+      "Patologia principale": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Valutazione",
+      "ID Valutazione",
+      "Data valutazione",
+      "Tipo valutazione",
+      "Paziente",
+      "Collaboratore",
+      "Caso clinico",
+      "Appuntamento",
+      "Erogato",
+      "Patologia principale",
+      "Scale",
+      "Indicazioni percorso"
+    ]
+  },
+  "VENDITE": {
+    "primary": "ID Vendita",
+    "key_fields": [
+      "ID Vendita",
+      "Vendita",
+      "Paziente",
+      "Stato vendita",
+      "Tipo di vendita",
+      "DATA E ORA VENDITA",
+      "Data vendita",
+      "LINK TO PRESTAZIONI",
+      "Sedute vendute",
+      "Numero sedute erogate",
+      "Sedute residue",
+      "Prezzo totale",
+      "PREZZO SCONTO",
+      "Modalità di Pagamento 1",
+      "Metodo di Pagamento 1",
+      "Stato Pagamento",
+      "Assicurazione",
+      "🧑‍💻 Fonti (per accredito extra)",
+      "Caso clinico",
+      "APPUNTAMENTI",
+      "Erogati collegati",
+      "SEDUTE COMPLETATE",
+      "N° Fattura 1",
+      "N° Fattura 2",
+      "Data Fattura 1",
+      "Data Fattura 2"
+    ],
+    "links": {
+      "Paziente": "ANAGRAFICA",
+      "LINK TO PRESTAZIONI": "PRESTAZIONI",
+      "Assicurazione": "ASSICURAZIONI",
+      "🧑‍💻 Fonti (per accredito extra)": "FONTI",
+      "Caso clinico": "CASI CLINICI",
+      "APPUNTAMENTI": "APPUNTAMENTI",
+      "Erogati collegati": "EROGATO"
+    },
+    "all_fields": [
+      "ID Vendita",
+      "Vendita",
+      "Paziente",
+      "Stato vendita",
+      "Tipo di vendita",
+      "DATA E ORA VENDITA",
+      "Data vendita",
+      "LINK TO PRESTAZIONI",
+      "Sedute vendute",
+      "Numero sedute erogate",
+      "Sedute residue",
+      "Prezzo totale",
+      "PREZZO SCONTO",
+      "Modalità di Pagamento 1",
+      "Metodo di Pagamento 1",
+      "Stato Pagamento",
+      "Assicurazione",
+      "🧑‍💻 Fonti (per accredito extra)",
+      "Caso clinico",
+      "APPUNTAMENTI",
+      "Erogati collegati",
+      "SEDUTE COMPLETATE",
+      "N° Fattura 1",
+      "N° Fattura 2",
+      "Data Fattura 1",
+      "Data Fattura 2"
     ]
   }
 }

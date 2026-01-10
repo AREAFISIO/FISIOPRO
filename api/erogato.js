@@ -205,6 +205,29 @@ export default async function handler(req, res) {
         }
 
         const out = targetId ? await airtableUpdate("EROGATO", targetId, fields) : await airtableCreate("EROGATO", fields);
+
+        // Best-effort: if this erogato is linked to an appointment, also link it back to
+        // any VALUTAZIONI/TRATTAMENTI that reference the same appointment.
+        try {
+          const erogatoId = out?.id || "";
+          const apptId = appointmentIds?.[0] || "";
+          if (erogatoId && apptId) {
+            const fAppt = `FIND("${escAirtableStringLib(apptId)}", ARRAYJOIN({Appuntamento}))`;
+
+            const [vals, trts] = await Promise.all([
+              airtableList("VALUTAZIONI", { filterByFormula: fAppt, maxRecords: 10, pageSize: 10, fields: ["Appuntamento", "Erogato"] }).catch(() => ({ records: [] })),
+              airtableList("TRATTAMENTI", { filterByFormula: fAppt, maxRecords: 10, pageSize: 10, fields: ["Appuntamento", "Erogato"] }).catch(() => ({ records: [] })),
+            ]);
+
+            await Promise.all([
+              ...((vals.records || []).map((r) => airtableUpdate("VALUTAZIONI", r.id, { Erogato: [erogatoId] }).catch(() => null))),
+              ...((trts.records || []).map((r) => airtableUpdate("TRATTAMENTI", r.id, { Erogato: [erogatoId] }).catch(() => null))),
+            ]);
+          }
+        } catch {
+          // ignore (best-effort)
+        }
+
         return res.status(200).json({ ok: true, record: { id: out.id, fields: out.fields || {}, createdTime: out.createdTime || "" } });
       }
 

@@ -727,6 +727,13 @@ export default async function handler(req, res) {
         appt.operator;
       const casoVal =
         appt.casoClinicoRecordId ?? appt.caseRecordId ?? appt["Caso clinico"] ?? appt.casoClinico ?? appt.case;
+      const prestazioneVal =
+        appt.prestazioneRecordId ??
+        appt.serviceRecordId ??
+        appt["Prestazione prevista"] ??
+        appt.prestazione ??
+        appt.prestazionePrevista ??
+        appt.codicePrestazione;
 
       if (!pazienteVal) return res.status(400).json({ ok: false, error: "missing_paziente" });
       if (!collaboratoreVal) return res.status(400).json({ ok: false, error: "missing_collaboratore" });
@@ -746,6 +753,23 @@ export default async function handler(req, res) {
 
       const tipoLavoro = norm(appt["Tipo lavoro"] ?? appt.tipoLavoro ?? appt.tipo_lavoro);
       if (tipoLavoro) fields["Tipo lavoro"] = tipoLavoro;
+
+      // Optional linked "Prestazione prevista" -> PRESTAZIONI (can be recordId OR name OR codice).
+      if (prestazioneVal !== undefined && prestazioneVal !== null && String(prestazioneVal).trim() !== "") {
+        let prestIds = [];
+        if (String(prestazioneVal).startsWith("rec")) prestIds = [String(prestazioneVal)];
+        else {
+          prestIds = await resolveLinkedIds({ table: "PRESTAZIONI", values: prestazioneVal, allowMissing: true });
+          if (!prestIds.length) {
+            // fallback by Codice exact
+            const formula = `LOWER({Codice}&"") = LOWER("${escAirtableStringLib(String(prestazioneVal).trim())}")`;
+            const found = await airtableList("PRESTAZIONI", { filterByFormula: formula, maxRecords: 1, pageSize: 1, fields: ["Servizio", "Codice"] });
+            const rid = found.records?.[0]?.id || "";
+            if (rid) prestIds = [rid];
+          }
+        }
+        if (prestIds.length) fields["Prestazione prevista"] = [prestIds[0]];
+      }
 
       const note = norm(appt["Note"] ?? appt.note ?? appt.notes);
       if (note || note === "") fields["Note"] = note;
