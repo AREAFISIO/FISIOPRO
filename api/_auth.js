@@ -177,10 +177,36 @@ export async function airtableFetch(path, init = {}) {
   }
 
   if (!res.ok) {
-    const msg = json?.error?.message || json?.error || text || `Airtable error ${res.status}`;
-    const err = new Error(msg);
+    const rawMsg = json?.error?.message || json?.error || text || `Airtable error ${res.status}`;
+    const msg = String(rawMsg || "").trim() || `Airtable error ${res.status}`;
+
+    // Add actionable context for the most common "config/permissions" failure.
+    // Airtable sometimes returns a generic message that includes "requested model".
+    const isPermOrModel =
+      /invalid permissions/i.test(msg) ||
+      /requested model was not found/i.test(msg) ||
+      /not authorized/i.test(msg);
+
+    const pathNoQs = String(path || "").split("?")[0] || "";
+    const tableEnc = String(pathNoQs || "").split("/")[0] || "";
+    let table = "";
+    try { table = decodeURIComponent(tableEnc); } catch { table = tableEnc; }
+
+    const err = new Error(
+      isPermOrModel
+        ? `Airtable: permessi mancanti o base/tabella non trovata (verifica AIRTABLE_TOKEN e AIRTABLE_BASE_ID).`
+        : msg,
+    );
     err.status = 502;
     err.airtable = json;
+    err.details = {
+      provider: "airtable",
+      airtableStatus: res.status,
+      airtableErrorType: json?.error?.type || "",
+      airtableMessage: msg,
+      table: table || "",
+      path: pathNoQs || "",
+    };
     throw err;
   }
 

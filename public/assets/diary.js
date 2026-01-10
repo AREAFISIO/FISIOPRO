@@ -1711,8 +1711,15 @@
 
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const extra = data.details ? `\n\nDettagli: ${JSON.stringify(data.details)}` : "";
-      throw new Error((data.error || ("HTTP " + r.status)) + extra);
+      const raw = String(data.error || "").trim();
+      let msg = raw || ("HTTP " + r.status);
+      // Airtable can return this generic string on missing base/table permissions.
+      if (/invalid permissions/i.test(msg) || /requested model was not found/i.test(msg)) {
+        msg = "Permessi Airtable mancanti o base/tabella non trovata. Controlla AIRTABLE_TOKEN/AIRTABLE_BASE_ID e gli accessi alla base.";
+      }
+      const where = `\n\nEndpoint: ${url} (HTTP ${r.status})`;
+      const extra = data.details ? `\nDettagli: ${JSON.stringify(data.details, null, 2)}` : "";
+      throw new Error(msg + where + extra);
     }
     return data;
   }
