@@ -474,7 +474,7 @@ function mapAppointmentFromRecord({
   };
 }
 
-async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session }) {
+async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite = false }) {
   if (!schema.FIELD_START) {
     const err = new Error("agenda_schema_mismatch: missing start field");
     err.status = 500;
@@ -534,6 +534,22 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
   for (const f of wantedFields) qs.append("fields[]", f);
 
   const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+
+  // LITE mode: avoid extra Airtable calls to resolve linked record names.
+  // This makes the first agenda load much faster and avoids client timeouts.
+  if (lite) {
+    const appointments = (data.records || []).map((r) =>
+      mapAppointmentFromRecord({
+        record: r,
+        schema,
+        patientNamesById: {},
+        collaboratorNamesById: {},
+        serviceNamesById: {},
+        locationNamesById: {},
+      }),
+    );
+    return { appointments };
+  }
 
   // Resolve linked names for patient + collaborator (for a nice agenda render).
   const patientIds = new Set();
@@ -682,6 +698,7 @@ export default async function handler(req, res) {
       const startRaw = norm(req.query?.start);
       const endRaw = norm(req.query?.end);
       const noCache = String(req.query?.nocache || "") === "1";
+      const lite = String(req.query?.lite || "") === "1";
 
       let startISO = "";
       let endISO = "";
@@ -704,7 +721,7 @@ export default async function handler(req, res) {
       const role = normalizeRole(session.role || "");
       const email = String(session.email || "").toLowerCase();
       const cacheKey = `appts:list:${tableName}:${startISO}:${endISO}:${role}:${email}`;
-      const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session });
+      const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite });
       const { appointments } = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
       return res.status(200).json({ ok: true, appointments });
     }
