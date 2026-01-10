@@ -157,7 +157,20 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
     const formula = `OR(${orParts.join(",")})`;
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
     for (const f of fields) qs.append("fields[]", f);
-    const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+
+    let data;
+    try {
+      data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+    } catch (e) {
+      // Some bases don't have optional fields like "Cognome e Nome".
+      // If Airtable rejects any requested field, retry without fields[] (fetch all fields).
+      if (isUnknownFieldError(e?.message)) {
+        const qs2 = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
+        data = await airtableFetch(`${tableEnc}?${qs2.toString()}`);
+      } else {
+        throw e;
+      }
+    }
     for (const r of data.records || []) {
       const name = String(pickName(r.fields) || "").trim();
       if (name) out[r.id] = name;
