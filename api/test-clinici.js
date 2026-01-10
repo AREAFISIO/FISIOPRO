@@ -1,5 +1,16 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { enc, norm, readJsonBody } from "./_common.js";
+import { airtableCreate, airtableList, airtableUpdate, escAirtableString as esc } from "../lib/airtableClient.js";
+
+function isWriteBlockedFieldName(fieldName) {
+  const k = String(fieldName || "").trim();
+  if (!k) return true;
+  const low = k.toLowerCase();
+  if (k === "...") return true;
+  if (low.includes("copy")) return true;
+  if (/\(from\s.+\)/i.test(k)) return true;
+  return false;
+}
 
 export default async function handler(req, res) {
   ensureRes(res);
@@ -22,6 +33,31 @@ export default async function handler(req, res) {
     const tableEnc = enc(tableName);
 
     if (req.method === "GET") {
+      // NEW CONTRACT: /api/test-clinici?q=... (search on NOME/CATEGORIA/DISTRETTO)
+      // Keep old behavior when q is missing (backward compatibility).
+      const q = norm(req.query?.q);
+      if (q) {
+        const qq = esc(q.toLowerCase());
+        const formula = `OR(
+          FIND(LOWER("${qq}"), LOWER({NOME}&"")),
+          FIND(LOWER("${qq}"), LOWER({CATEGORIA}&"")),
+          FIND(LOWER("${qq}"), LOWER({DISTRETTO}&""))
+        )`;
+
+        const { records } = await airtableList("TEST CLINICI", {
+          filterByFormula: formula,
+          maxRecords: 200,
+          sort: [{ field: "NOME", direction: "asc" }],
+          fields: ["NOME", "CATEGORIA", "DISTRETTO", "DESCRIZIONE", "STEP", "VIDEO URL", "VIDEO FILE"],
+        });
+
+        return res.status(200).json({
+          ok: true,
+          q,
+          records: (records || []).map((r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields || {} })),
+        });
+      }
+
       const activeOnly = String(req.query?.activeOnly ?? "1") !== "0";
       const qs = new URLSearchParams({ pageSize: "100" });
       if (activeOnly) qs.set("filterByFormula", `{${fieldActive}}=1`);
@@ -58,6 +94,21 @@ export default async function handler(req, res) {
       if (String(user.role) !== "manager") return res.status(403).json({ ok: false, error: "forbidden" });
       const body = await readJsonBody(req);
       if (!body) return res.status(400).json({ ok: false, error: "invalid_json" });
+
+      // NEW CONTRACT: create/update by recordId (supports attachment field VIDEO FILE).
+      // If caller passes "fields", treat it as Airtable payload.
+      const recordId = norm(body.recordId || body.id);
+      const rawFields = body.fields && typeof body.fields === "object" ? body.fields : body;
+      if (recordId) {
+        const fields = {};
+        for (const [k, v] of Object.entries(rawFields || {})) {
+          if (k === "recordId" || k === "id" || k === "createdTime") continue;
+          if (isWriteBlockedFieldName(k)) continue;
+          fields[k] = v;
+        }
+        const updated = await airtableUpdate("TEST CLINICI", recordId, fields);
+        return res.status(200).json({ ok: true, record: { id: updated.id, createdTime: updated.createdTime, fields: updated.fields || {} } });
+      }
 
       const name = norm(body.name || body.nome || body[fieldName]);
       if (!name) return res.status(400).json({ ok: false, error: "missing_name" });
