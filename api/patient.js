@@ -1,5 +1,6 @@
-import { airtableFetch, ensureRes, requireSession } from "./_auth.js";
+import { ensureRes, requireSession } from "./_auth.js";
 import { memGet, memSet } from "./_common.js";
+import { airtableGet, airtableGetMany } from "../lib/airtableClient.js";
 
 function enc(x) {
   return encodeURIComponent(String(x));
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
     const session = requireSession(req);
     if (!session) return res.status(401).json({ error: "Not authenticated" });
 
-    const patientId = req.query?.id;
+    const patientId = req.query?.recordId || req.query?.id;
     if (!patientId) return res.status(400).json({ error: "Missing id" });
 
     // NOTE: requirement: the patient card must be viewable even if the patient has no appointments yet.
@@ -130,26 +131,63 @@ export default async function handler(req, res) {
     // (Authentication is still required above.)
 
     const TABLE_PATIENTS = process.env.AIRTABLE_PATIENTS_TABLE || "ANAGRAFICA";
-    const table = enc(TABLE_PATIENTS);
-
-    const record = await airtableFetch(`${table}/${enc(patientId)}`);
+    const record = await airtableGet(TABLE_PATIENTS, patientId);
     const f = record.fields || {};
 
     const FIELD_FIRSTNAME = process.env.AIRTABLE_PATIENTS_FIRSTNAME_FIELD || "Nome";
     const FIELD_LASTNAME = process.env.AIRTABLE_PATIENTS_LASTNAME_FIELD || "Cognome";
-    const FIELD_PHONE = process.env.AIRTABLE_PATIENTS_PHONE_FIELD || "Telefono";
+    // Prefer "Numero di telefono" from schema; keep env override for older bases.
+    const FIELD_PHONE = process.env.AIRTABLE_PATIENTS_PHONE_FIELD || "Numero di telefono";
     const FIELD_EMAIL = process.env.AIRTABLE_PATIENTS_EMAIL_FIELD || "Email";
     const FIELD_DOB = process.env.AIRTABLE_PATIENTS_DOB_FIELD || "Data di nascita";
-    const FIELD_NOTES = process.env.AIRTABLE_PATIENTS_NOTES_FIELD || "Note";
+    const FIELD_NOTES = process.env.AIRTABLE_PATIENTS_NOTES_FIELD || "Note interne";
+
+    // Linked record expansions (as requested): Casi clinici + Anamnesi e Consenso
+    const caseIdsRaw = f["Casi clinici"];
+    const anamIdsRaw = f["Anamnesi e Consenso"];
+    const caseIds = Array.isArray(caseIdsRaw) ? caseIdsRaw.filter((x) => String(x || "").startsWith("rec")) : [];
+    const anamIds = Array.isArray(anamIdsRaw) ? anamIdsRaw.filter((x) => String(x || "").startsWith("rec")) : [];
+
+    const [cases, anamnesi] = await Promise.all([
+      airtableGetMany("CASI CLINICI", caseIds, {
+        fields: [
+          "CASO CLINICO",
+          "ID caso clinico",
+          "Patologia principale",
+          "Patologie secondarie",
+          "Macro Area",
+          "Sotto-Area",
+          "Struttura Anatomica",
+          "Nervo Coinvolto",
+          "Lateralità",
+          "Data apertura",
+          "Stato caso",
+          "Note caso",
+          "DATA CHIUSURA",
+        ],
+      }),
+      airtableGetMany("ANAMNESI E CONSENSO", anamIds, {
+        fields: ["ANAGRAFICA | DATA | PATOLOGIA", "DATA ", "ANAMNESI", "CONSENSO INFORMATO", "URL ANAMNESI", "URL CONSENSO"],
+      }),
+    ]);
 
     return res.status(200).json({
       id: record.id,
       Nome: f[FIELD_FIRSTNAME] || f["Nome"] || "",
       Cognome: f[FIELD_LASTNAME] || f["Cognome"] || "",
-      Telefono: f[FIELD_PHONE] || f["Telefono"] || "",
+      Telefono: f[FIELD_PHONE] || f["Numero di telefono"] || f["Telefono"] || "",
       Email: f[FIELD_EMAIL] || f["Email"] || "",
       "Data di nascita": f[FIELD_DOB] || f["Data di nascita"] || "",
-      Note: f[FIELD_NOTES] || f["Note"] || "",
+      Note: f[FIELD_NOTES] || f["Note interne"] || f["Note"] || "",
+
+      // Extra payload for the patient card
+      recordId: record.id,
+      recordIdText: f["Record ID"] || "",
+      fields: f,
+      linked: {
+        cases: (cases.records || []).map((r) => ({ id: r.id, fields: r.fields || {} })),
+        anamnesi: (anamnesi.records || []).map((r) => ({ id: r.id, fields: r.fields || {} })),
+      },
     });
   } catch (e) {
     const status = e.status || 500;
