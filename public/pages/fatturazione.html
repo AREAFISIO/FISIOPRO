@@ -128,6 +128,13 @@
                   <option value="ricevuta">Ricevuta</option>
                 </select>
               </div>
+              <div class="field" style="min-width:260px;">
+                <label>Regime IVA</label>
+                <select id="vatMode">
+                  <option value="art10">Esente IVA art. 10</option>
+                  <option value="manual">Manuale (IVA per riga)</option>
+                </select>
+              </div>
               <div class="field">
                 <label>Data documento</label>
                 <input id="docDate" type="date" />
@@ -276,6 +283,21 @@
   $("#btnAddRow").addEventListener("click", () => addRow({ descrizione: "Prestazione", qty: 1, prezzo: 0, ivaPercent: 0 }));
   addRow({ descrizione: "Seduta fisioterapia", qty: 1, prezzo: 0, ivaPercent: 0 });
 
+  function applyVatMode() {
+    const mode = ($("#vatMode").value || "art10").toLowerCase();
+    const isArt10 = mode === "art10";
+    // In Art.10 mode force IVA 0 and lock the field to avoid mistakes.
+    $("#rowsBox").querySelectorAll("[data-row-iva]").forEach((el) => {
+      try {
+        if (isArt10) el.value = "0";
+        el.disabled = isArt10;
+        el.title = isArt10 ? "Esente IVA art. 10: IVA bloccata a 0" : "";
+      } catch {}
+    });
+  }
+  $("#vatMode").addEventListener("change", applyVatMode);
+  applyVatMode();
+
   // Patient search
   async function doSearch(){
     const q = ($("#patientSearch").value || "").trim();
@@ -402,6 +424,7 @@
     const payload = {
       clienteAirtableId: selectedClienteFic.airtableId,
       tipoDocumento: ($("#docType").value || "fattura"),
+      esenteArt10: ($("#vatMode").value || "art10") === "art10",
       data: ($("#docDate").value || ""),
       note: ($("#docNote").value || ""),
       righe: righe.map(r => ({ descrizione: r.descrizione, qty: r.qty, prezzo: r.prezzo, ivaPercent: r.ivaPercent })),
