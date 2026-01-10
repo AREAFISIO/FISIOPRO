@@ -144,21 +144,20 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   const html = [];
 
   // --------
-  // Operativo
+  // Top (sempre visibile): Agenda, Pazienti
+  // --------
+  html.push(link("agenda.html", "Agenda"));
+  html.push(link("pazienti-hub.html", "Pazienti"));
+
+  // --------
+  // Operativo (voci poche e mirate)
   // --------
   html.push(section("Operativo"));
   html.push(link("operativo.html", "Oggi"));
-  html.push(link("agenda.html", "Agenda"));
-  if (["front", "manager"].includes(role)) html.push(link("fatturazione.html", "Fatturazione"));
   if (["front", "back", "manager"].includes(role)) {
     html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
   }
-
-  // --------
-  // Pazienti
-  // --------
-  html.push(section("Pazienti"));
-  html.push(link("pazienti-hub.html", "Pazienti"));
+  if (["front", "manager"].includes(role)) html.push(link("fatturazione.html", "Fatturazione"));
 
   // --------
   // Ruolo-specifico
