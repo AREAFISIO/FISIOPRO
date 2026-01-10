@@ -1208,11 +1208,140 @@ function ensureSettingsModals() {
     `;
     document.body.appendChild(back);
   }
+
+  // Billing / Fatturazione
+  if (!document.querySelector("[data-fp-billing-back]")) {
+    const back = document.createElement("div");
+    back.className = "fp-set-back";
+    back.setAttribute("data-fp-billing-back", "1");
+    back.innerHTML = `
+      <div class="fp-set-panel" role="dialog" aria-modal="true" style="width:820px;">
+        <div class="fp-set-head">
+          <div class="fp-set-title"><span style="font-size:18px;">🧾</span> Impostazioni fatturazione</div>
+          <button class="btn" type="button" data-fp-billing-close>Chiudi</button>
+        </div>
+        <div class="fp-set-body">
+          <div class="card" style="padding:14px;">
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">IVA predefinita (%)</div>
+                <div class="sub">Valore inserito automaticamente nelle nuove righe prestazione.</div>
+              </div>
+              <div class="right">
+                <input class="input" type="number" min="0" step="0.01" style="width:160px;" data-fp-billing-iva />
+              </div>
+            </div>
+            <div class="fp-set-row">
+              <div style="min-width:0;">
+                <div class="lbl">Tipo documento predefinito</div>
+                <div class="sub">Valore iniziale in “Step 3 — Conferma”.</div>
+              </div>
+              <div class="right">
+                <select class="select" style="width:220px;" data-fp-billing-doctype>
+                  <option value="fattura">Fattura</option>
+                  <option value="ricevuta">Ricevuta</option>
+                </select>
+              </div>
+            </div>
+            <div class="fp-set-row" style="align-items:flex-start;">
+              <div style="min-width:0;">
+                <div class="lbl">Note predefinite (opzionale)</div>
+                <div class="sub">Suggerimento per il campo Note nella creazione documento.</div>
+              </div>
+              <div class="right" style="flex-direction:column; align-items:flex-end;">
+                <textarea class="textarea" style="width:min(520px, 78vw); min-height: 90px;" maxlength="240" data-fp-billing-note></textarea>
+                <div style="font-size:12px; color:var(--muted);" data-fp-billing-note-count>0 / 240</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fp-set-foot">
+          <button class="btn" type="button" data-fp-billing-reset>Reset</button>
+          <button class="btn primary" type="button" data-fp-billing-save>Salva</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+  }
 }
 
 function fpSettingsKey(suffix) {
   const email = String((window.FP_USER?.email || window.FP_SESSION?.email || "anon")).trim().toLowerCase() || "anon";
   return `fp_settings_${suffix}_${email}`;
+}
+
+function loadBillingSettings() {
+  const key = fpSettingsKey("billing");
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(key) || "null"); } catch {}
+  const out = {
+    defaultIvaPercent: 0,
+    defaultDocType: "fattura",
+    defaultNote: "",
+    ...(s && typeof s === "object" ? s : {}),
+  };
+  const iva = Number(out.defaultIvaPercent);
+  out.defaultIvaPercent = Number.isFinite(iva) ? iva : 0;
+  out.defaultDocType = String(out.defaultDocType || "fattura") === "ricevuta" ? "ricevuta" : "fattura";
+  out.defaultNote = String(out.defaultNote || "");
+  return out;
+}
+
+window.fpGetBillingSettings = loadBillingSettings;
+
+function openBillingModal() {
+  ensureSettingsModals();
+  const back = document.querySelector("[data-fp-billing-back]");
+  if (!back) return;
+
+  const s = loadBillingSettings();
+  const iva = back.querySelector("[data-fp-billing-iva]");
+  const doctype = back.querySelector("[data-fp-billing-doctype]");
+  const note = back.querySelector("[data-fp-billing-note]");
+  const noteCount = back.querySelector("[data-fp-billing-note-count]");
+  const close = back.querySelector("[data-fp-billing-close]");
+  const reset = back.querySelector("[data-fp-billing-reset]");
+  const save = back.querySelector("[data-fp-billing-save]");
+
+  const syncCount = () => {
+    if (!note || !noteCount) return;
+    const len = String(note.value || "").length;
+    noteCount.textContent = `${len} / 240`;
+  };
+
+  if (iva) iva.value = String(s.defaultIvaPercent ?? 0);
+  if (doctype) doctype.value = s.defaultDocType || "fattura";
+  if (note) note.value = s.defaultNote || "";
+  syncCount();
+  if (note) note.oninput = syncCount;
+
+  back.style.display = "block";
+  close && (close.onclick = () => closeBillingModal());
+  back.onclick = (e) => { if (e.target === back) closeBillingModal(); };
+
+  reset && (reset.onclick = () => {
+    localStorage.removeItem(fpSettingsKey("billing"));
+    try { window.dispatchEvent(new CustomEvent("fpBillingSettingsChanged")); } catch {}
+    closeBillingModal();
+    toast("Reset");
+  });
+
+  save && (save.onclick = () => {
+    const next = {
+      defaultIvaPercent: Number(iva?.value || 0) || 0,
+      defaultDocType: String(doctype?.value || "fattura") === "ricevuta" ? "ricevuta" : "fattura",
+      defaultNote: String(note?.value || ""),
+    };
+    try { localStorage.setItem(fpSettingsKey("billing"), JSON.stringify(next)); } catch {}
+    closeBillingModal();
+    toast("Salvato");
+    try { window.dispatchEvent(new CustomEvent("fpBillingSettingsChanged")); } catch {}
+  });
+}
+
+function closeBillingModal() {
+  const back = document.querySelector("[data-fp-billing-back]");
+  if (back) back.style.display = "none";
 }
 
 function openAvailabilityModal() {
@@ -1881,13 +2010,34 @@ function isAgendaNow() {
   return Boolean(document.querySelector("[data-diary]")) || (location.pathname || "").endsWith("/pages/agenda.html");
 }
 
+function isBillingNow() {
+  const p = location.pathname || "";
+  return p.endsWith("/pages/fatturazione.html") || p.endsWith("/fatturazione.html");
+}
+
 function normalizeRightbar() {
   const rb = document.querySelector(".app > .rightbar");
   if (!rb) return;
 
   const isAgenda = isAgendaNow();
+  const isBilling = isBillingNow();
 
   rb.className = "rightbar fp-rbar";
+
+  if (isBilling) {
+    rb.innerHTML = `
+      <button class="rbBtn" data-open-billing title="Impostazioni fatturazione">
+        <span class="rbIcon">🧾</span>
+        <span class="rbLabel">Impostazioni fatturazione</span>
+      </button>
+      <button class="rbBtn" data-open-theme title="Tema">
+        <span class="rbIcon">🎨</span>
+        <span class="rbLabel">Tema</span>
+      </button>
+    `;
+    return;
+  }
+
   rb.innerHTML = `
     <button class="rbBtn" ${isAgenda ? 'data-open-prefs' : ""} title="Impostazioni Agenda">
       <span class="rbIcon">⚙️</span>
@@ -2023,6 +2173,13 @@ function setupSpaRouter() {
       if (openAppt) {
         e.preventDefault();
         openAppointmentsModal();
+        return;
+      }
+
+      const openBilling = e.target?.closest?.("[data-open-billing]");
+      if (openBilling) {
+        e.preventDefault();
+        openBillingModal();
         return;
       }
 
