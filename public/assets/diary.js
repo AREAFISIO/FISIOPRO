@@ -1841,7 +1841,37 @@
     const endExclusive = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
     endExclusive.setDate(endExclusive.getDate() + days);
     const endISO = endExclusive.toISOString();
-    const data = await apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
+    // Background operators fetch (do not block first render).
+    // Helps multi-user selector even if appointments are slow.
+    apiGet("/api/operators")
+      .then((ops) => {
+        if (!ops?.items) return;
+        const items = (ops.items || []);
+        knownOperators = items;
+        const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
+        if (names.length) knownTherapists = names;
+        knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
+        operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
+        operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
+
+        // Shared colors (from Airtable via /api/operators)
+        ensureOperatorColorsObject();
+        const nextColors = {};
+        items.forEach((x) => {
+          const id = String(x.id || "").trim();
+          const c = normalizeHexColor(x.color);
+          if (id && c) nextColors[id] = c;
+        });
+        prefs.operatorColors = nextColors;
+
+        syncOpsBar();
+        try { render(); } catch {}
+      })
+      .catch(() => {});
+
+    // First load: ask the API for a "lite" response (no extra name-resolving calls),
+    // to avoid 25s client timeouts on cold starts.
+    const data = await apiGet(`/api/appointments?lite=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
 
     // NOTE: operators are NOT needed to render the agenda grid.
     // Loading them on the critical path makes the "first open" slower on cold starts.
@@ -1901,30 +1931,32 @@
     syncOpsBar();
     render();
 
-    // Background: load operators (colors, role labels, selects).
-    // This keeps the first paint fast while still enabling all features shortly after.
-    apiGet("/api/operators")
-      .then((ops) => {
-        if (!ops?.items) return;
-        const items = (ops.items || []);
-        knownOperators = items;
-        const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
-        if (names.length) knownTherapists = names;
-        knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
-        operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
-        operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
-
-        // Shared colors (from Airtable via /api/operators)
-        ensureOperatorColorsObject();
-        const nextColors = {};
-        items.forEach((x) => {
-          const id = String(x.id || "").trim();
-          const c = normalizeHexColor(x.color);
-          if (id && c) nextColors[id] = c;
-        });
-        prefs.operatorColors = nextColors;
-
-        // Update UI
+    // Best-effort: enrich appointments in background (names for linked records).
+    // If it times out, the agenda still works (it will show what it can from raw fields).
+    apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
+      .then((full) => {
+        if (!full?.appointments) return;
+        rawItems = (full.appointments || []).map((a) => {
+          const ap = a || {};
+          return normalizeItem({
+            id: ap.id,
+            operator: ap.therapist_name || "",
+            fields: {
+              start_at: ap.start_at || "",
+              end_at: ap.end_at || "",
+              therapist_name: ap.therapist_name || "",
+              service_name: ap.service_name || "",
+              status: ap.status || "",
+              patient_name: ap.patient_name || "",
+              patient_id: ap.patient_id || "",
+              // Keep link-like keys if downstream expects them
+              erogato_id: ap.erogato_id || "",
+              vendita_id: ap.vendita_id || "",
+              internal_note: ap.internal_note || ap.quick_note || "",
+            },
+          });
+        }).filter((x) => x.startAt);
+        rebuildSlotLocationIndex();
         syncOpsBar();
         try { render(); } catch {}
       })
