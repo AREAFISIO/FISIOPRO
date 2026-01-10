@@ -749,5 +749,346 @@
       "PATOLOGIE ORTOPEDICHE",
       "PATOLOGIE ORTOPEDICHE 2"
     ]
+  },
+  "PRESTAZIONI": {
+    "primary": "Servizio",
+    "key_fields": [
+      "Servizio",
+      "Codice",
+      "Costo Seduta singola",
+      "Tipo tariffa",
+      "N° SEDUTE INCLUSE",
+      "Area",
+      "Durata Singola",
+      "Data creazione",
+      "Valore Totale",
+      "Consuma seduta?",
+      "È valutazione?",
+      "È trattamento?",
+      "Paga collaboratore?"
+    ],
+    "links": {
+      "Erogato": "EROGATO",
+      "EROGATO 2": "EROGATO",
+      "Vendite": "VENDITE",
+      "Trattamenti": "TRATTAMENTI",
+      "Appuntamenti": "APPUNTAMENTI",
+      "CASI CLINICI": "CASI CLINICI"
+    },
+    "all_fields": [
+      "Servizio",
+      "Codice",
+      "Costo Seduta singola",
+      "Tipo tariffa",
+      "N° SEDUTE INCLUSE",
+      "Area",
+      "Durata Singola",
+      "Data creazione",
+      "Valore Totale",
+      "Consuma seduta?",
+      "È valutazione?",
+      "È trattamento?",
+      "Paga collaboratore?",
+      "Erogato",
+      "EROGATO 2",
+      "Vendite",
+      "Trattamenti",
+      "Appuntamenti",
+      "CASI CLINICI"
+    ]
+  },
+  "TARIFFE COMPENSI": {
+    "primary": "Chiave tariffa",
+    "key_fields": [
+      "Chiave tariffa",
+      "Tipo tariffa",
+      "Livello",
+      "Consuma seduta",
+      "Compenso per slot 30m",
+      "Compenso per 60m",
+      "Domicilio"
+    ],
+    "links": {
+      "EROGATO": "EROGATO",
+      "EROGATO 2": "EROGATO",
+      "APPUNTAMENTI": "APPUNTAMENTI"
+    },
+    "all_fields": [
+      "Chiave tariffa",
+      "Tipo tariffa",
+      "Livello",
+      "Consuma seduta",
+      "Compenso per slot 30m",
+      "Compenso per 60m",
+      "Domicilio",
+      "EROGATO",
+      "EROGATO 2",
+      "APPUNTAMENTI"
+    ]
+  },
+  "PRESENZE SEGRETERIA": {
+    "primary": "Operatore - Data",
+    "key_fields": [
+      "Operatore - Data",
+      "Data",
+      "Mese",
+      "Anno",
+      "Operatore",
+      "Turno",
+      "Note",
+      "Presenza",
+      "Ingresso",
+      "Uscita",
+      "Ore Tot",
+      "Ore Ordinarie",
+      "Ore Straordinarie",
+      "Ore di pausa",
+      "Certificato",
+      "ultima modifica",
+      "Mese_",
+      "Mese corrente",
+      "Mese passato",
+      "Anno_",
+      "Conta Ferie",
+      "Conta Malattie",
+      "Conta Recuperi",
+      "Riepilogo Presenze segreteria",
+      "Mese - Anno",
+      "Mese (n°)",
+      "Stato",
+      "Ora Ingresso",
+      "Ora Uscita",
+      "Orario"
+    ],
+    "links": {
+      "Operatore": "COLLABORATORI",
+      "Riepilogo Presenze segreteria": "RIEPILOGO PRESENZE SEGRETERIA"
+    },
+    "all_fields": [
+      "Operatore - Data",
+      "Data",
+      "Mese",
+      "Anno",
+      "Operatore",
+      "Turno",
+      "Note",
+      "Presenza",
+      "Ingresso",
+      "Uscita",
+      "Ore Tot",
+      "Ore Ordinarie",
+      "Ore Straordinarie",
+      "Ore di pausa",
+      "Certificato",
+      "ultima modifica",
+      "Mese_",
+      "Mese corrente",
+      "Mese passato",
+      "Anno_",
+      "Conta Ferie",
+      "Conta Malattie",
+      "Conta Recuperi",
+      "Riepilogo Presenze segreteria",
+      "Mese - Anno",
+      "Mese (n°)",
+      "Stato",
+      "Ora Ingresso",
+      "Ora Uscita",
+      "Orario"
+    ]
+  },
+  "PREVENTIVO E REGOLAMENTO": {
+    "primary": "ANAGRAFICA | DATA",
+    "key_fields": [
+      "ANAGRAFICA | DATA",
+      "DATA ",
+      "REGOLAMENTO/PREVENTIVO",
+      "FILE REGOLAMENTO / PREVENTIVO",
+      "URL REGOLAMENTO / PREVENTIVO",
+      "CREA REGOLAMNETO / PREVENTIVO",
+      "REGOLAMENTO FIRMATO",
+      "Cognome e Nome",
+      "COGNOME",
+      "NOME",
+      "CODICE FISCALE",
+      "DATA DI NASCITA",
+      "COMUNE DI NASCITA"
+    ],
+    "links": {
+      "Anagrafica": "ANAGRAFICA",
+      "Vendite": "VENDITE"
+    },
+    "all_fields": [
+      "ANAGRAFICA | DATA",
+      "DATA ",
+      "REGOLAMENTO/PREVENTIVO",
+      "FILE REGOLAMENTO / PREVENTIVO",
+      "URL REGOLAMENTO / PREVENTIVO",
+      "CREA REGOLAMNETO / PREVENTIVO",
+      "REGOLAMENTO FIRMATO",
+      "Cognome e Nome",
+      "COGNOME",
+      "NOME",
+      "CODICE FISCALE",
+      "DATA DI NASCITA",
+      "COMUNE DI NASCITA",
+      "Anagrafica",
+      "Vendite"
+    ]
+  },
+  "REGOLE MATCHING": {
+    "primary": "Nome Regola",
+    "key_fields": [
+      "Nome Regola",
+      "Direzione",
+      "Qonto Category",
+      "Descrizione contiene",
+      "Categoria",
+      "Sotto-macro",
+      "Confidenza",
+      "Priorità",
+      "Attiva"
+    ],
+    "links": {
+      "Categoria": "CATEGORIE CONTABILI",
+      "Sotto-macro": "SOTTO MACRO"
+    },
+    "all_fields": [
+      "Nome Regola",
+      "Direzione",
+      "Qonto Category",
+      "Descrizione contiene",
+      "Categoria",
+      "Sotto-macro",
+      "Confidenza",
+      "Priorità",
+      "Attiva"
+    ]
+  },
+  "SOTTO MACRO": {
+    "primary": "Nome Sotto-macro",
+    "key_fields": [
+      "Nome Sotto-macro",
+      "Macro",
+      "Tipo",
+      "Natura Costo",
+      "Attiva",
+      "Parole chiave",
+      "Priorità",
+      "Note"
+    ],
+    "links": {
+      "Macro": "CATEGORIE CONTABILI",
+      "CATEGORIE CONTABILI": "CATEGORIE CONTABILI",
+      "REGOLE MATCHING": "REGOLE MATCHING",
+      "REGOLE MATCHING 2": "REGOLE MATCHING",
+      "MOVIMENTI CONTO": "MOVIMENTI CONTO"
+    },
+    "all_fields": [
+      "Nome Sotto-macro",
+      "Macro",
+      "Tipo",
+      "Natura Costo",
+      "Attiva",
+      "Parole chiave",
+      "Priorità",
+      "Note",
+      "CATEGORIE CONTABILI",
+      "REGOLE MATCHING",
+      "REGOLE MATCHING 2",
+      "MOVIMENTI CONTO"
+    ]
+  },
+  "RIEPILOGO ANNUALE": {
+    "primary": "Mese",
+    "key_fields": [
+      "Mese",
+      "Spese Fisse",
+      "Spese Variabili",
+      "Importo Variabile Competenza",
+      "Totale Mensile",
+      "Note",
+      "Movimenti",
+      "Totale Fisse Reali",
+      "Totale Variabili Reali",
+      "Totale Reale",
+      "Scostamento",
+      "Stato Budget",
+      "Forecast Prossimo Anno",
+      "Forecast avanzato"
+    ],
+    "links": {
+      "Movimenti": "MOVIMENTI CONTO"
+    },
+    "all_fields": [
+      "Mese",
+      "Spese Fisse",
+      "Spese Variabili",
+      "Importo Variabile Competenza",
+      "Totale Mensile",
+      "Note",
+      "Movimenti",
+      "Totale Fisse Reali",
+      "Totale Variabili Reali",
+      "Totale Reale",
+      "Scostamento",
+      "Stato Budget",
+      "Forecast Prossimo Anno",
+      "Forecast avanzato"
+    ]
+  },
+  "SOTTO AREE": {
+    "primary": "Nome",
+    "key_fields": [
+      "Nome",
+      "Macro Area"
+    ],
+    "links": {
+      "Macro Area": "MACRO AREE",
+      "STRUTTURE ANATOMICHE": "STRUTTURE ANATOMICHE",
+      "PATOLOGIE ORTOPEDICHE": "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Nome",
+      "Macro Area",
+      "Nome (from Macro Area)",
+      "STRUTTURE ANATOMICHE",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ]
+  },
+  "STRUTTURE ANATOMICHE": {
+    "primary": "Nome",
+    "key_fields": [
+      "Nome",
+      "Sotto-Area",
+      "Lateralità"
+    ],
+    "links": {
+      "Sotto-Area": "SOTTO AREE",
+      "PATOLOGIE ORTOPEDICHE": "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Nome",
+      "Sotto-Area",
+      "Lateralità",
+      "PATOLOGIE ORTOPEDICHE",
+      "PATOLOGIE ORTOPEDICHE 2"
+    ]
+  },
+  "SPORT": {
+    "primary": "Sport",
+    "key_fields": [
+      "Sport"
+    ],
+    "links": {
+      "PATOLOGIE ORTOPEDICHE": "PATOLOGIE ORTOPEDICHE"
+    },
+    "all_fields": [
+      "Sport",
+      "PATOLOGIE ORTOPEDICHE"
+    ]
   }
 }
