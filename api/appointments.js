@@ -6,6 +6,13 @@
 
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 import { asLinkArray, enc, escAirtableString, memGet, memGetOrSet, memSet, norm, readJsonBody, setPrivateCache } from "./_common.js";
+import {
+  airtableCreate,
+  airtableList,
+  airtableUpdate,
+  escAirtableString as escAirtableStringLib,
+  resolveLinkedIds,
+} from "../lib/airtableClient.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
@@ -608,6 +615,55 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       setPrivateCache(res, 30);
 
+      // -----------------------------
+      // NEW CONTRACT (requested):
+      // GET /api/appointments?from=ISO&to=ISO&collaboratore=...
+      // - Uses fixed schema field names from Airtable CSV export (no heuristics)
+      // - Returns raw Airtable records (id + fields) for robust UI mapping
+      // -----------------------------
+      const fromISOParam = norm(req.query?.from);
+      const toISOParam = norm(req.query?.to);
+      if (fromISOParam && toISOParam) {
+        const fromISO = parseIsoOrThrow(fromISOParam, "from");
+        const toISO = parseIsoOrThrow(toISOParam, "to");
+
+        const rangeFilter = `AND({Data e ora INIZIO} >= DATETIME_PARSE("${escAirtableStringLib(fromISO)}"), {Data e ora INIZIO} <= DATETIME_PARSE("${escAirtableStringLib(toISO)}"))`;
+
+        const collaboratoreParam = norm(req.query?.collaboratore);
+        let collabFilter = "TRUE()";
+        if (collaboratoreParam) {
+          const collabId = collaboratoreParam.startsWith("rec")
+            ? collaboratoreParam
+            : (await resolveLinkedIds({ table: "COLLABORATORI", values: collaboratoreParam }))[0];
+          collabFilter = `FIND("${escAirtableStringLib(collabId)}", ARRAYJOIN({Collaboratore}))`;
+        }
+
+        const formula = `AND(${rangeFilter}, ${collabFilter})`;
+        const { records } = await airtableList("APPUNTAMENTI", {
+          filterByFormula: formula,
+          sort: [{ field: "Data e ora INIZIO", direction: "asc" }],
+          maxRecords: 1500,
+          fields: [
+            "Data e ora INIZIO",
+            "Data e ora fine",
+            "Durata (minuti)",
+            "Paziente",
+            "Collaboratore",
+            "Caso clinico",
+            "Tipo lavoro",
+            "DOMICILIO",
+            "Note",
+            "Stato appuntamento",
+            "Erogato collegato",
+          ],
+        });
+
+        return res.status(200).json({
+          ok: true,
+          records: (records || []).map((r) => ({ id: r.id, createdTime: r.createdTime, fields: r.fields || {} })),
+        });
+      }
+
       // Back-compat: allow ?date=YYYY-MM-DD
       const date = norm(req.query?.date);
       const startRaw = norm(req.query?.start);
@@ -631,6 +687,77 @@ export default async function handler(req, res) {
 
       const { appointments } = await listAppointments({ tableEnc, tableName, schema, startISO, endISO, session });
       return res.status(200).json({ ok: true, appointments });
+    }
+
+    // -----------------------------
+    // NEW CONTRACT (requested):
+    // POST /api/appointments -> create/update appointment
+    // - Supports linked records: Paziente/Collaboratore/Caso clinico via recordId OR via primary name
+    // - Uses fixed schema field names from Airtable CSV export
+    // -----------------------------
+    if (req.method === "POST") {
+      const body = await readJsonBody(req);
+      if (!body) return res.status(400).json({ ok: false, error: "invalid_json" });
+
+      const appt = body.appointment || body;
+      const recordId = norm(body.recordId || body.id || appt.recordId || appt.id);
+
+      const startRaw = appt["Data e ora INIZIO"] ?? appt.start ?? appt.startISO ?? appt.start_at ?? appt.startAt;
+      const endRaw = appt["Data e ora fine"] ?? appt["Data e ora FINE"] ?? appt.end ?? appt.endISO ?? appt.end_at ?? appt.endAt;
+      const startISO = parseIsoOrThrow(startRaw, "start_at");
+      const endISO = parseIsoOrThrow(endRaw, "end_at");
+
+      let durata = appt["Durata (minuti)"] ?? appt.durataMinuti ?? appt.durationMinutes ?? appt.duration;
+      if (durata === undefined || durata === null || String(durata).trim() === "") {
+        const ms = new Date(endISO).getTime() - new Date(startISO).getTime();
+        const minutes = Math.max(0, Math.round(ms / 60000));
+        durata = minutes;
+      }
+
+      const pazienteVal =
+        appt.pazienteRecordId ?? appt.patientRecordId ?? appt.PazienteRecordId ?? appt.Paziente ?? appt.paziente ?? appt.patient;
+      const collaboratoreVal =
+        appt.collaboratoreRecordId ??
+        appt.therapistRecordId ??
+        appt.operatorRecordId ??
+        appt.CollaboratoreRecordId ??
+        appt.Collaboratore ??
+        appt.collaboratore ??
+        appt.therapist ??
+        appt.operator;
+      const casoVal =
+        appt.casoClinicoRecordId ?? appt.caseRecordId ?? appt["Caso clinico"] ?? appt.casoClinico ?? appt.case;
+
+      if (!pazienteVal) return res.status(400).json({ ok: false, error: "missing_paziente" });
+      if (!collaboratoreVal) return res.status(400).json({ ok: false, error: "missing_collaboratore" });
+
+      const [pazienteId] = await resolveLinkedIds({ table: "ANAGRAFICA", values: pazienteVal });
+      const [collaboratoreId] = await resolveLinkedIds({ table: "COLLABORATORI", values: collaboratoreVal });
+      const casoIds = casoVal ? await resolveLinkedIds({ table: "CASI CLINICI", values: casoVal, allowMissing: true }) : [];
+
+      const fields = {
+        "Data e ora INIZIO": startISO,
+        "Data e ora fine": endISO,
+        "Durata (minuti)": Number(durata),
+        Paziente: [pazienteId],
+        Collaboratore: [collaboratoreId],
+        DOMICILIO: Boolean(appt.DOMICILIO ?? appt.domicilio ?? false),
+      };
+
+      const tipoLavoro = norm(appt["Tipo lavoro"] ?? appt.tipoLavoro ?? appt.tipo_lavoro);
+      if (tipoLavoro) fields["Tipo lavoro"] = tipoLavoro;
+
+      const note = norm(appt["Note"] ?? appt.note ?? appt.notes);
+      if (note || note === "") fields["Note"] = note;
+
+      if (casoIds.length) fields["Caso clinico"] = casoIds;
+      else if (casoVal === null || casoVal === "") fields["Caso clinico"] = [];
+
+      const out = recordId
+        ? await airtableUpdate("APPUNTAMENTI", recordId, fields)
+        : await airtableCreate("APPUNTAMENTI", fields);
+
+      return res.status(200).json({ ok: true, record: { id: out.id, fields: out.fields || {}, createdTime: out.createdTime || "" } });
     }
 
     if (req.method === "DELETE") {
