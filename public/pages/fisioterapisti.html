@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Fisioterapisti</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
+  <style>
+    .two-col{ display:grid; grid-template-columns: 1.6fr 1fr; gap:14px; }
+    @media (max-width: 1100px){ .two-col{ grid-template-columns: 1fr; } }
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      cursor:pointer;
+    }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Fisioterapisti</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main" style="padding:18px 18px 30px;">
+    <div class="topbar" style="position:sticky; top:0; z-index:10;">
+      <div class="toprow">
+        <div class="h1">Fisioterapisti <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn primary" onclick="location.href='agenda.html'">Apri Agenda</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <section class="card">
+        <div class="head"><h2>Workflow clinico</h2><span class="chip">operativo</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>1) Agenda</h3><p>Giornata, appuntamenti, note.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pazienti-hub.html'">
+            <div><h3>2) Pazienti</h3><p>Ricerca rapida e schede paziente.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='anamnesi.html'">
+            <div><h3>3) Anamnesi</h3><p>Stato anamnesi e consensi.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card" style="align-self:start;">
+        <div class="head"><h2>Scorciatoie</h2></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='operativo.html'">
+            <div><h3>Oggi</h3><p>Riepilogo operativo.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='note.html'">
+            <div><h3>Note & Alert</h3><p>Solo se abilitato dal ruolo.</p></div><div class="go">→</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="../assets/app.js?v=fpui-20260108a"></script>
+</body>
+</html>
+
