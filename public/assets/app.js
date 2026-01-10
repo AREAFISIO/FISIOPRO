@@ -117,34 +117,94 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   if (!nav) return;
   if (nav.getAttribute("data-fp-unified-nav") === "1") return;
 
-  const role = String(roleRaw || "").trim() || String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
+  function normalizeRole(raw) {
+    const r = String(raw || "").trim().toLowerCase();
+    if (!r) return "";
+    if (["physio", "fisioterapisti", "fisioterapista", "fisioterapiste", "terapista", "terapisti"].includes(r)) return "physio";
+    if (["front", "front-office", "frontoffice", "segreteria"].includes(r)) return "front";
+    if (["back", "back-office", "backoffice", "amministrazione"].includes(r)) return "back";
+    if (["manager", "admin", "administrator"].includes(r)) return "manager";
+    return r;
+  }
 
-  // Use absolute /pages/* so SPA router always handles it reliably.
-  const pageHref = (p) => (String(p || "").startsWith("/pages/") ? String(p) : `/pages/${String(p || "").replace(/^\/+/, "")}`);
-  const link = (href, label, dataRole = "", extraHtml = "") =>
-    `<a data-nav href="${pageHref(href)}"${dataRole ? ` data-role="${dataRole}"` : ""}>${label}${extraHtml}</a>`;
-  const section = (title, dataRole = "") =>
-    `<div class="section"${dataRole ? ` data-role="${dataRole}"` : ""}>${title}</div>`;
+  const role = normalizeRole(
+    String(roleRaw || "").trim() || String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim()
+  );
 
-  // Keep it extremely simple: few generic hubs.
-  nav.innerHTML = `
-    ${section("Operativo")}
-    ${link("operativo.html", "Oggi", "physio,front,back,manager")}
-    ${link("agenda.html", "Agenda", "physio,front,back,manager")}
-    ${link("fatturazione.html", "Fatturazione", "front,manager")}
-    ${link("note.html", "Note & Alert", "front,back,manager", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`)}
+  // Default all relative links to /pages/*, but allow absolute paths (e.g. /manager/*).
+  const pageHref = (p) => {
+    const s = String(p || "").trim();
+    if (!s) return "#";
+    if (s.startsWith("/")) return s;
+    return `/pages/${s.replace(/^\/+/, "")}`;
+  };
+  const link = (href, label, extraHtml = "") => `<a data-nav href="${pageHref(href)}">${label}${extraHtml}</a>`;
+  const section = (title) => `<div class="section">${title}</div>`;
 
-    ${section("Pazienti")}
-    ${link("pazienti-hub.html", "Pazienti", "physio,front,back,manager")}
+  const html = [];
 
-    ${section("Ruolo")}
-    ${link("front-office.html", "Front Office", "front,manager")}
-    ${link("back-office.html", "Back Office", "back,manager")}
-    ${link("manager.html", "Manager", "manager")}
+  // --------
+  // Operativo
+  // --------
+  html.push(section("Operativo"));
+  html.push(link("operativo.html", "Oggi"));
+  html.push(link("agenda.html", "Agenda"));
+  if (["front", "manager"].includes(role)) html.push(link("fatturazione.html", "Fatturazione"));
+  if (["front", "back", "manager"].includes(role)) {
+    html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+  }
 
-    ${section("Sessione")}
-    ${link("login.html", "Logout")}
-  `;
+  // --------
+  // Pazienti
+  // --------
+  html.push(section("Pazienti"));
+  html.push(link("pazienti-hub.html", "Pazienti"));
+
+  // --------
+  // Ruolo-specifico
+  // --------
+  if (role === "physio") {
+    html.push(section("Fisioterapisti"));
+    html.push(link("fisioterapisti.html", "Home"));
+    html.push(link("anamnesi.html", "Anamnesi"));
+  }
+  if (role === "front") {
+    html.push(section("Front Office"));
+    html.push(link("front-office.html", "Home"));
+    html.push(link("vendite.html", "Vendite"));
+    html.push(link("pratiche-assicurative.html", "Assicurazioni"));
+    html.push(link("archivio-documenti.html", "Archivio documenti"));
+    html.push(link("anamnesi.html", "Anamnesi"));
+    html.push(link("erogato.html", "Erogato"));
+  }
+  if (role === "back") {
+    html.push(section("Back Office"));
+    html.push(link("back-office.html", "Home"));
+    html.push(link("gestione-contabile.html", "Gestione contabile"));
+    html.push(link("vendite.html", "Vendite"));
+    html.push(link("erogato.html", "Erogato"));
+  }
+  if (role === "manager") {
+    html.push(section("Manager"));
+    html.push(link("manager.html", "Home"));
+    html.push(link("/manager/dashboard.html", "Dashboard"));
+    html.push(link("/manager/riepilogo-mensile.html", "Riepilogo mensile"));
+    html.push(link("/manager/costi-per-categoria.html", "Costi per categoria"));
+
+    html.push(section("Ruolo"));
+    html.push(link("front-office.html", "Front Office"));
+    html.push(link("fisioterapisti.html", "Fisioterapisti"));
+    html.push(link("back-office.html", "Back Office"));
+    html.push(link("manager.html", "Manager"));
+  }
+
+  // --------
+  // Sessione
+  // --------
+  html.push(section("Sessione"));
+  html.push(link("login.html", "Logout"));
+
+  nav.innerHTML = html.join("\n");
 
   nav.setAttribute("data-fp-unified-nav", "1");
 }
