@@ -9,10 +9,23 @@
   <link rel="stylesheet" href="../assets/app.css?v=fpui-20260108a" />
   <style>
     body{ overflow:auto; }
-    .app{ grid-template-columns: 300px 1fr; }
+    /* Keep the global 3-column layout (sidebar + main + rightbar).
+       Using grid-template-columns here would push the rightbar into a new row (bottom-left). */
+    .app{ --leftW: 300px; }
     .tabs{ display:flex; gap:8px; flex-wrap:wrap; }
-    .tabbtn{ padding:10px 12px; border-radius: 12px; border:1px solid var(--border); background: rgba(255,255,255,.03); cursor:pointer; font-weight: 900; }
-    .tabbtn.active{ background: rgba(255,255,255,.10); }
+    .tabbtn{
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
+      cursor:pointer;
+      font-weight: 900;
+      transition: .15s;
+    }
+    .tabbtn:hover{ background: var(--btnBgHover); transform: translateY(-1px); }
+    .tabbtn:active{ transform: translateY(0); }
+    .tabbtn.active{ background: var(--tabActiveBg); border-color: var(--tabActiveBorder); }
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .field{ display:flex; flex-direction:column; gap:6px; min-width: 220px; }
     .field label{ font-size: 13px; color: var(--muted); font-weight: 800; }
@@ -198,6 +211,20 @@
 <script>
   const $ = (sel) => document.querySelector(sel);
   const api = window.fpApi;
+  const getBillingSettings = () => {
+    try { return (typeof window.fpGetBillingSettings === "function") ? window.fpGetBillingSettings() : null; }
+    catch { return null; }
+  };
+  const getDefaultIvaPercent = () => {
+    const s = getBillingSettings();
+    const n = Number(s?.defaultIvaPercent);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const applyBillingDefaultsToUi = () => {
+    const s = getBillingSettings();
+    const docType = (s?.defaultDocType === "ricevuta" || s?.defaultDocType === "fattura") ? s.defaultDocType : null;
+    if (docType) $("#docType").value = docType;
+  };
 
   // Hard gate: physio must not see this section
   (async function guardRole(){
@@ -268,13 +295,13 @@
     set("[data-row-desc]", pref.descrizione || "Seduta fisioterapia");
     set("[data-row-qty]", pref.qty ?? 1);
     set("[data-row-price]", pref.prezzo ?? 0);
-    set("[data-row-iva]", pref.ivaPercent ?? 0);
+    set("[data-row-iva]", pref.ivaPercent ?? getDefaultIvaPercent());
     wrap.querySelector("[data-row-del]").addEventListener("click", () => wrap.remove());
     $("#rowsBox").appendChild(wrap);
   }
 
-  $("#btnAddRow").addEventListener("click", () => addRow({ descrizione: "Prestazione", qty: 1, prezzo: 0, ivaPercent: 0 }));
-  addRow({ descrizione: "Seduta fisioterapia", qty: 1, prezzo: 0, ivaPercent: 0 });
+  $("#btnAddRow").addEventListener("click", () => addRow({ descrizione: "Prestazione", qty: 1, prezzo: 0 }));
+  addRow({ descrizione: "Seduta fisioterapia", qty: 1, prezzo: 0 });
 
   // Patient search
   async function doSearch(){
@@ -449,6 +476,8 @@
   $("#btnCreateInvoice").addEventListener("click", createInvoice);
   // default date = today
   $("#docDate").value = new Date().toISOString().slice(0,10);
+  applyBillingDefaultsToUi();
+  window.addEventListener("fpBillingSettingsChanged", applyBillingDefaultsToUi);
 
   // Tab 2: issued
   async function loadIssued(){
