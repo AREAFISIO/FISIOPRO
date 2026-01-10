@@ -1,6 +1,11 @@
 // Diary (agenda) renderer: week grid similar to OsteoEasy,
 // but styled using the existing app.css tokens.
 (function () {
+  // Build marker (to verify cache-busting in production)
+  try {
+    window.__FP_DIARY_BUILD = "fpui-20260110c";
+    console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
+  } catch {}
   if (typeof window.fpDiaryInit === "function") return;
 
   window.fpDiaryInit = function fpDiaryInit() {
