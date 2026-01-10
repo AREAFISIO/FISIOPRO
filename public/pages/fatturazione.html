@@ -56,8 +56,8 @@
         <div class="h1">Fatturazione <span class="pill" data-user-badge>—</span></div>
         <div class="actions">
           <a class="btn" href="/pages/front-office.html" data-role="front,manager">Front Office</a>
-          <button class="btn" type="button" id="oauthBtn" data-role="front,manager" style="display:none;">Collega Fatture in Cloud</button>
-          <button class="btn" type="button" id="companiesBtn" data-role="manager" style="display:none;">Aziende FIC (ID)</button>
+          <a class="btn" id="oauthBtn" data-role="front,manager" href="/api/fic/oauth/start">Collega Fatture in Cloud</a>
+          <button class="btn" type="button" id="companiesBtn" data-role="manager">Aziende FIC (ID)</button>
         </div>
       </div>
     </div>
@@ -240,12 +240,6 @@
       if (tab === "clients") loadClients();
     });
   });
-
-  // OAuth button (always available)
-  $("#oauthBtn").addEventListener("click", () => location.href = "/api/fic/oauth/start");
-  // show it (roleGuard will hide for non-allowed)
-  $("#oauthBtn").style.display = "inline-flex";
-  $("#companiesBtn").style.display = "inline-flex";
 
   $("#companiesBtn").addEventListener("click", async () => {
     const box = $("#companiesBox");
