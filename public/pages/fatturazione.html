@@ -57,6 +57,7 @@
         <div class="actions">
           <a class="btn" href="/pages/front-office.html" data-role="front,manager">Front Office</a>
           <button class="btn" type="button" id="oauthBtn" data-role="front,manager" style="display:none;">Collega Fatture in Cloud</button>
+          <button class="btn" type="button" id="companiesBtn" data-role="manager" style="display:none;">Aziende FIC (ID)</button>
         </div>
       </div>
     </div>
@@ -72,6 +73,15 @@
       </div>
       <div class="body">
         <div id="globalMsg" class="warnbox" style="display:none;"></div>
+        <div id="companiesBox" class="card" style="display:none; margin: 0 0 12px;">
+          <div class="head"><h2>Aziende Fatture in Cloud</h2><span class="chip">solo manager</span></div>
+          <div class="body">
+            <div class="hint" style="margin-bottom:10px;">
+              Se hai più aziende su FIC: copia l’ID corretto e impostalo su Vercel come <b>FIC_DEFAULT_COMPANY_ID</b>, poi rifai “Collega Fatture in Cloud”.
+            </div>
+            <div id="companiesList" class="list"></div>
+          </div>
+        </div>
 
         <!-- TAB 1 -->
         <section id="tab-create">
@@ -235,6 +245,39 @@
   $("#oauthBtn").addEventListener("click", () => location.href = "/api/fic/oauth/start");
   // show it (roleGuard will hide for non-allowed)
   $("#oauthBtn").style.display = "inline-flex";
+  $("#companiesBtn").style.display = "inline-flex";
+
+  $("#companiesBtn").addEventListener("click", async () => {
+    const box = $("#companiesBox");
+    const list = $("#companiesList");
+    box.style.display = (box.style.display === "none" || !box.style.display) ? "block" : "none";
+    if (box.style.display !== "block") return;
+    list.innerHTML = `<div class="item"><div>Caricamento…</div><div></div></div>`;
+    try {
+      const data = await api("/api/fic/companies");
+      const items = data?.items || [];
+      if (!items.length) {
+        list.innerHTML = `<div class="item"><div>Nessuna azienda trovata.</div><div></div></div>`;
+        return;
+      }
+      list.innerHTML = "";
+      items.forEach((it) => {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <div><b>${it.name || "Azienda"}</b><div class="hint">Imposta su Vercel: <span class="mono">FIC_DEFAULT_COMPANY_ID=${it.id}</span></div></div>
+          <div class="mono" style="opacity:.85;">${it.id}</div>
+        `;
+        div.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(it.id); } catch {}
+          if (typeof window.toast === "function") window.toast("ID copiato");
+        });
+        list.appendChild(div);
+      });
+    } catch (e) {
+      list.innerHTML = `<div class="item"><div>Errore: ${String(e?.message || "server_error")}</div><div></div></div>`;
+    }
+  });
 
   // Wizard state
   let selectedPatient = null; // { id, name, email, nome, cognome }
