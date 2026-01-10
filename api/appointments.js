@@ -1014,6 +1014,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
   } catch (e) {
     const status = e.status || 500;
-    return res.status(status).json({ ok: false, error: e.message || "server_error" });
+    return res.status(status).json({
+      ok: false,
+      error: e.message || "server_error",
+      // Forward Airtable/debug context to the frontend (shown in agenda popup).
+      details: e.details || e.airtable || undefined,
+    });
   }
 }
