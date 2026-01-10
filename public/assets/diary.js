@@ -1699,6 +1699,18 @@
       try { ctrl.abort(); } catch {}
     }, timeoutMs);
 
+    // Small in-memory cache to avoid refetch loops during fast navigation/view switches.
+    // (Server still enforces auth; this is just for UI responsiveness.)
+    const cacheKey = String(url || "");
+    const canCache = cacheKey && !cacheKey.includes("nocache=1");
+    if (canCache) {
+      try {
+        apiGet._cache = apiGet._cache || new Map();
+        const hit = apiGet._cache.get(cacheKey);
+        if (hit && Date.now() < hit.exp) return hit.data;
+      } catch {}
+    }
+
     let r;
     try {
       r = await fetch(url, { credentials: "include", signal: ctrl.signal });
@@ -1720,6 +1732,13 @@
       const where = `\n\nEndpoint: ${url} (HTTP ${r.status})`;
       const extra = data.details ? `\nDettagli: ${JSON.stringify(data.details, null, 2)}` : "";
       throw new Error(msg + where + extra);
+    }
+
+    if (canCache) {
+      try {
+        // short TTL: keeps UI snappy without hiding real-time updates for long
+        apiGet._cache.set(cacheKey, { exp: Date.now() + 12_000, data });
+      } catch {}
     }
     return data;
   }
@@ -1964,6 +1983,15 @@
       }
     }
 
+    // Expose geometry to CSS so we can draw the grid with gradients (faster than DOM lines).
+    try {
+      const slotsPerHour = Math.max(1, Math.round(60 / Math.max(1, Number(SLOT_MIN || 30))));
+      document.documentElement.style.setProperty("--fp-slot-px", `${SLOT_PX}px`);
+      document.documentElement.style.setProperty("--fp-hour-px", `${SLOT_PX * slotsPerHour}px`);
+      document.documentElement.style.setProperty("--fp-grid-pad-top", `${GRID_PAD_TOP}px`);
+      document.documentElement.style.setProperty("--fp-grid-pad-bottom", `${GRID_PAD_BOTTOM}px`);
+    } catch {}
+
     const bodyHeightPx = totalSlots * SLOT_PX;
     const heightPx = bodyHeightPx + GRID_PAD_TOP + GRID_PAD_BOTTOM;
 
@@ -2168,14 +2196,7 @@
         }
 
         // grid lines
-        for (let s = 0; s <= totalSlots; s++) {
-          const m = s * SLOT_MIN;
-          const y = GRID_PAD_TOP + (s * SLOT_PX);
-          const line = document.createElement("div");
-          line.className = "gridLine" + ((m % 60 === 0) ? " hour" : "");
-          line.style.top = y + "px";
-          col.appendChild(line);
-        }
+        // NOTE: grid lines are painted via CSS background gradients on .dayCol (see agenda.html).
 
         // Hover slot highlight + click to create
         const hover = document.createElement("div");
