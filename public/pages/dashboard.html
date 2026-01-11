@@ -35,31 +35,28 @@
     .kpi .value{ font-size: 28px; font-weight: 900; margin-top: 6px; letter-spacing: -.2px; }
     .kpi .mini{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
 
-    .quickGrid{
-      display:grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-    @media (max-width: 900px){
-      .quickGrid{ grid-template-columns: 1fr; }
-    }
-    .quick{
-      cursor:pointer;
-      user-select:none;
-      padding: 14px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
+    .tile{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:16px; border-radius:16px;
+      border:1px solid var(--border);
       background: rgba(255,255,255,.03);
-      box-shadow: var(--shadow);
+      cursor:pointer;
       transition: transform .08s ease, border-color .08s ease, background .08s ease;
     }
-    .quick:hover{
+    .tile:hover{
       transform: translateY(-1px);
       background: rgba(255,255,255,.05);
       border-color: rgba(34,230,195,.28);
     }
-    .quick .title{ font-weight: 900; letter-spacing:-.2px; }
-    .quick .sub{ color: var(--muted); font-size: 13px; margin-top: 6px; line-height: 1.4; }
+    .tile h3{ margin:0; font-size:18px; }
+    .tile p{ margin:6px 0 0; font-size:14px; color: var(--muted); line-height:1.4; }
+    .go{
+      width:40px;height:40px;border-radius:999px;
+      display:grid; place-items:center;
+      background: rgba(255,255,255,.10);
+      border:1px solid var(--border);
+      font-weight: 950;
+    }
   </style>
 </head>
 <body>
@@ -121,26 +118,44 @@
 
     <div class="dashGrid">
       <section class="card">
-        <div class="head"><h2>Scorciatoie</h2><span class="chip">Operativo</span></div>
-        <div class="body">
-          <div class="quickGrid">
-            <div class="quick" onclick="location.href='agenda.html'">
-              <div class="title">Agenda</div>
-              <div class="sub">Calendario settimanale e appuntamenti.</div>
-            </div>
+        <div class="head"><h2>Flusso paziente</h2><span class="chip">workflow</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='anagrafica.html'">
+            <div><h3>Ricerca / Anagrafica</h3><p>Cerca paziente, apri scheda, contatti, note.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='anamnesi.html'">
+            <div><h3>Anamnesi e consensi</h3><p>Privacy, consenso informato, stato anamnesi.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='archivio-documenti.html'">
+            <div><h3>Archivio documenti</h3><p>PDF, allegati, consensi e documentazione.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='pratiche-assicurative.html'">
+            <div><h3>Pratiche assicurative</h3><p>Stati pratica e documenti richiesti.</p></div><div class="go">→</div>
           </div>
         </div>
       </section>
 
-      <aside class="card">
-        <div class="head"><h2>Note</h2><span class="chip">Info</span></div>
-        <div class="body" style="line-height:1.6; color: var(--muted);">
-          Questa pagina è la landing principale dal menù laterale.
-          <br/>
-          Se vuoi, nel prossimo step la collego a dati reali (appuntamenti di oggi, nuovi pazienti, incassi).
+      <aside class="card" style="align-self:start;">
+        <div class="head"><h2>Operativo</h2><span class="chip">rapido</span></div>
+        <div class="body" style="padding-top:6px; display:grid; gap:12px;">
+          <div class="tile" onclick="location.href='agenda.html'">
+            <div><h3>Agenda</h3><p>Appuntamenti e gestione giornaliera.</p></div><div class="go">→</div>
+          </div>
+          <div class="tile" onclick="location.href='note.html'">
+            <div><h3>Note & Alert</h3><p>Alert anti-errori: contatti, consensi, pagamenti.</p></div><div class="go">→</div>
+          </div>
         </div>
       </aside>
     </div>
+
+    <section class="card" style="margin-top:14px;">
+      <div class="head"><h2>Note</h2><span class="chip">Info</span></div>
+      <div class="body" style="line-height:1.6; color: var(--muted);">
+        Questa pagina è la landing principale dal menù laterale.
+        <br/>
+        Se vuoi, nel prossimo step la collego a dati reali (appuntamenti di oggi, nuovi pazienti, incassi).
+      </div>
+    </section>
   </main>
 
   <aside class="rightbar">
