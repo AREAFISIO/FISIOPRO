@@ -188,8 +188,6 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   }
   if (role === "manager") {
     html.push(section("Manager"));
-    html.push(link("manager.html", "Home"));
-    html.push(link("/manager/dashboard.html", "Dashboard"));
     html.push(link("/manager/riepilogo-mensile.html", "Riepilogo mensile"));
     html.push(link("/manager/costi-per-categoria.html", "Costi per categoria"));
 
