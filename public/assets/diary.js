@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260110d";
+    window.__FP_DIARY_BUILD = "fpui-20260110e";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -3237,7 +3237,9 @@
         const dt0 = new Date(x.startAt.getFullYear(), x.startAt.getMonth(), x.startAt.getDate()).getTime();
         const idx = Math.round((dt0 - day0) / 86400000);
         if (idx < 0 || idx >= days) return false;
-        if (selectedTherapists.size && !selectedTherapists.has(x.therapist)) return false;
+        // If we don't know the therapist yet (lite load / operators not fetched),
+        // don't hide the appointment: show it in the current view and backfill later.
+        if (selectedTherapists.size && x.therapist && !selectedTherapists.has(x.therapist)) return false;
         if (!q) return true;
         const hay = [x.patient, x.service, x.therapist, x.status].filter(Boolean).join(" ").toLowerCase();
         return hay.includes(q);
