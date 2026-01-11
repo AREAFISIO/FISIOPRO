@@ -1,6 +1,7 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { memGetOrSet, setPrivateCache } from "./_common.js";
 import { airtableListAll } from "./_airtableClient.js";
+import { airtableSchema } from "../lib/airtableClient.js";
 
 function escAirtableString(s) {
   return String(s ?? "")
@@ -46,6 +47,19 @@ function resolveFieldKeyFromKeys(keys, candidates) {
 }
 
 async function inferTableFieldKeys(tableEnc, cacheKey) {
+  // Fast-path: if we have a local schema snapshot, avoid the extra Airtable call.
+  // This removes a common cold-start penalty for endpoints that would otherwise probe fields.
+  try {
+    const tableName = decodeURIComponent(String(tableEnc || ""));
+    const schema = airtableSchema?.[tableName] || null;
+    const keys = Array.isArray(schema?.all_fields)
+      ? schema.all_fields
+      : (Array.isArray(schema?.key_fields) ? schema.key_fields : []);
+    const list = (keys || []).map((k) => String(k || "").trim()).filter(Boolean);
+    if (list.length) return list;
+  } catch {
+    // ignore schema decoding issues, fallback to probing Airtable
+  }
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
     // Single call: fetch one record without fields[] so we can see real keys.
     const data = await airtableFetch(`${tableEnc}?pageSize=1`);

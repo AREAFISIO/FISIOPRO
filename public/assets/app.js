@@ -1741,7 +1741,12 @@ async function initAnagrafica() {
 
     tbody.innerHTML = `<tr><td colspan="8" class="muted">Caricamento…</td></tr>`;
     try {
-      const data = await api(`/api/airtable?op=searchPatientsFull&q=${encodeURIComponent(q)}`);
+      // Keep initial load fast: cap records returned, especially with empty query.
+      const maxRecords = q ? 50 : 30;
+      const pageSize = maxRecords;
+      const data = await api(
+        `/api/airtable?op=searchPatientsFull&maxRecords=${maxRecords}&pageSize=${pageSize}&q=${encodeURIComponent(q)}`
+      );
       const items = (data.items || []).map((x) => ({
         ...x,
         // normalizza canali come stringa per filtro
@@ -2477,19 +2482,29 @@ async function runRouteInits() {
   const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
   if (role) roleGuard(role);
 
-  await updateInboxBadge();
-  await initNotesPage();
-  await initOperativoPage();
-  await initSalesPage();
-  await initErogatoPage();
-  await initInsurancePage();
-  await initAnamnesiPage();
-  await initAnagrafica();
-  await initPatientPage();
-  await ensureDiaryLoaded();
-  await initDashboard();
-  await initDashboardCosti();
-  await initDashboardControllo();
+  // Non-blocking: keep navigation/UI responsive, update later.
+  updateInboxBadge().catch(() => {});
+
+  // Run ONLY the init relevant to the current page to avoid doing extra work
+  // (many init() functions are async and would otherwise create a long await chain).
+  const tasks = [];
+  if (isNotesPage()) tasks.push(initNotesPage());
+  if (isOperativoPage()) tasks.push(initOperativoPage());
+  if (isSalesPage()) tasks.push(initSalesPage());
+  if (isErogatoPage()) tasks.push(initErogatoPage());
+  if (isInsurancePage()) tasks.push(initInsurancePage());
+  if (isAnamnesiPage()) tasks.push(initAnamnesiPage());
+  if (isAnagraficaPage()) tasks.push(initAnagrafica());
+  if (isPatientPage()) tasks.push(initPatientPage());
+  if (isAgendaPage()) tasks.push(initAgenda());
+  if (isDashboardPage()) tasks.push(initDashboard());
+  if (isDashboardCostiPage()) tasks.push(initDashboardCosti());
+  if (isDashboardControlloPage()) tasks.push(initDashboardControllo());
+
+  // Diary script is optional; load it without blocking the route init.
+  if (isAgendaPage()) ensureDiaryLoaded().catch(() => {});
+
+  await Promise.all(tasks.map((p) => Promise.resolve(p).catch(() => {})));
 }
 
 function removeInnerMenuIcons() {
