@@ -3229,6 +3229,15 @@
     const ops = Array.from(selectedTherapists);
     const range = computeGridRange(start, days);
 
+    // If the current selection doesn't match any known therapist labels (common when
+    // auth name != COLLABORATORI display name), do NOT filter by therapist, otherwise
+    // appointments can "flash" and then disappear after operator backfill.
+    const selectionHasAnyKnown =
+      selectedTherapists.size &&
+      Array.isArray(knownTherapists) &&
+      knownTherapists.length &&
+      Array.from(selectedTherapists).some((n) => knownTherapists.includes(String(n)));
+
     const q = String(qEl?.value || "").trim().toLowerCase();
     const items = rawItems
       .filter((x) => {
@@ -3239,7 +3248,7 @@
         if (idx < 0 || idx >= days) return false;
         // If we don't know the therapist yet (lite load / operators not fetched),
         // don't hide the appointment: show it in the current view and backfill later.
-        if (selectedTherapists.size && x.therapist && !selectedTherapists.has(x.therapist)) return false;
+        if (selectionHasAnyKnown && x.therapist && !selectedTherapists.has(x.therapist)) return false;
         if (!q) return true;
         const hay = [x.patient, x.service, x.therapist, x.status].filter(Boolean).join(" ").toLowerCase();
         return hay.includes(q);
