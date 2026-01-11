@@ -144,10 +144,15 @@ function ensureUnifiedSidebarMenu(roleRaw) {
   const html = [];
 
   // --------
-  // Top (sempre visibile): Agenda, Pazienti
+  // Generale (sempre visibile)
   // --------
+  html.push(section("Generale"));
+  html.push(link("dashboard.html", "Dashboard"));
+  // Richiesto: la voce "Pazienti" deve mostrare l'anagrafica pazienti
+  html.push(link("anagrafica.html", "Pazienti"));
+  // Richiesto: aggiungi la schermata workflow (Flusso paziente) prima di Agenda
+  html.push(link("pazienti-hub.html", "Flusso paziente"));
   html.push(link("agenda.html", "Agenda"));
-  html.push(link("pazienti-hub.html", "Pazienti"));
 
   // --------
   // Operativo (voci poche e mirate)
