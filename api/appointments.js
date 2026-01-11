@@ -270,6 +270,7 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_OPERATOR,
     FIELD_EMAIL,
     FIELD_STATUS,
+    FIELD_TYPE,
     FIELD_SERVICE,
     FIELD_DURATION,
     FIELD_CONFIRMED_BY_PATIENT,
@@ -343,6 +344,12 @@ async function resolveSchemaLite(tableEnc, tableName) {
     ),
     resolveFieldName(
       tableEnc,
+      `appts:field:type:${tableName}`,
+      [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
       `appts:field:service:${tableName}`,
       [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
       tableName,
@@ -400,7 +407,7 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_OPERATOR,
     FIELD_EMAIL,
     FIELD_STATUS,
-    FIELD_TYPE: "",
+    FIELD_TYPE,
     FIELD_SERVICE,
     FIELD_LOCATION: "",
     FIELD_DURATION,
@@ -727,6 +734,38 @@ function parseDateRangeDays(startISO, endISO) {
   }
 }
 
+function normalizeApptType(v) {
+  return String(v ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function parseDateSafe(v) {
+  const d = new Date(String(v || ""));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function overlapMinutesInRange(appt, rangeStart, rangeEnd) {
+  const s = parseDateSafe(appt?.start_at);
+  if (!s) return 0;
+
+  let e = parseDateSafe(appt?.end_at);
+  if (!e) {
+    const raw = appt?.duration;
+    const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+    if (Number.isFinite(n) && n > 0) e = new Date(s.getTime() + n * 60_000);
+  }
+  if (!e) return 0;
+
+  const start = s < rangeStart ? rangeStart : s;
+  const end = e > rangeEnd ? rangeEnd : e;
+  const ms = end.getTime() - start.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.max(0, Math.round(ms / 60_000));
+}
+
 async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endISO, session }) {
   if (!schema.FIELD_START) {
     const err = new Error("agenda_schema_mismatch: missing start field");
@@ -791,6 +830,78 @@ async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endI
   }
 
   return { total, missingPatient, needConfirmPatient, needConfirmPlatform };
+}
+
+async function appointmentsKpi({ tableEnc, tableName, schema, startISO, endISO, session, wantedTypeNorm = "" }) {
+  if (!schema.FIELD_START) {
+    const err = new Error("agenda_schema_mismatch: missing start field");
+    err.status = 500;
+    throw err;
+  }
+
+  const rangeFilter = `AND(
+    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
+    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+  )`;
+
+  const role = normalizeRole(session.role || "");
+  const email = String(session.email || "").toLowerCase();
+  let roleFilter = "TRUE()";
+  if (role === "physio") {
+    if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    else roleFilter = "FALSE()";
+  }
+
+  const qs = new URLSearchParams({
+    filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
+    pageSize: "100",
+  });
+  qs.append("sort[0][field]", schema.FIELD_START);
+  qs.append("sort[0][direction]", "asc");
+
+  // Only what we need for KPI (no linked resolution).
+  const wanted = [
+    schema.FIELD_START,
+    schema.FIELD_END,
+    schema.FIELD_DURATION,
+    schema.FIELD_TYPE,
+    schema.FIELD_EMAIL,
+  ].filter(Boolean);
+  for (const f of wanted) qs.append("fields[]", f);
+
+  const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+  const records = data.records || [];
+
+  const appts = records.map((r) =>
+    mapAppointmentFromRecord({
+      record: r,
+      schema,
+      patientNamesById: {},
+      collaboratorNamesById: {},
+      serviceNamesById: {},
+      locationNamesById: {},
+    }),
+  );
+
+  const rangeStart = new Date(startISO);
+  const rangeEnd = new Date(endISO);
+  const want = normalizeApptType(wantedTypeNorm);
+
+  const filtered = want
+    ? appts.filter((a) => normalizeApptType(a?.appointment_type) === want)
+    : appts;
+
+  let minutes = 0;
+  for (const a of filtered) minutes += overlapMinutesInRange(a, rangeStart, rangeEnd);
+
+  const slots = minutes <= 0 ? 0 : Math.ceil(minutes / 60);
+  return {
+    totalAppointments: appts.length,
+    filteredAppointments: filtered.length,
+    minutes,
+    slots,
+    type: want || "",
+  };
 }
 
 async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite = false }) {
@@ -1024,6 +1135,8 @@ export default async function handler(req, res) {
       const noCache = String(req.query?.nocache || "") === "1";
       const lite = String(req.query?.lite || "") === "1";
       const summary = String(req.query?.summary || "") === "1";
+      const kpi = String(req.query?.kpi || "") === "1";
+      const kpiType = norm(req.query?.type);
       const schema = lite ? await resolveSchemaLite(tableEnc, tableName) : await resolveSchema(tableEnc, tableName);
 
       let startISO = "";
@@ -1057,6 +1170,17 @@ export default async function handler(req, res) {
         const run = () => appointmentsSummary({ tableEnc, tableName, schema: schemaLite, startISO, endISO, session });
         const counts = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
         return res.status(200).json({ ok: true, counts });
+      }
+
+      // KPI mode: compute lightweight metrics (e.g. Dashboard "Oggi") without returning full appointments list.
+      if (kpi) {
+        const schemaLite = await resolveSchemaLite(tableEnc, tableName);
+        const role = normalizeRole(session.role || "");
+        const email = String(session.email || "").toLowerCase();
+        const cacheKey = `appts:kpi:${tableName}:${startISO}:${endISO}:${role}:${email}:${kpiType}`;
+        const run = () => appointmentsKpi({ tableEnc, tableName, schema: schemaLite, startISO, endISO, session, wantedTypeNorm: kpiType });
+        const out = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
+        return res.status(200).json({ ok: true, kpi: out });
       }
 
       // Short warm-instance cache: speeds up repeated view switches/navigation.

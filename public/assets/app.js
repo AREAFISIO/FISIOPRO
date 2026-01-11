@@ -1339,17 +1339,26 @@ async function initDashboard() {
   dayEnd.setDate(dayEnd.getDate() + 1);
 
   try {
+    const wantedType = "appuntamento paziente";
+    // Fast path: backend computes KPI without returning full appointment list.
+    try {
+      const k = await api(
+        `/api/appointments?kpi=1&type=${encodeURIComponent(wantedType)}&start=${encodeURIComponent(dayStart.toISOString())}&end=${encodeURIComponent(dayEnd.toISOString())}`,
+      );
+      const slots = Number(k?.kpi?.slots || 0);
+      valueEl.textContent = String(slots);
+      if (miniEl) miniEl.textContent = `Slot da 60' • solo "Appuntamento paziente"`;
+      return;
+    } catch {}
+
+    // Fallback (compat): compute KPI from full list.
     const data = await api(
       `/api/appointments?start=${encodeURIComponent(dayStart.toISOString())}&end=${encodeURIComponent(dayEnd.toISOString())}`,
     );
     const appts = Array.isArray(data?.appointments) ? data.appointments : [];
-
-    const wantedType = "appuntamento paziente";
     const filtered = appts.filter((a) => normalizeApptType(a?.appointment_type) === wantedType);
-
     let minutes = 0;
     for (const a of filtered) minutes += overlapMinutesForDay(a, dayStart, dayEnd);
-
     const slots = minutes <= 0 ? 0 : Math.ceil(minutes / 60);
     valueEl.textContent = String(slots);
     if (miniEl) miniEl.textContent = `Slot da 60' • solo "Appuntamento paziente"`;
