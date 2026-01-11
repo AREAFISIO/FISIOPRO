@@ -929,20 +929,15 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
 
   let roleFilter = "TRUE()";
   if (role === "physio") {
-    // In "lite" mode we prioritize speed and avoid extra Airtable lookups:
-    // if we have an Email field on appointments, filter by email directly.
-    if (lite && schema.FIELD_EMAIL) {
+    // Prefer linked Collaboratore filter (most reliable); fallback to Email field if present.
+    // Some bases don't populate appointment Email consistently, which would hide all appointments for physios.
+    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdByEmail(email) : "";
+    if (collabRecId && schema.FIELD_OPERATOR) {
+      roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
+    } else if (schema.FIELD_EMAIL) {
       roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
     } else {
-      // Prefer linked Collaboratore filter; fallback to Email field if present.
-      const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdByEmail(email) : "";
-      if (collabRecId && schema.FIELD_OPERATOR) {
-        roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
-      } else if (schema.FIELD_EMAIL) {
-        roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
-      } else {
-        roleFilter = "FALSE()";
-      }
+      roleFilter = "FALSE()";
     }
   }
 
