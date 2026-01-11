@@ -1172,9 +1172,9 @@
     const start = pickField(f, ["Data e ora INIZIO", "Start", "Inizio", "start_at", "StartAt"]);
     const end = pickField(f, ["Data e ora FINE", "End", "Fine", "end_at", "EndAt"]);
     let therapist = String(x.operator || "").trim() || pickField(f, ["Collaboratore", "Collaborator", "Operatore", "Operator", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
+    const therapistId = String(pickField(f, ["therapist_id", "collaboratoreId", "operatorId", "CollaboratoreId"]) || "").trim();
     if (!therapist) {
-      const tid = String(pickField(f, ["therapist_id", "collaboratoreId", "operatorId", "CollaboratoreId"]) || "").trim();
-      if (tid) therapist = String(operatorIdToName.get(tid) || "").trim();
+      if (therapistId) therapist = String(operatorIdToName.get(therapistId) || "").trim();
     }
     // In case Operatore is still an array, normalize to a readable string.
     if (Array.isArray(therapist)) therapist = therapist.filter(Boolean).join(", ");
@@ -1220,6 +1220,7 @@
       patient: String(patient || "").trim(),
       patientId,
       therapist: String(therapist || "").trim(),
+      therapistId,
       service: String(service || "").trim(),
       status: String(status || "").trim(),
       startAt: startOk ? startAt : null,
@@ -1326,6 +1327,22 @@
     const name = String(getUserName() || "").trim();
     const roleLabel = getUserRoleLabel();
     loginNameEl.textContent = name ? (name + (roleLabel ? " • " + roleLabel : "")) : "—";
+  }
+
+  function ensureUserMappedOrWarn() {
+    // Agenda is mission-critical: if the logged-in user can't be mapped to an operator,
+    // tell them explicitly instead of silently hiding appointments.
+    const email = getUserEmail();
+    if (!email) return;
+    if (!knownByEmail || !knownByEmail.has(email)) {
+      try {
+        console.warn("[Agenda] user email not mapped to operator:", email);
+      } catch {}
+      try {
+        // Non-blocking toast; doesn't interrupt workflow.
+        if (typeof window.toast === "function") window.toast("Attenzione: utente non mappato a Collaboratore (controlla email in COLLABORATORI).");
+      } catch {}
+    }
   }
 
   function prefsKey() {
@@ -1898,6 +1915,7 @@
         // If appointments were loaded in lite mode, backfill therapist names from ids.
         backfillTherapistNamesFromIds();
         syncOpsBar();
+        ensureUserMappedOrWarn();
         try { render(); } catch {}
       })
       .catch(() => {});
@@ -3229,14 +3247,25 @@
     const ops = Array.from(selectedTherapists);
     const range = computeGridRange(start, days);
 
-    // If the current selection doesn't match any known therapist labels (common when
-    // auth name != COLLABORATORI display name), do NOT filter by therapist, otherwise
-    // appointments can "flash" and then disappear after operator backfill.
-    const selectionHasAnyKnown =
-      selectedTherapists.size &&
-      Array.isArray(knownTherapists) &&
-      knownTherapists.length &&
-      Array.from(selectedTherapists).some((n) => knownTherapists.includes(String(n)));
+    // Infallibile: filter by therapist *id* (stable) instead of display name (can differ).
+    const selectedOperatorIds = (() => {
+      try {
+        const out = new Set();
+        // selection may contain display names -> map to ids when possible
+        Array.from(selectedTherapists || []).forEach((name) => {
+          const id = String(operatorNameToId.get(String(name || "").trim()) || "").trim();
+          if (id) out.add(id);
+        });
+        // If we can map current user email to an operator, include it (prevents "flash then disappear").
+        const meEmail = getUserEmail();
+        const meName = meEmail ? String(knownByEmail.get(meEmail) || "").trim() : "";
+        const meId = meName ? String(operatorNameToId.get(meName) || "").trim() : "";
+        if (meId) out.add(meId);
+        return out;
+      } catch {
+        return new Set();
+      }
+    })();
 
     const q = String(qEl?.value || "").trim().toLowerCase();
     const items = rawItems
@@ -3246,9 +3275,11 @@
         const dt0 = new Date(x.startAt.getFullYear(), x.startAt.getMonth(), x.startAt.getDate()).getTime();
         const idx = Math.round((dt0 - day0) / 86400000);
         if (idx < 0 || idx >= days) return false;
-        // If we don't know the therapist yet (lite load / operators not fetched),
-        // don't hide the appointment: show it in the current view and backfill later.
-        if (selectionHasAnyKnown && x.therapist && !selectedTherapists.has(x.therapist)) return false;
+        // Filter by operator id when we have it; if we don't know the id yet, don't hide the appointment.
+        if (selectedOperatorIds.size) {
+          const tid = String(x?.therapistId || x?.fields?.therapist_id || "").trim();
+          if (tid && !selectedOperatorIds.has(tid)) return false;
+        }
         if (!q) return true;
         const hay = [x.patient, x.service, x.therapist, x.status].filter(Boolean).join(" ").toLowerCase();
         return hay.includes(q);
