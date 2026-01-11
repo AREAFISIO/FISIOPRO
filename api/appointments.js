@@ -13,10 +13,45 @@ import {
   escAirtableString as escAirtableStringLib,
   resolveLinkedIds,
 } from "../lib/airtableClient.js";
+import { airtableSchema } from "../lib/airtableClient.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
   return s.includes("unknown field name") || s.includes("unknown field names");
+}
+
+function normalizeKeyLoose(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function resolveFieldFromSchema(tableName, candidates) {
+  const t = String(tableName || "").trim();
+  const schema = airtableSchema?.[t] || null;
+  const keys = Array.isArray(schema?.all_fields)
+    ? schema.all_fields
+    : (Array.isArray(schema?.key_fields) ? schema.key_fields : []);
+  const list = (keys || []).map((k) => String(k || "")).filter(Boolean);
+  if (!list.length) return "";
+
+  const byLower = new Map(list.map((k) => [String(k).toLowerCase(), String(k)]));
+  for (const c of (candidates || []).filter(Boolean)) {
+    const want = String(c || "").trim();
+    if (!want) continue;
+    const hit = byLower.get(want.toLowerCase());
+    if (hit) return hit;
+  }
+
+  const byLoose = new Map(list.map((k) => [normalizeKeyLoose(k), String(k)]));
+  for (const c of (candidates || []).filter(Boolean)) {
+    const wantLoose = normalizeKeyLoose(c);
+    if (!wantLoose) continue;
+    const hit = byLoose.get(wantLoose);
+    if (hit) return hit;
+  }
+
+  return "";
 }
 
 async function probeField(tableEnc, candidate) {
@@ -33,8 +68,11 @@ async function probeField(tableEnc, candidate) {
   }
 }
 
-async function resolveFieldName(tableEnc, cacheKey, candidates) {
+async function resolveFieldName(tableEnc, cacheKey, candidates, tableNameForSchema = "") {
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
+    // Fast-path: resolve from local schema snapshot (zero network calls).
+    const fromSchema = resolveFieldFromSchema(tableNameForSchema, candidates);
+    if (fromSchema) return fromSchema;
     for (const c of (candidates || []).filter(Boolean)) {
       if (await probeField(tableEnc, c)) return String(c).trim();
     }
@@ -150,9 +188,20 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
   if (!all.length) return {};
   const out = {};
 
+  // Warm-instance cache: avoid re-fetching names for the same record IDs.
+  // This drastically reduces Airtable calls when navigating or refreshing views.
+  const missing = [];
+  for (const id of all) {
+    const k = `name:${tableName}:${id}`;
+    const cached = memGet(k);
+    if (typeof cached === "string" && cached.trim()) out[id] = cached;
+    else missing.push(id);
+  }
+  if (!missing.length) return out;
+
   // Airtable formula length limits: chunk OR() reasonably.
-  for (let i = 0; i < all.length; i += 30) {
-    const chunk = all.slice(i, i + 30);
+  for (let i = 0; i < missing.length; i += 30) {
+    const chunk = missing.slice(i, i + 30);
     const orParts = chunk.map((id) => `RECORD_ID()="${escAirtableString(id)}"`);
     const formula = `OR(${orParts.join(",")})`;
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
@@ -173,7 +222,10 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
     }
     for (const r of data.records || []) {
       const name = String(pickName(r.fields) || "").trim();
-      if (name) out[r.id] = name;
+      if (name) {
+        out[r.id] = name;
+        memSet(`name:${tableName}:${r.id}`, name, 6 * 60 * 60_000);
+      }
     }
   }
 
@@ -192,6 +244,7 @@ async function resolveCollaboratorRecordIdByEmail(emailRaw) {
     collabTableEnc,
     `collab:field:email:${collabTableName}`,
     [process.env.COLLAB_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+    collabTableName,
   );
   if (!emailField) return "";
 
@@ -217,8 +270,11 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_OPERATOR,
     FIELD_EMAIL,
     FIELD_STATUS,
+    FIELD_TYPE,
     FIELD_SERVICE,
     FIELD_DURATION,
+    FIELD_CONFIRMED_BY_PATIENT,
+    FIELD_CONFIRMED_IN_PLATFORM,
     FIELD_QUICK_NOTE,
     FIELD_NOTES,
   ] = await Promise.all([
@@ -244,6 +300,7 @@ async function resolveSchemaLite(tableEnc, tableName) {
         "Data e ora Inizio (manuale)",
         "Data e Ora Inizio (manuale)",
       ].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
@@ -259,46 +316,87 @@ async function resolveSchemaLite(tableEnc, tableName) {
         "End",
         "End at",
       ].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:patient:${tableName}`,
       [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Pazienti", "Patient", "Patients"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:operator:${tableName}`,
       [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:email:${tableName}`,
       [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:status:${tableName}`,
       [process.env.AGENDA_STATUS_FIELD, "Stato appuntamento", "Stato", "Status"].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:type:${tableName}`,
+      [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:service:${tableName}`,
       [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:duration:${tableName}`,
       [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:confirmedByPatient:${tableName}`,
+      [
+        process.env.AGENDA_CONFIRMED_BY_PATIENT_FIELD,
+        "Confermato dal paziente",
+        "Conferma del paziente",
+        "Conferma paziente",
+        "Paziente confermato",
+        "Confermato paziente",
+      ].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:confirmedInPlatform:${tableName}`,
+      [
+        process.env.AGENDA_CONFIRMED_IN_PLATFORM_FIELD,
+        "Conferma in InBuoneMani",
+        "Conferma in piattaforma",
+        "Confermato in piattaforma",
+        "Confermato in InBuoneMani",
+        "InBuoneMani",
+      ].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:quick:${tableName}`,
       [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:notes:${tableName}`,
       [process.env.AGENDA_NOTES_FIELD, "Note", "Note paziente"].filter(Boolean),
+      tableName,
     ),
   ]);
 
@@ -309,12 +407,12 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_OPERATOR,
     FIELD_EMAIL,
     FIELD_STATUS,
-    FIELD_TYPE: "",
+    FIELD_TYPE,
     FIELD_SERVICE,
     FIELD_LOCATION: "",
     FIELD_DURATION,
-    FIELD_CONFIRMED_BY_PATIENT: "",
-    FIELD_CONFIRMED_IN_PLATFORM: "",
+    FIELD_CONFIRMED_BY_PATIENT,
+    FIELD_CONFIRMED_IN_PLATFORM,
     FIELD_QUICK_NOTE,
     FIELD_NOTES,
     FIELD_TIPI_EROGATI: "",
@@ -351,6 +449,7 @@ async function resolveSchema(tableEnc, tableName) {
       "Data e ora Inizio (manuale)",
       "Data e Ora Inizio (manuale)",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_END = await resolveFieldName(
     tableEnc,
@@ -366,47 +465,56 @@ async function resolveSchema(tableEnc, tableName) {
       "End",
       "End at",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_PATIENT = await resolveFieldName(
     tableEnc,
     `appts:field:patient:${tableName}`,
     [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Pazienti", "Patient", "Patients"].filter(Boolean),
+    tableName,
   );
   const FIELD_OPERATOR = await resolveFieldName(
     tableEnc,
     `appts:field:operator:${tableName}`,
     [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean),
+    tableName,
   );
   const FIELD_EMAIL = await resolveFieldName(
     tableEnc,
     `appts:field:email:${tableName}`,
     [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_STATUS = await resolveFieldName(
     tableEnc,
     `appts:field:status:${tableName}`,
     [process.env.AGENDA_STATUS_FIELD, "Stato appuntamento", "Stato", "Status"].filter(Boolean),
+    tableName,
   );
   const FIELD_TYPE = await resolveFieldName(
     tableEnc,
     `appts:field:type:${tableName}`,
     [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+    tableName,
   );
   const FIELD_SERVICE = await resolveFieldName(
     tableEnc,
     `appts:field:service:${tableName}`,
     [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+    tableName,
   );
   const FIELD_LOCATION = await resolveFieldName(
     tableEnc,
     `appts:field:location:${tableName}`,
     [process.env.AGENDA_LOCATION_FIELD, "Posizione", "Posizione appuntamento", "Sede", "Sedi", "Location", "Luogo"].filter(Boolean),
+    tableName,
   );
   const FIELD_DURATION = await resolveFieldName(
     tableEnc,
     `appts:field:duration:${tableName}`,
     [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_CONFIRMED_BY_PATIENT = await resolveFieldName(
@@ -420,6 +528,7 @@ async function resolveSchema(tableEnc, tableName) {
       "Paziente confermato",
       "Confermato paziente",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_CONFIRMED_IN_PLATFORM = await resolveFieldName(
     tableEnc,
@@ -432,48 +541,57 @@ async function resolveSchema(tableEnc, tableName) {
       "Confermato in InBuoneMani",
       "InBuoneMani",
     ].filter(Boolean),
+    tableName,
   );
 
   const FIELD_QUICK_NOTE = await resolveFieldName(
     tableEnc,
     `appts:field:quick:${tableName}`,
     [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
+    tableName,
   );
   const FIELD_NOTES = await resolveFieldName(
     tableEnc,
     `appts:field:notes:${tableName}`,
     [process.env.AGENDA_NOTES_FIELD, "Note", "Note paziente"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_TIPI_EROGATI = await resolveFieldName(
     tableEnc,
     `appts:field:tipiErogati:${tableName}`,
     [process.env.AGENDA_TIPI_EROGATI_FIELD, "Tipi Erogati", "Tipi erogati"].filter(Boolean),
+    tableName,
   );
   const FIELD_VALUTAZIONI = await resolveFieldName(
     tableEnc,
     `appts:field:valutazioni:${tableName}`,
     [process.env.AGENDA_VALUTAZIONI_FIELD, "VALUTAZIONI", "Valutazioni"].filter(Boolean),
+    tableName,
   );
   const FIELD_TRATTAMENTI = await resolveFieldName(
     tableEnc,
     `appts:field:trattamenti:${tableName}`,
     [process.env.AGENDA_TRATTAMENTI_FIELD, "TRATTAMENTI", "Trattamenti"].filter(Boolean),
+    tableName,
   );
   const FIELD_EROGATO_COLLEGATO = await resolveFieldName(
     tableEnc,
     `appts:field:erogato:${tableName}`,
     [process.env.AGENDA_EROGATO_FIELD, "Erogato collegato", "Erogato", "Appuntamento collegato"].filter(Boolean),
+    tableName,
   );
   const FIELD_CASO_CLINICO = await resolveFieldName(
     tableEnc,
     `appts:field:case:${tableName}`,
     [process.env.AGENDA_CASE_FIELD, "Caso clinico", "Caso", "Caso Clinico"].filter(Boolean),
+    tableName,
   );
   const FIELD_VENDITA_COLLEGATA = await resolveFieldName(
     tableEnc,
     `appts:field:sale:${tableName}`,
     [process.env.AGENDA_SALE_FIELD, "Vendita collegata", "Vendita", "Sale"].filter(Boolean),
+    tableName,
   );
 
   return {
@@ -600,6 +718,189 @@ function mapAppointmentFromRecord({
     erogato_id: getLinkId(schema.FIELD_EROGATO_COLLEGATO),
     caso_clinico_id: getLinkId(schema.FIELD_CASO_CLINICO),
     vendita_id: getLinkId(schema.FIELD_VENDITA_COLLEGATA),
+  };
+}
+
+function parseDateRangeDays(startISO, endISO) {
+  try {
+    const a = new Date(String(startISO || ""));
+    const b = new Date(String(endISO || ""));
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+    const ms = b.getTime() - a.getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    return ms / 86_400_000;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeApptType(v) {
+  return String(v ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function parseDateSafe(v) {
+  const d = new Date(String(v || ""));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function overlapMinutesInRange(appt, rangeStart, rangeEnd) {
+  const s = parseDateSafe(appt?.start_at);
+  if (!s) return 0;
+
+  let e = parseDateSafe(appt?.end_at);
+  if (!e) {
+    const raw = appt?.duration;
+    const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+    if (Number.isFinite(n) && n > 0) e = new Date(s.getTime() + n * 60_000);
+  }
+  if (!e) return 0;
+
+  const start = s < rangeStart ? rangeStart : s;
+  const end = e > rangeEnd ? rangeEnd : e;
+  const ms = end.getTime() - start.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return 0;
+  return Math.max(0, Math.round(ms / 60_000));
+}
+
+async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endISO, session }) {
+  if (!schema.FIELD_START) {
+    const err = new Error("agenda_schema_mismatch: missing start field");
+    err.status = 500;
+    throw err;
+  }
+
+  const rangeFilter = `AND(
+    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
+    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+  )`;
+
+  const role = normalizeRole(session.role || "");
+  const email = String(session.email || "").toLowerCase();
+
+  let roleFilter = "TRUE()";
+  if (role === "physio") {
+    if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    else roleFilter = "FALSE()";
+  }
+
+  const qs = new URLSearchParams({
+    filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
+    pageSize: "100",
+  });
+  qs.append("sort[0][field]", schema.FIELD_START);
+  qs.append("sort[0][direction]", "asc");
+
+  // Only fetch what we need for counts.
+  const wanted = [
+    schema.FIELD_START,
+    schema.FIELD_PATIENT,
+    schema.FIELD_CONFIRMED_BY_PATIENT,
+    schema.FIELD_CONFIRMED_IN_PLATFORM,
+    schema.FIELD_EMAIL,
+  ].filter(Boolean);
+  for (const f of wanted) qs.append("fields[]", f);
+
+  const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+  const records = data.records || [];
+
+  let total = 0;
+  let missingPatient = 0;
+  let needConfirmPatient = 0;
+  let needConfirmPlatform = 0;
+
+  for (const r of records) {
+    total += 1;
+    const f = r?.fields || {};
+    const patientField = schema.FIELD_PATIENT ? f[schema.FIELD_PATIENT] : undefined;
+    const patient_id =
+      Array.isArray(patientField) &&
+      patientField.length &&
+      typeof patientField[0] === "string" &&
+      patientField[0].startsWith("rec")
+        ? String(patientField[0] || "")
+        : "";
+    if (!patient_id) missingPatient += 1;
+
+    if (schema.FIELD_CONFIRMED_BY_PATIENT && !toBool(f[schema.FIELD_CONFIRMED_BY_PATIENT])) needConfirmPatient += 1;
+    if (schema.FIELD_CONFIRMED_IN_PLATFORM && !toBool(f[schema.FIELD_CONFIRMED_IN_PLATFORM])) needConfirmPlatform += 1;
+  }
+
+  return { total, missingPatient, needConfirmPatient, needConfirmPlatform };
+}
+
+async function appointmentsKpi({ tableEnc, tableName, schema, startISO, endISO, session, wantedTypeNorm = "" }) {
+  if (!schema.FIELD_START) {
+    const err = new Error("agenda_schema_mismatch: missing start field");
+    err.status = 500;
+    throw err;
+  }
+
+  const rangeFilter = `AND(
+    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
+    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+  )`;
+
+  const role = normalizeRole(session.role || "");
+  const email = String(session.email || "").toLowerCase();
+  let roleFilter = "TRUE()";
+  if (role === "physio") {
+    if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    else roleFilter = "FALSE()";
+  }
+
+  const qs = new URLSearchParams({
+    filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
+    pageSize: "100",
+  });
+  qs.append("sort[0][field]", schema.FIELD_START);
+  qs.append("sort[0][direction]", "asc");
+
+  // Only what we need for KPI (no linked resolution).
+  const wanted = [
+    schema.FIELD_START,
+    schema.FIELD_END,
+    schema.FIELD_DURATION,
+    schema.FIELD_TYPE,
+    schema.FIELD_EMAIL,
+  ].filter(Boolean);
+  for (const f of wanted) qs.append("fields[]", f);
+
+  const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+  const records = data.records || [];
+
+  const appts = records.map((r) =>
+    mapAppointmentFromRecord({
+      record: r,
+      schema,
+      patientNamesById: {},
+      collaboratorNamesById: {},
+      serviceNamesById: {},
+      locationNamesById: {},
+    }),
+  );
+
+  const rangeStart = new Date(startISO);
+  const rangeEnd = new Date(endISO);
+  const want = normalizeApptType(wantedTypeNorm);
+
+  const filtered = want
+    ? appts.filter((a) => normalizeApptType(a?.appointment_type) === want)
+    : appts;
+
+  let minutes = 0;
+  for (const a of filtered) minutes += overlapMinutesInRange(a, rangeStart, rangeEnd);
+
+  const slots = minutes <= 0 ? 0 : Math.ceil(minutes / 60);
+  return {
+    totalAppointments: appts.length,
+    filteredAppointments: filtered.length,
+    minutes,
+    slots,
+    type: want || "",
   };
 }
 
@@ -833,6 +1134,9 @@ export default async function handler(req, res) {
       const endRaw = norm(req.query?.end);
       const noCache = String(req.query?.nocache || "") === "1";
       const lite = String(req.query?.lite || "") === "1";
+      const summary = String(req.query?.summary || "") === "1";
+      const kpi = String(req.query?.kpi || "") === "1";
+      const kpiType = norm(req.query?.type);
       const schema = lite ? await resolveSchemaLite(tableEnc, tableName) : await resolveSchema(tableEnc, tableName);
 
       let startISO = "";
@@ -849,6 +1153,34 @@ export default async function handler(req, res) {
 
       if (!startISO || !endISO) {
         return res.status(400).json({ ok: false, error: "missing_start_end" });
+      }
+
+      // Guardrail: prevent accidental huge ranges that would be slow (Airtable + JSON + linked resolution).
+      const days = parseDateRangeDays(startISO, endISO);
+      if (days && days > 45) {
+        return res.status(400).json({ ok: false, error: "range_too_large", maxDays: 45 });
+      }
+
+      // Summary mode: used for badges/KPI; avoids linked name resolution and heavy payloads.
+      if (summary) {
+        const schemaLite = await resolveSchemaLite(tableEnc, tableName);
+        const role = normalizeRole(session.role || "");
+        const email = String(session.email || "").toLowerCase();
+        const cacheKey = `appts:summary:${tableName}:${startISO}:${endISO}:${role}:${email}`;
+        const run = () => appointmentsSummary({ tableEnc, tableName, schema: schemaLite, startISO, endISO, session });
+        const counts = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
+        return res.status(200).json({ ok: true, counts });
+      }
+
+      // KPI mode: compute lightweight metrics (e.g. Dashboard "Oggi") without returning full appointments list.
+      if (kpi) {
+        const schemaLite = await resolveSchemaLite(tableEnc, tableName);
+        const role = normalizeRole(session.role || "");
+        const email = String(session.email || "").toLowerCase();
+        const cacheKey = `appts:kpi:${tableName}:${startISO}:${endISO}:${role}:${email}:${kpiType}`;
+        const run = () => appointmentsKpi({ tableEnc, tableName, schema: schemaLite, startISO, endISO, session, wantedTypeNorm: kpiType });
+        const out = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
+        return res.status(200).json({ ok: true, kpi: out });
       }
 
       // Short warm-instance cache: speeds up repeated view switches/navigation.
