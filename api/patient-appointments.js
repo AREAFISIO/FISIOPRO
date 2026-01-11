@@ -59,7 +59,15 @@ async function probeField(tableEnc, candidate) {
 async function resolveFieldName(tableEnc, cacheKey, candidates, tableNameForSchema = "") {
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
     const fromSchema = resolveFieldFromSchema(tableNameForSchema, candidates);
-    if (fromSchema) return fromSchema;
+    if (fromSchema) {
+      // Safety: schema snapshots can drift. Verify the field exists in the current base.
+      // If it doesn't, fall back to probing candidates.
+      try {
+        if (await probeField(tableEnc, fromSchema)) return fromSchema;
+      } catch {
+        // ignore and continue with candidate probing
+      }
+    }
     for (const c of (candidates || []).filter(Boolean)) {
       if (await probeField(tableEnc, c)) return String(c).trim();
     }
