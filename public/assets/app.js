@@ -392,12 +392,15 @@ async function updateInboxBadge() {
   try {
     const start = new Date(); // now
     const end = addDaysLocal(start, 2);
-    const data = await api(`/api/appointments?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
-    const appts = data.appointments || [];
+    // Fast path: ask backend for counts only (no big payload, no linked-name lookups).
+    const data = await api(
+      `/api/appointments?summary=1&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`
+    );
+    const c = data?.counts || {};
     const n =
-      appts.filter((a) => !a.patient_id).length +
-      appts.filter((a) => a.patient_id && !a.confirmed_by_patient).length +
-      appts.filter((a) => a.patient_id && !a.confirmed_in_platform).length;
+      Number(c.missingPatient || 0) +
+      Number(c.needConfirmPatient || 0) +
+      Number(c.needConfirmPlatform || 0);
     badge.textContent = String(n);
     badge.style.display = n > 0 ? "" : "none";
     try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), n })); } catch {}

@@ -272,6 +272,8 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_STATUS,
     FIELD_SERVICE,
     FIELD_DURATION,
+    FIELD_CONFIRMED_BY_PATIENT,
+    FIELD_CONFIRMED_IN_PLATFORM,
     FIELD_QUICK_NOTE,
     FIELD_NOTES,
   ] = await Promise.all([
@@ -353,6 +355,32 @@ async function resolveSchemaLite(tableEnc, tableName) {
     ),
     resolveFieldName(
       tableEnc,
+      `appts:field:confirmedByPatient:${tableName}`,
+      [
+        process.env.AGENDA_CONFIRMED_BY_PATIENT_FIELD,
+        "Confermato dal paziente",
+        "Conferma del paziente",
+        "Conferma paziente",
+        "Paziente confermato",
+        "Confermato paziente",
+      ].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:confirmedInPlatform:${tableName}`,
+      [
+        process.env.AGENDA_CONFIRMED_IN_PLATFORM_FIELD,
+        "Conferma in InBuoneMani",
+        "Conferma in piattaforma",
+        "Confermato in piattaforma",
+        "Confermato in InBuoneMani",
+        "InBuoneMani",
+      ].filter(Boolean),
+      tableName,
+    ),
+    resolveFieldName(
+      tableEnc,
       `appts:field:quick:${tableName}`,
       [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
       tableName,
@@ -376,8 +404,8 @@ async function resolveSchemaLite(tableEnc, tableName) {
     FIELD_SERVICE,
     FIELD_LOCATION: "",
     FIELD_DURATION,
-    FIELD_CONFIRMED_BY_PATIENT: "",
-    FIELD_CONFIRMED_IN_PLATFORM: "",
+    FIELD_CONFIRMED_BY_PATIENT,
+    FIELD_CONFIRMED_IN_PLATFORM,
     FIELD_QUICK_NOTE,
     FIELD_NOTES,
     FIELD_TIPI_EROGATI: "",
@@ -686,6 +714,85 @@ function mapAppointmentFromRecord({
   };
 }
 
+function parseDateRangeDays(startISO, endISO) {
+  try {
+    const a = new Date(String(startISO || ""));
+    const b = new Date(String(endISO || ""));
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+    const ms = b.getTime() - a.getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return null;
+    return ms / 86_400_000;
+  } catch {
+    return null;
+  }
+}
+
+async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endISO, session }) {
+  if (!schema.FIELD_START) {
+    const err = new Error("agenda_schema_mismatch: missing start field");
+    err.status = 500;
+    throw err;
+  }
+
+  const rangeFilter = `AND(
+    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
+    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+  )`;
+
+  const role = normalizeRole(session.role || "");
+  const email = String(session.email || "").toLowerCase();
+
+  let roleFilter = "TRUE()";
+  if (role === "physio") {
+    if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    else roleFilter = "FALSE()";
+  }
+
+  const qs = new URLSearchParams({
+    filterByFormula: `AND(${rangeFilter}, ${roleFilter})`,
+    pageSize: "100",
+  });
+  qs.append("sort[0][field]", schema.FIELD_START);
+  qs.append("sort[0][direction]", "asc");
+
+  // Only fetch what we need for counts.
+  const wanted = [
+    schema.FIELD_START,
+    schema.FIELD_PATIENT,
+    schema.FIELD_CONFIRMED_BY_PATIENT,
+    schema.FIELD_CONFIRMED_IN_PLATFORM,
+    schema.FIELD_EMAIL,
+  ].filter(Boolean);
+  for (const f of wanted) qs.append("fields[]", f);
+
+  const data = await airtableFetch(`${tableEnc}?${qs.toString()}`);
+  const records = data.records || [];
+
+  let total = 0;
+  let missingPatient = 0;
+  let needConfirmPatient = 0;
+  let needConfirmPlatform = 0;
+
+  for (const r of records) {
+    total += 1;
+    const f = r?.fields || {};
+    const patientField = schema.FIELD_PATIENT ? f[schema.FIELD_PATIENT] : undefined;
+    const patient_id =
+      Array.isArray(patientField) &&
+      patientField.length &&
+      typeof patientField[0] === "string" &&
+      patientField[0].startsWith("rec")
+        ? String(patientField[0] || "")
+        : "";
+    if (!patient_id) missingPatient += 1;
+
+    if (schema.FIELD_CONFIRMED_BY_PATIENT && !toBool(f[schema.FIELD_CONFIRMED_BY_PATIENT])) needConfirmPatient += 1;
+    if (schema.FIELD_CONFIRMED_IN_PLATFORM && !toBool(f[schema.FIELD_CONFIRMED_IN_PLATFORM])) needConfirmPlatform += 1;
+  }
+
+  return { total, missingPatient, needConfirmPatient, needConfirmPlatform };
+}
+
 async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite = false }) {
   if (!schema.FIELD_START) {
     const err = new Error("agenda_schema_mismatch: missing start field");
@@ -916,6 +1023,7 @@ export default async function handler(req, res) {
       const endRaw = norm(req.query?.end);
       const noCache = String(req.query?.nocache || "") === "1";
       const lite = String(req.query?.lite || "") === "1";
+      const summary = String(req.query?.summary || "") === "1";
       const schema = lite ? await resolveSchemaLite(tableEnc, tableName) : await resolveSchema(tableEnc, tableName);
 
       let startISO = "";
@@ -932,6 +1040,23 @@ export default async function handler(req, res) {
 
       if (!startISO || !endISO) {
         return res.status(400).json({ ok: false, error: "missing_start_end" });
+      }
+
+      // Guardrail: prevent accidental huge ranges that would be slow (Airtable + JSON + linked resolution).
+      const days = parseDateRangeDays(startISO, endISO);
+      if (days && days > 45) {
+        return res.status(400).json({ ok: false, error: "range_too_large", maxDays: 45 });
+      }
+
+      // Summary mode: used for badges/KPI; avoids linked name resolution and heavy payloads.
+      if (summary) {
+        const schemaLite = await resolveSchemaLite(tableEnc, tableName);
+        const role = normalizeRole(session.role || "");
+        const email = String(session.email || "").toLowerCase();
+        const cacheKey = `appts:summary:${tableName}:${startISO}:${endISO}:${role}:${email}`;
+        const run = () => appointmentsSummary({ tableEnc, tableName, schema: schemaLite, startISO, endISO, session });
+        const counts = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
+        return res.status(200).json({ ok: true, counts });
       }
 
       // Short warm-instance cache: speeds up repeated view switches/navigation.
