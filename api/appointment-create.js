@@ -108,7 +108,7 @@ async function tryCreate({ tableName, fields }) {
 
 export default async function handler(req, res) {
   ensureRes(res);
-  const user = requireRoles(req, res, ["physio", "front", "manager"]);
+  const user = requireRoles(req, res, ["physio", "front", "back", "manager"]);
   if (!user) return;
 
   try {
@@ -177,11 +177,24 @@ export default async function handler(req, res) {
       "Orario FINE",
       "Orario Fine",
     ].filter(Boolean);
-    const FIELD_OPERATOR = process.env.AGENDA_OPERATOR_FIELD || "Collaboratore";
-    const FIELD_PATIENT = process.env.AGENDA_PATIENT_FIELD || "Paziente";
-    // Requested mapping: in "APPUNTAMENTI" the linked field is usually "Servizio" (to PRESTAZIONI).
-    // Keep it overrideable via env, but default to the correct one.
-    const FIELD_SERVICE = process.env.AGENDA_SERVICE_FIELD || "Servizio";
+    const FIELD_OPERATOR =
+      process.env.AGENDA_OPERATOR_FIELD ||
+      (await resolveFieldNameByProbe(tableEnc, `apptCreate:field:operator:${tableName}`, ["Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean))) ||
+      "Collaboratore";
+    const FIELD_PATIENT =
+      process.env.AGENDA_PATIENT_FIELD ||
+      (await resolveFieldNameByProbe(tableEnc, `apptCreate:field:patient:${tableName}`, ["Paziente", "Patient"].filter(Boolean))) ||
+      "Paziente";
+    // In this project schema (see lib/airtableSchema.json) the linked service field is typically "Prestazione prevista".
+    // Keep it overrideable via env, and fall back to common variants.
+    const FIELD_SERVICE =
+      process.env.AGENDA_SERVICE_FIELD ||
+      (await resolveFieldNameByProbe(
+        tableEnc,
+        `apptCreate:field:service:${tableName}`,
+        ["Prestazione prevista", "Servizio", "Prestazione", "Service"].filter(Boolean),
+      )) ||
+      "Prestazione prevista";
     const tableEnc = encodeURIComponent(tableName);
     const FIELD_LOCATION =
       process.env.AGENDA_LOCATION_FIELD ||
@@ -191,11 +204,39 @@ export default async function handler(req, res) {
         ["Posizione", "Posizione appuntamento", "Sede", "Sedi", "Location", "Luogo"].filter(Boolean),
       )) ||
       "Sede";
-    const FIELD_VOCE_AGENDA = process.env.AGENDA_VOCE_AGENDA_FIELD || process.env.AGENDA_TYPE_FIELD || "Voce agenda";
-    const FIELD_DURATION = process.env.AGENDA_DURATION_FIELD || "Durata";
-    const FIELD_INTERNAL = process.env.AGENDA_INTERNAL_NOTES_FIELD || "Note interne";
-    const FIELD_STATUS = process.env.AGENDA_STATUS_FIELD || "Stato appuntamento";
-    const FIELD_NOTES = process.env.AGENDA_NOTES_FIELD || "Note";
+    const FIELD_VOCE_AGENDA =
+      process.env.AGENDA_VOCE_AGENDA_FIELD ||
+      process.env.AGENDA_TYPE_FIELD ||
+      (await resolveFieldNameByProbe(tableEnc, `apptCreate:field:voce:${tableName}`, ["Voce agenda", "Tipo lavoro", "Tipo appuntamento"].filter(Boolean))) ||
+      "Voce agenda";
+    const FIELD_DURATION =
+      process.env.AGENDA_DURATION_FIELD ||
+      (await resolveFieldNameByProbe(
+        tableEnc,
+        `apptCreate:field:duration:${tableName}`,
+        ["Durata (minuti)", "Durata (min)", "Durata", "Minuti"].filter(Boolean),
+      )) ||
+      "Durata (minuti)";
+    const FIELD_INTERNAL =
+      process.env.AGENDA_INTERNAL_NOTES_FIELD ||
+      (await resolveFieldNameByProbe(
+        tableEnc,
+        `apptCreate:field:internal:${tableName}`,
+        ["Nota rapida", "Nota interna", "Note interne", "Internal note"].filter(Boolean),
+      )) ||
+      "Nota rapida";
+    const FIELD_STATUS =
+      process.env.AGENDA_STATUS_FIELD ||
+      (await resolveFieldNameByProbe(
+        tableEnc,
+        `apptCreate:field:status:${tableName}`,
+        ["Stato appuntamento", "Stato", "Status"].filter(Boolean),
+      )) ||
+      "Stato appuntamento";
+    const FIELD_NOTES =
+      process.env.AGENDA_NOTES_FIELD ||
+      (await resolveFieldNameByProbe(tableEnc, `apptCreate:field:notes:${tableName}`, ["Note", "Note paziente"].filter(Boolean))) ||
+      "Note";
     const FIELD_TIPI_EROGATI = process.env.AGENDA_TIPI_EROGATI_FIELD || "Tipi Erogati";
     const FIELD_VALUTAZIONI = process.env.AGENDA_VALUTAZIONI_FIELD || "VALUTAZIONI";
     const FIELD_TRATTAMENTI = process.env.AGENDA_TRATTAMENTI_FIELD || "TRATTAMENTI";
