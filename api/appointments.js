@@ -184,17 +184,146 @@ async function resolveCollaboratorRecordIdByEmail(emailRaw) {
   const email = String(emailRaw || "").trim().toLowerCase();
   if (!email) return "";
 
+  // Some Airtable bases use different collaborator email field names (Airtable is case-sensitive).
+  // Resolve once per warm instance to avoid hard-coding {Email}.
+  const collabTableName = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
+  const collabTableEnc = enc(collabTableName);
+  const emailField = await resolveFieldName(
+    collabTableEnc,
+    `collab:field:email:${collabTableName}`,
+    [process.env.COLLAB_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+  );
+  if (!emailField) return "";
+
   const cacheKey = `collabIdByEmail:${email}`;
   const cached = memGet(cacheKey);
   if (cached) return cached;
 
-  const collabTable = enc(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
-  const formula = `LOWER({Email}) = LOWER("${escAirtableString(email)}")`;
+  const formula = `LOWER({${emailField}}) = LOWER("${escAirtableString(email)}")`;
   const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
-  const data = await airtableFetch(`${collabTable}?${qs.toString()}`);
+  const data = await airtableFetch(`${collabTableEnc}?${qs.toString()}`);
   const recId = data.records?.[0]?.id || "";
   if (recId) memSet(cacheKey, recId, 10 * 60_000);
   return recId;
+}
+
+async function resolveSchemaLite(tableEnc, tableName) {
+  // Critical-path schema: only fields needed to render the agenda grid fast.
+  // This avoids probing dozens of optional fields on cold starts (which can time out clients).
+  const [
+    FIELD_START,
+    FIELD_END,
+    FIELD_PATIENT,
+    FIELD_OPERATOR,
+    FIELD_EMAIL,
+    FIELD_STATUS,
+    FIELD_SERVICE,
+    FIELD_DURATION,
+    FIELD_QUICK_NOTE,
+    FIELD_NOTES,
+  ] = await Promise.all([
+    resolveFieldName(
+      tableEnc,
+      `appts:field:start:${tableName}`,
+      [
+        process.env.AGENDA_START_FIELD,
+        "Data e Ora",
+        "Data e ora",
+        "Data e ora INIZIO",
+        "Data e Ora INIZIO",
+        "Data e ora Inizio",
+        "Data e Ora Inizio",
+        "Inizio",
+        "Start",
+        "Start at",
+        "Inizio appuntamento",
+        "DataOra Inizio",
+        "DataOra INIZIO",
+        "Data e ora INIZIO (manuale)",
+        "Data e Ora INIZIO (manuale)",
+        "Data e ora Inizio (manuale)",
+        "Data e Ora Inizio (manuale)",
+      ].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:end:${tableName}`,
+      [
+        process.env.AGENDA_END_FIELD,
+        "Data e ora FINE",
+        "Data e Ora FINE",
+        "Data e ora Fine",
+        "Data e Ora Fine",
+        "Data e ora fine",
+        "Fine",
+        "End",
+        "End at",
+      ].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:patient:${tableName}`,
+      [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Pazienti", "Patient", "Patients"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:operator:${tableName}`,
+      [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:email:${tableName}`,
+      [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:status:${tableName}`,
+      [process.env.AGENDA_STATUS_FIELD, "Stato appuntamento", "Stato", "Status"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:service:${tableName}`,
+      [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:duration:${tableName}`,
+      [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:quick:${tableName}`,
+      [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
+    ),
+    resolveFieldName(
+      tableEnc,
+      `appts:field:notes:${tableName}`,
+      [process.env.AGENDA_NOTES_FIELD, "Note", "Note paziente"].filter(Boolean),
+    ),
+  ]);
+
+  return {
+    FIELD_START,
+    FIELD_END,
+    FIELD_PATIENT,
+    FIELD_OPERATOR,
+    FIELD_EMAIL,
+    FIELD_STATUS,
+    FIELD_TYPE: "",
+    FIELD_SERVICE,
+    FIELD_LOCATION: "",
+    FIELD_DURATION,
+    FIELD_CONFIRMED_BY_PATIENT: "",
+    FIELD_CONFIRMED_IN_PLATFORM: "",
+    FIELD_QUICK_NOTE,
+    FIELD_NOTES,
+    FIELD_TIPI_EROGATI: "",
+    FIELD_VALUTAZIONI: "",
+    FIELD_TRATTAMENTI: "",
+    FIELD_EROGATO_COLLEGATO: "",
+    FIELD_CASO_CLINICO: "",
+    FIELD_VENDITA_COLLEGATA: "",
+  };
 }
 
 async function resolveSchema(tableEnc, tableName) {
@@ -491,14 +620,20 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
 
   let roleFilter = "TRUE()";
   if (role === "physio") {
-    // Prefer linked Collaboratore filter; fallback to Email field if present.
-    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdByEmail(email) : "";
-    if (collabRecId && schema.FIELD_OPERATOR) {
-      roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
-    } else if (schema.FIELD_EMAIL) {
+    // In "lite" mode we prioritize speed and avoid extra Airtable lookups:
+    // if we have an Email field on appointments, filter by email directly.
+    if (lite && schema.FIELD_EMAIL) {
       roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
     } else {
-      roleFilter = "FALSE()";
+      // Prefer linked Collaboratore filter; fallback to Email field if present.
+      const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdByEmail(email) : "";
+      if (collabRecId && schema.FIELD_OPERATOR) {
+        roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
+      } else if (schema.FIELD_EMAIL) {
+        roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+      } else {
+        roleFilter = "FALSE()";
+      }
     }
   }
 
@@ -639,7 +774,6 @@ export default async function handler(req, res) {
 
     const tableName = process.env.AGENDA_TABLE || "APPUNTAMENTI";
     const tableEnc = enc(tableName);
-    const schema = await resolveSchema(tableEnc, tableName);
 
     if (req.method === "GET") {
       setPrivateCache(res, 30);
@@ -699,6 +833,7 @@ export default async function handler(req, res) {
       const endRaw = norm(req.query?.end);
       const noCache = String(req.query?.nocache || "") === "1";
       const lite = String(req.query?.lite || "") === "1";
+      const schema = lite ? await resolveSchemaLite(tableEnc, tableName) : await resolveSchema(tableEnc, tableName);
 
       let startISO = "";
       let endISO = "";
@@ -833,6 +968,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PATCH") {
+      const schema = await resolveSchema(tableEnc, tableName);
       const id = norm(req.query?.id);
       if (!id) return res.status(400).json({ ok: false, error: "missing_id" });
 
