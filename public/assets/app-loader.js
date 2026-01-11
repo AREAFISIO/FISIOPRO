@@ -30,8 +30,9 @@
       return;
     }
 
+    // Don't wait too long: we want a fast first paint, but still start app.js quickly.
     if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(inject, { timeout: 1200 });
+      window.requestIdleCallback(inject, { timeout: 400 });
     } else {
       setTimeout(inject, 50);
     }
