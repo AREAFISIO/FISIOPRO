@@ -57,10 +57,8 @@ async function inferTableFieldKeys(tableEnc, cacheKey) {
 // ------------------------------------------------------------
 // Reusable Airtable helper (requested for finance dashboards)
 // ------------------------------------------------------------
-function isUnknownFieldError(msg) {
-  const s = String(msg || "").toLowerCase();
-  return s.includes("unknown field name") || s.includes("unknown field names");
-}
+// NOTE: `isUnknownFieldError` is already defined above; keep a single definition
+// to avoid duplicate identifier errors in ESM/strict mode.
 
 function escAirtableStringLiteral(v) {
   return String(v ?? "")
@@ -135,7 +133,9 @@ export async function fetchAirtable(tableName, options = {}) {
 
 export default async function handler(req, res) {
   ensureRes(res);
-  const user = requireRoles(req, res, ["physio", "front", "manager"]);
+  // NOTE: "Anagrafica / Pazienti" is available from the unified sidebar also for Back Office,
+  // so this endpoint must allow "back" to avoid 403 and an empty/broken patient list UI.
+  const user = requireRoles(req, res, ["physio", "front", "back", "manager"]);
   if (!user) return;
 
   try {
