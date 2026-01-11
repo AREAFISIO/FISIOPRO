@@ -781,9 +781,10 @@ async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endI
     throw err;
   }
 
+  // Use DATETIME_PARSE for robust comparisons (Airtable can be picky with raw ISO strings).
   const rangeFilter = `AND(
-    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
-    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+    {${schema.FIELD_START}} >= DATETIME_PARSE("${escAirtableStringLib(startISO)}"),
+    {${schema.FIELD_START}} < DATETIME_PARSE("${escAirtableStringLib(endISO)}")
   )`;
 
   const role = normalizeRole(session.role || "");
@@ -847,9 +848,10 @@ async function appointmentsKpi({ tableEnc, tableName, schema, startISO, endISO, 
     throw err;
   }
 
+  // Use DATETIME_PARSE for robust comparisons (Airtable can be picky with raw ISO strings).
   const rangeFilter = `AND(
-    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
-    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+    {${schema.FIELD_START}} >= DATETIME_PARSE("${escAirtableStringLib(startISO)}"),
+    {${schema.FIELD_START}} < DATETIME_PARSE("${escAirtableStringLib(endISO)}")
   )`;
 
   const role = normalizeRole(session.role || "");
@@ -919,9 +921,10 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
     throw err;
   }
 
+  // Use DATETIME_PARSE for robust comparisons (Airtable can be picky with raw ISO strings).
   const rangeFilter = `AND(
-    OR(IS_AFTER({${schema.FIELD_START}}, "${startISO}"), IS_SAME({${schema.FIELD_START}}, "${startISO}")),
-    IS_BEFORE({${schema.FIELD_START}}, "${endISO}")
+    {${schema.FIELD_START}} >= DATETIME_PARSE("${escAirtableStringLib(startISO)}"),
+    {${schema.FIELD_START}} < DATETIME_PARSE("${escAirtableStringLib(endISO)}")
   )`;
 
   const role = normalizeRole(session.role || "");
