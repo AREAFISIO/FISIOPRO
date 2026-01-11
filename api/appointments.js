@@ -13,10 +13,45 @@ import {
   escAirtableString as escAirtableStringLib,
   resolveLinkedIds,
 } from "../lib/airtableClient.js";
+import { airtableSchema } from "../lib/airtableClient.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
   return s.includes("unknown field name") || s.includes("unknown field names");
+}
+
+function normalizeKeyLoose(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function resolveFieldFromSchema(tableName, candidates) {
+  const t = String(tableName || "").trim();
+  const schema = airtableSchema?.[t] || null;
+  const keys = Array.isArray(schema?.all_fields)
+    ? schema.all_fields
+    : (Array.isArray(schema?.key_fields) ? schema.key_fields : []);
+  const list = (keys || []).map((k) => String(k || "")).filter(Boolean);
+  if (!list.length) return "";
+
+  const byLower = new Map(list.map((k) => [String(k).toLowerCase(), String(k)]));
+  for (const c of (candidates || []).filter(Boolean)) {
+    const want = String(c || "").trim();
+    if (!want) continue;
+    const hit = byLower.get(want.toLowerCase());
+    if (hit) return hit;
+  }
+
+  const byLoose = new Map(list.map((k) => [normalizeKeyLoose(k), String(k)]));
+  for (const c of (candidates || []).filter(Boolean)) {
+    const wantLoose = normalizeKeyLoose(c);
+    if (!wantLoose) continue;
+    const hit = byLoose.get(wantLoose);
+    if (hit) return hit;
+  }
+
+  return "";
 }
 
 async function probeField(tableEnc, candidate) {
@@ -33,8 +68,11 @@ async function probeField(tableEnc, candidate) {
   }
 }
 
-async function resolveFieldName(tableEnc, cacheKey, candidates) {
+async function resolveFieldName(tableEnc, cacheKey, candidates, tableNameForSchema = "") {
   return await memGetOrSet(cacheKey, 60 * 60_000, async () => {
+    // Fast-path: resolve from local schema snapshot (zero network calls).
+    const fromSchema = resolveFieldFromSchema(tableNameForSchema, candidates);
+    if (fromSchema) return fromSchema;
     for (const c of (candidates || []).filter(Boolean)) {
       if (await probeField(tableEnc, c)) return String(c).trim();
     }
@@ -150,9 +188,20 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
   if (!all.length) return {};
   const out = {};
 
+  // Warm-instance cache: avoid re-fetching names for the same record IDs.
+  // This drastically reduces Airtable calls when navigating or refreshing views.
+  const missing = [];
+  for (const id of all) {
+    const k = `name:${tableName}:${id}`;
+    const cached = memGet(k);
+    if (typeof cached === "string" && cached.trim()) out[id] = cached;
+    else missing.push(id);
+  }
+  if (!missing.length) return out;
+
   // Airtable formula length limits: chunk OR() reasonably.
-  for (let i = 0; i < all.length; i += 30) {
-    const chunk = all.slice(i, i + 30);
+  for (let i = 0; i < missing.length; i += 30) {
+    const chunk = missing.slice(i, i + 30);
     const orParts = chunk.map((id) => `RECORD_ID()="${escAirtableString(id)}"`);
     const formula = `OR(${orParts.join(",")})`;
     const qs = new URLSearchParams({ filterByFormula: formula, pageSize: "100" });
@@ -173,7 +222,10 @@ async function fetchRecordNamesByIds({ tableName, ids, pickName, fields = [] }) 
     }
     for (const r of data.records || []) {
       const name = String(pickName(r.fields) || "").trim();
-      if (name) out[r.id] = name;
+      if (name) {
+        out[r.id] = name;
+        memSet(`name:${tableName}:${r.id}`, name, 6 * 60 * 60_000);
+      }
     }
   }
 
@@ -192,6 +244,7 @@ async function resolveCollaboratorRecordIdByEmail(emailRaw) {
     collabTableEnc,
     `collab:field:email:${collabTableName}`,
     [process.env.COLLAB_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+    collabTableName,
   );
   if (!emailField) return "";
 
@@ -244,6 +297,7 @@ async function resolveSchemaLite(tableEnc, tableName) {
         "Data e ora Inizio (manuale)",
         "Data e Ora Inizio (manuale)",
       ].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
@@ -259,46 +313,55 @@ async function resolveSchemaLite(tableEnc, tableName) {
         "End",
         "End at",
       ].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:patient:${tableName}`,
       [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Pazienti", "Patient", "Patients"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:operator:${tableName}`,
       [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:email:${tableName}`,
       [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:status:${tableName}`,
       [process.env.AGENDA_STATUS_FIELD, "Stato appuntamento", "Stato", "Status"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:service:${tableName}`,
       [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:duration:${tableName}`,
       [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:quick:${tableName}`,
       [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
+      tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:notes:${tableName}`,
       [process.env.AGENDA_NOTES_FIELD, "Note", "Note paziente"].filter(Boolean),
+      tableName,
     ),
   ]);
 
@@ -351,6 +414,7 @@ async function resolveSchema(tableEnc, tableName) {
       "Data e ora Inizio (manuale)",
       "Data e Ora Inizio (manuale)",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_END = await resolveFieldName(
     tableEnc,
@@ -366,47 +430,56 @@ async function resolveSchema(tableEnc, tableName) {
       "End",
       "End at",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_PATIENT = await resolveFieldName(
     tableEnc,
     `appts:field:patient:${tableName}`,
     [process.env.AGENDA_PATIENT_FIELD, "Paziente", "Pazienti", "Patient", "Patients"].filter(Boolean),
+    tableName,
   );
   const FIELD_OPERATOR = await resolveFieldName(
     tableEnc,
     `appts:field:operator:${tableName}`,
     [process.env.AGENDA_OPERATOR_FIELD, "Collaboratore", "Operatore", "Fisioterapista"].filter(Boolean),
+    tableName,
   );
   const FIELD_EMAIL = await resolveFieldName(
     tableEnc,
     `appts:field:email:${tableName}`,
     [process.env.AGENDA_EMAIL_FIELD, "Email", "E-mail", "email"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_STATUS = await resolveFieldName(
     tableEnc,
     `appts:field:status:${tableName}`,
     [process.env.AGENDA_STATUS_FIELD, "Stato appuntamento", "Stato", "Status"].filter(Boolean),
+    tableName,
   );
   const FIELD_TYPE = await resolveFieldName(
     tableEnc,
     `appts:field:type:${tableName}`,
     [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+    tableName,
   );
   const FIELD_SERVICE = await resolveFieldName(
     tableEnc,
     `appts:field:service:${tableName}`,
     [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+    tableName,
   );
   const FIELD_LOCATION = await resolveFieldName(
     tableEnc,
     `appts:field:location:${tableName}`,
     [process.env.AGENDA_LOCATION_FIELD, "Posizione", "Posizione appuntamento", "Sede", "Sedi", "Location", "Luogo"].filter(Boolean),
+    tableName,
   );
   const FIELD_DURATION = await resolveFieldName(
     tableEnc,
     `appts:field:duration:${tableName}`,
     [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_CONFIRMED_BY_PATIENT = await resolveFieldName(
@@ -420,6 +493,7 @@ async function resolveSchema(tableEnc, tableName) {
       "Paziente confermato",
       "Confermato paziente",
     ].filter(Boolean),
+    tableName,
   );
   const FIELD_CONFIRMED_IN_PLATFORM = await resolveFieldName(
     tableEnc,
@@ -432,48 +506,57 @@ async function resolveSchema(tableEnc, tableName) {
       "Confermato in InBuoneMani",
       "InBuoneMani",
     ].filter(Boolean),
+    tableName,
   );
 
   const FIELD_QUICK_NOTE = await resolveFieldName(
     tableEnc,
     `appts:field:quick:${tableName}`,
     [process.env.AGENDA_QUICK_NOTE_FIELD, "Nota rapida", "Nota rapida (interna)", "Note interne", "Nota interna"].filter(Boolean),
+    tableName,
   );
   const FIELD_NOTES = await resolveFieldName(
     tableEnc,
     `appts:field:notes:${tableName}`,
     [process.env.AGENDA_NOTES_FIELD, "Note", "Note paziente"].filter(Boolean),
+    tableName,
   );
 
   const FIELD_TIPI_EROGATI = await resolveFieldName(
     tableEnc,
     `appts:field:tipiErogati:${tableName}`,
     [process.env.AGENDA_TIPI_EROGATI_FIELD, "Tipi Erogati", "Tipi erogati"].filter(Boolean),
+    tableName,
   );
   const FIELD_VALUTAZIONI = await resolveFieldName(
     tableEnc,
     `appts:field:valutazioni:${tableName}`,
     [process.env.AGENDA_VALUTAZIONI_FIELD, "VALUTAZIONI", "Valutazioni"].filter(Boolean),
+    tableName,
   );
   const FIELD_TRATTAMENTI = await resolveFieldName(
     tableEnc,
     `appts:field:trattamenti:${tableName}`,
     [process.env.AGENDA_TRATTAMENTI_FIELD, "TRATTAMENTI", "Trattamenti"].filter(Boolean),
+    tableName,
   );
   const FIELD_EROGATO_COLLEGATO = await resolveFieldName(
     tableEnc,
     `appts:field:erogato:${tableName}`,
     [process.env.AGENDA_EROGATO_FIELD, "Erogato collegato", "Erogato", "Appuntamento collegato"].filter(Boolean),
+    tableName,
   );
   const FIELD_CASO_CLINICO = await resolveFieldName(
     tableEnc,
     `appts:field:case:${tableName}`,
     [process.env.AGENDA_CASE_FIELD, "Caso clinico", "Caso", "Caso Clinico"].filter(Boolean),
+    tableName,
   );
   const FIELD_VENDITA_COLLEGATA = await resolveFieldName(
     tableEnc,
     `appts:field:sale:${tableName}`,
     [process.env.AGENDA_SALE_FIELD, "Vendita collegata", "Vendita", "Sale"].filter(Boolean),
+    tableName,
   );
 
   return {
