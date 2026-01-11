@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260110c";
+    window.__FP_DIARY_BUILD = "fpui-20260110d";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -66,6 +66,7 @@
   let knownByEmail = new Map(); // email -> name
   let knownOperators = []; // [{id,name,email,...}] from /api/operators
   let operatorNameToId = new Map(); // name -> recId
+  let operatorIdToName = new Map(); // recId -> name
   let operatorNameToRole = new Map(); // name -> role label
   let locationsCache = null; // [{id,name}]
   let servicesCache = null; // [{id,name}]
@@ -1146,11 +1147,35 @@
     );
   }
 
+  function backfillTherapistNamesFromIds() {
+    if (!rawItems || !rawItems.length) return;
+    let changed = 0;
+    for (const it of rawItems) {
+      if (!it) continue;
+      const ther = String(it.therapist || "").trim();
+      if (ther) continue;
+      const id = String(it?.fields?.therapist_id || it?.fields?.collaboratoreId || it?.fields?.operatorId || "").trim();
+      if (!id) continue;
+      const name = String(operatorIdToName.get(id) || "").trim();
+      if (!name) continue;
+      it.therapist = name;
+      changed += 1;
+    }
+    if (changed) {
+      try { rebuildSlotLocationIndex(); } catch {}
+      try { if (!knownTherapists.length) knownTherapists = getTherapists(rawItems); } catch {}
+    }
+  }
+
   function normalizeItem(x) {
     const f = x.fields || {};
     const start = pickField(f, ["Data e ora INIZIO", "Start", "Inizio", "start_at", "StartAt"]);
     const end = pickField(f, ["Data e ora FINE", "End", "Fine", "end_at", "EndAt"]);
     let therapist = String(x.operator || "").trim() || pickField(f, ["Collaboratore", "Collaborator", "Operatore", "Operator", "Fisioterapista", "Therapist", "therapist_name", "Email"]) || "";
+    if (!therapist) {
+      const tid = String(pickField(f, ["therapist_id", "collaboratoreId", "operatorId", "CollaboratoreId"]) || "").trim();
+      if (tid) therapist = String(operatorIdToName.get(tid) || "").trim();
+    }
     // In case Operatore is still an array, normalize to a readable string.
     if (Array.isArray(therapist)) therapist = therapist.filter(Boolean).join(", ");
     // If it contains multiple names, pick the first for column placement
@@ -1855,6 +1880,7 @@
         knownOperators = items;
         const names = items.map((x) => String(x.name || "").trim()).filter(Boolean);
         if (names.length) knownTherapists = names;
+        operatorIdToName = new Map(items.map((x) => [String(x.id || "").trim(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
         knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
         operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
         operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
@@ -1869,6 +1895,8 @@
         });
         prefs.operatorColors = nextColors;
 
+        // If appointments were loaded in lite mode, backfill therapist names from ids.
+        backfillTherapistNamesFromIds();
         syncOpsBar();
         try { render(); } catch {}
       })
@@ -1895,6 +1923,7 @@
         fields: {
           start_at: ap.start_at || "",
           end_at: ap.end_at || "",
+          therapist_id: ap.therapist_id || "",
           therapist_name: ap.therapist_name || "",
           service_name: ap.service_name || "",
           status: ap.status || "",

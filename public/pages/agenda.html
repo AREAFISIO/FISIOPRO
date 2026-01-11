@@ -336,7 +336,6 @@
       border-right: 1px solid var(--fp-vert-line);
       /* Base column background + grid lines (drawn via CSS, not DOM nodes) */
       background-image:
-        var(--fp-col-bg),
         repeating-linear-gradient(
           to bottom,
           transparent 0,
@@ -350,11 +349,12 @@
           transparent calc(var(--fp-hour-px, 36px) - 1px),
           var(--fp-grid-line-hour) calc(var(--fp-hour-px, 36px) - 1px),
           var(--fp-grid-line-hour) var(--fp-hour-px, 36px)
-        );
-      background-repeat: no-repeat, repeat, repeat;
+        ),
+        var(--fp-col-bg);
+      background-repeat: repeat, repeat, no-repeat;
       /* align the repeating grid to start under the header padding */
-      background-position: 0 0, 0 var(--fp-grid-pad-top, 10px), 0 var(--fp-grid-pad-top, 10px);
-      background-size: auto, 100% var(--fp-slot-px, 18px), 100% var(--fp-hour-px, 36px);
+      background-position: 0 var(--fp-grid-pad-top, 10px), 0 var(--fp-grid-pad-top, 10px), 0 0;
+      background-size: 100% var(--fp-slot-px, 18px), 100% var(--fp-hour-px, 36px), auto;
     }
 
     /* Stronger day separators (between days) */
@@ -935,7 +935,7 @@
 
 <!-- cache-bust -->
   <script src="../assets/app.js?v=fpui-20260110a"></script>
-<script src="../assets/diary.js?v=fpui-20260110c"></script>
+<script src="../assets/diary.js?v=fpui-20260110d"></script>
 </body>
 </html>
 
