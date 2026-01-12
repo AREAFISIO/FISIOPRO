@@ -1922,7 +1922,7 @@
 
     // First load: ask the API for a "lite" response (no extra name-resolving calls),
     // to avoid 25s client timeouts on cold starts.
-    const data = await apiGet(`/api/appointments?lite=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
+    const data = await apiGet(`/api/appointments?lite=1&allowUnmapped=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`);
 
     // NOTE: operators are NOT needed to render the agenda grid.
     // Loading them on the critical path makes the "first open" slower on cold starts.
@@ -1933,6 +1933,10 @@
     if (prefDoublePicker && prefDoublePicker.style.display !== "none") renderDoublePickerList();
 
     // Normalize appointments to the legacy shape expected by the renderer.
+    if (data?.meta?.unmappedPhysio) {
+      try { if (typeof window.toast === "function") window.toast("Avviso: utente non mappato a Collaboratore, agenda in modalità fallback."); } catch {}
+    }
+
     rawItems = (data.appointments || []).map((a) => {
       const ap = a || {};
       return normalizeItem({
@@ -1985,9 +1989,12 @@
 
     // Best-effort: enrich appointments in background (names for linked records).
     // If it times out, the agenda still works (it will show what it can from raw fields).
-    apiGet(`/api/appointments?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
+    apiGet(`/api/appointments?allowUnmapped=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
       .then((full) => {
         if (!full?.appointments) return;
+        if (full?.meta?.unmappedPhysio) {
+          try { if (typeof window.toast === "function") window.toast("Avviso: agenda in modalità fallback (mapping Collaboratore mancante)."); } catch {}
+        }
         rawItems = (full.appointments || []).map((a) => {
           const ap = a || {};
           return normalizeItem({
