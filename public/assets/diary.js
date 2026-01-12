@@ -1193,6 +1193,14 @@
         if (byIdLoose) therapistIdNorm = byIdLoose;
       }
     }
+
+    // If we can map an operator id to a display name, prefer that (stable labels across renders).
+    const mappedName = therapistIdNorm && String(therapistIdNorm).startsWith("rec")
+      ? String(operatorIdToName.get(String(therapistIdNorm)) || "").trim()
+      : "";
+    if (mappedName) therapist = mappedName;
+    // If we still don't have a readable label, keep a stable placeholder so the event can be placed.
+    if (!therapist && therapistIdNorm) therapist = String(therapistIdNorm);
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
     const status = pickField(f, ["Stato appuntamento", "Stato", "status"]) || "";
 
@@ -2241,11 +2249,18 @@
         col.dataset.dayIndex = String(dIdx);
         if (multiUser) {
           const slot = opSlots[oIdx] || { therapist: "", laneIndex: 0, laneCount: 1 };
-          col.dataset.therapist = String(slot.therapist || "");
+          const ther = String(slot.therapist || "").trim();
+          const id =
+            ther && ther.startsWith("rec")
+              ? ther
+              : String(operatorNameToId.get(ther) || "").trim();
+          col.dataset.therapist = ther; // label (may be rec... placeholder)
+          if (id) col.dataset.therapistId = id;
           col.dataset.lane = String(slot.laneIndex || 0);
           col.dataset.lanes = String(slot.laneCount || 1);
         } else {
           col.dataset.therapist = "";
+          col.dataset.therapistId = "";
           col.dataset.lane = "0";
           col.dataset.lanes = "1";
         }
@@ -3364,7 +3379,13 @@
       items.forEach((it) => { it._lane = 0; });
     }
 
-    buildGridSkeleton(start, days, ops.length ? ops : knownTherapists.slice(0, 1), {
+    // If selection is empty/misaligned, fall back to whatever operators exist in data,
+    // otherwise the grid has empty columns and events can't be placed.
+    const opsForGrid =
+      (ops && ops.length)
+        ? ops
+        : ((knownTherapists && knownTherapists.length) ? knownTherapists : getTherapists(rawItems || []));
+    buildGridSkeleton(start, days, (opsForGrid && opsForGrid.length) ? opsForGrid : [""], {
       gridStartMin: range.startMin,
       gridEndMin: range.endMin,
     });
@@ -3450,15 +3471,26 @@
       let col = null;
       if (multiUser) {
         const lane = String(it._lane ?? 0);
+        const tid = String(it?.therapistId || "").trim();
         col =
           cols.find(
             (c) =>
               c.dataset.dayIndex === String(it._dayIndex) &&
-              c.dataset.therapist === String(it.therapist || "") &&
+              (tid
+                ? (String(c.dataset.therapistId || "").trim() === tid)
+                : (c.dataset.therapist === String(it.therapist || ""))) &&
               String(c.dataset.lane || "0") === lane,
           ) ||
           // fallback: first column for that therapist/day
-          cols.find((c) => c.dataset.dayIndex === String(it._dayIndex) && c.dataset.therapist === String(it.therapist || ""));
+          cols.find(
+            (c) =>
+              c.dataset.dayIndex === String(it._dayIndex) &&
+              (tid
+                ? (String(c.dataset.therapistId || "").trim() === tid)
+                : (c.dataset.therapist === String(it.therapist || "")))
+          ) ||
+          // ultimate fallback: first column for that day (never drop an appointment)
+          cols.find((c) => c.dataset.dayIndex === String(it._dayIndex));
       } else {
         // first column for that day
         col = cols.find((c) => c.dataset.dayIndex === String(it._dayIndex));
