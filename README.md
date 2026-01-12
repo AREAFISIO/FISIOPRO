@@ -17,6 +17,44 @@ Static HTML app in `public/` + Vercel Serverless Functions in `api/`.
 - **AIRTABLE_TOKEN**: Airtable API token.
 - **AIRTABLE_BASE_ID**: Airtable base id.
 
+### Airtable -> Supabase migration (full)
+
+This repo includes a practical “full migration” path:
+
+- **Raw import** (no data loss): all Airtable records are stored in `airtable_raw_records` (JSONB)
+- **Core normalized tables**: `patients`, `cases`, `appointments`, `sales`, `erogato`, ...
+
+#### 1) Create Supabase schema
+
+- In Supabase SQL editor, run `supabase/schema.sql`.
+
+#### 2) Set env vars (local)
+
+Export:
+
+- `AIRTABLE_TOKEN`
+- `AIRTABLE_BASE_ID`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+#### 3) Run migration
+
+```bash
+npm run migrate:airtable:all
+```
+
+You can also run steps separately:
+
+```bash
+npm run migrate:airtable:raw
+npm run migrate:airtable:core
+```
+
+#### Notes
+
+- The migration uses `lib/airtableSchema.json` to enumerate tables.
+- For normalized tables we store `airtable_id` to keep a stable mapping from Airtable record ids.
+
 Optional overrides (defaults shown in code):
 
 - `AIRTABLE_COLLABORATORI_TABLE` (default `COLLABORATORI`)
