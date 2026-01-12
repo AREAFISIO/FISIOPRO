@@ -268,6 +268,60 @@ async function resolveCollaboratorRecordIdByEmail(emailRaw) {
   return recId;
 }
 
+async function resolveCollaboratorRecordIdForSession(session, schema) {
+  // "Infallibile" mapping: try email first, then fallback to name/surname search.
+  const email = String(session?.email || "").trim().toLowerCase();
+  const nome = String(session?.nome || "").trim();
+  const cognome = String(session?.cognome || "").trim();
+
+  // 1) by email (best)
+  const byEmail = await resolveCollaboratorRecordIdByEmail(email);
+  if (byEmail) return byEmail;
+
+  // 2) by name/surname (fallback when emails don't match between auth and Airtable)
+  const full = [nome, cognome].filter(Boolean).join(" ").trim();
+  if (!full) return "";
+
+  const collabTableName = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
+  const collabTableEnc = enc(collabTableName);
+
+  // Resolve likely name fields once.
+  const FIELD_NOME = await resolveFieldName(
+    collabTableEnc,
+    `collab:field:nome:${collabTableName}`,
+    ["Nome", "First name", "Firstname"].filter(Boolean),
+    collabTableName,
+  );
+  const FIELD_COGNOME = await resolveFieldName(
+    collabTableEnc,
+    `collab:field:cognome:${collabTableName}`,
+    ["Cognome", "Last name", "Lastname"].filter(Boolean),
+    collabTableName,
+  );
+  // Primary-like label field (common in schema)
+  const FIELD_COLLAB = await resolveFieldName(
+    collabTableEnc,
+    `collab:field:primary:${collabTableName}`,
+    [process.env.COLLAB_PRIMARY_FIELD, "Collaboratore", "Nome completo", "Cognome e Nome", "Full Name", "Name"].filter(Boolean),
+    collabTableName,
+  );
+
+  const parts = [];
+  const nLow = escAirtableString(nome.toLowerCase());
+  const cLow = escAirtableString(cognome.toLowerCase());
+  const fullLow = escAirtableString(full.toLowerCase());
+  if (FIELD_NOME && nome) parts.push(`LOWER({${FIELD_NOME}}&"") = "${nLow}"`);
+  if (FIELD_COGNOME && cognome) parts.push(`LOWER({${FIELD_COGNOME}}&"") = "${cLow}"`);
+  // Also match full label field (contains or equals)
+  if (FIELD_COLLAB) parts.push(`FIND("${fullLow}", LOWER({${FIELD_COLLAB}}&""))`);
+  if (!parts.length) return "";
+
+  const formula = `OR(${parts.join(",")})`;
+  const qs = new URLSearchParams({ filterByFormula: formula, maxRecords: "1", pageSize: "1" });
+  const data = await airtableFetch(`${collabTableEnc}?${qs.toString()}`);
+  return data.records?.[0]?.id || "";
+}
+
 async function resolveSchemaLite(tableEnc, tableName) {
   // Critical-path schema: only fields needed to render the agenda grid fast.
   // This avoids probing dozens of optional fields on cold starts (which can time out clients).
@@ -792,6 +846,16 @@ async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endI
 
   let roleFilter = "TRUE()";
   if (role === "physio") {
+    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdForSession(session, schema) : "";
+    if (collabRecId && schema.FIELD_OPERATOR) {
+      roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
+    } else if (schema.FIELD_EMAIL) {
+      roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    } else {
+      roleFilter = "FALSE()";
+    }
+  }
+  if (role === "physio") {
     if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
     else roleFilter = "FALSE()";
   }
@@ -858,8 +922,14 @@ async function appointmentsKpi({ tableEnc, tableName, schema, startISO, endISO, 
   const email = String(session.email || "").toLowerCase();
   let roleFilter = "TRUE()";
   if (role === "physio") {
-    if (schema.FIELD_EMAIL) roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
-    else roleFilter = "FALSE()";
+    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdForSession(session, schema) : "";
+    if (collabRecId && schema.FIELD_OPERATOR) {
+      roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
+    } else if (schema.FIELD_EMAIL) {
+      roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
+    } else {
+      roleFilter = "FALSE()";
+    }
   }
 
   const qs = new URLSearchParams({
@@ -931,24 +1001,19 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
   const email = String(session.email || "").toLowerCase();
 
   let roleFilter = "TRUE()";
-  let unmappedPhysio = false;
   if (role === "physio") {
     // Prefer linked Collaboratore filter (most reliable); fallback to Email field if present.
-    // Some bases don't populate appointment Email consistently, which would hide all appointments for physios.
-    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdByEmail(email) : "";
+    const collabRecId = schema.FIELD_OPERATOR ? await resolveCollaboratorRecordIdForSession(session, schema) : "";
     if (collabRecId && schema.FIELD_OPERATOR) {
       roleFilter = `FIND("${escAirtableString(collabRecId)}", ARRAYJOIN({${schema.FIELD_OPERATOR}}))`;
     } else if (schema.FIELD_EMAIL) {
       roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
     } else {
-      // If we can't map this user to a collaborator AND we don't have an email field,
-      // we cannot safely filter. For the Agenda (mission-critical) allow a controlled fallback.
-      if (allowUnmapped) {
-        roleFilter = "TRUE()";
-        unmappedPhysio = true;
-      } else {
-        roleFilter = "FALSE()";
-      }
+      // Don't return "empty" silently; surface a clear mapping error.
+      const err = new Error("operator_mapping_missing");
+      err.status = 409;
+      err.details = { email, nome: String(session?.nome || ""), cognome: String(session?.cognome || "") };
+      throw err;
     }
   }
 
@@ -998,7 +1063,7 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
         locationNamesById: {},
       }),
     );
-    return { appointments, meta: unmappedPhysio ? { unmappedPhysio: true } : {} };
+    return { appointments, meta: {} };
   }
 
   // Resolve linked names for patient + collaborator (for a nice agenda render).
@@ -1078,7 +1143,7 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
     }),
   );
 
-  return { appointments, meta: unmappedPhysio ? { unmappedPhysio: true } : {} };
+  return { appointments, meta: {} };
 }
 
 export default async function handler(req, res) {

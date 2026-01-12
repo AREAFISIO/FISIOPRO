@@ -1946,10 +1946,6 @@
     if (prefDoublePicker && prefDoublePicker.style.display !== "none") renderDoublePickerList();
 
     // Normalize appointments to the legacy shape expected by the renderer.
-    if (data?.meta?.unmappedPhysio) {
-      try { if (typeof window.toast === "function") window.toast("Avviso: utente non mappato a Collaboratore, agenda in modalità fallback."); } catch {}
-    }
-
     rawItems = (data.appointments || []).map((a) => {
       const ap = a || {};
       return normalizeItem({
@@ -2005,9 +2001,6 @@
     apiGet(`/api/appointments?allowUnmapped=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
       .then((full) => {
         if (!full?.appointments) return;
-        if (full?.meta?.unmappedPhysio) {
-          try { if (typeof window.toast === "function") window.toast("Avviso: agenda in modalità fallback (mapping Collaboratore mancante)."); } catch {}
-        }
         rawItems = (full.appointments || []).map((a) => {
           const ap = a || {};
           return normalizeItem({
