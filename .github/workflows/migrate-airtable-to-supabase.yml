@@ -1,32 +1,450 @@
-name: Migrate Airtable to Supabase
+/**
+ * Airtable -> Supabase migration (RAW + CORE).
+ *
+ * Online (GitHub Actions):
+ * - first run: mode=all
+ * - if CORE links are wrong: update this file and re-run mode=core
+ *
+ * Required secrets/env:
+ *   AIRTABLE_TOKEN
+ *   AIRTABLE_BASE_ID
+ *   SUPABASE_URL
+ *   SUPABASE_SERVICE_ROLE_KEY
+ */
  
-on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "raw | core | all"
-        required: true
-        default: "all"
+import { createClient } from "@supabase/supabase-js";
+import { airtableList } from "../lib/airtableClient.js";
+import { airtableSchema } from "../lib/airtableClient.js";
  
-jobs:
-  migrate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+function norm(s) {
+  const v = String(s ?? "").trim();
+  return v ? v : "";
+}
+function keyLower(s) {
+  return norm(s).toLowerCase();
+}
+function envOrThrow(name) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing ${name}`);
+  return v;
+}
+function supabaseClient() {
+  const url = envOrThrow("SUPABASE_URL");
+  const key = envOrThrow("SUPABASE_SERVICE_ROLE_KEY");
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+function chunk(arr, size) {
+  const out = [];
+  const n = Math.max(1, Number(size) || 1);
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
+async function upsertRows(sb, tableName, rows, onConflict = "airtable_id") {
+  if (!rows.length) return [];
+  const parts = chunk(rows, 200);
+  const out = [];
+  for (const p of parts) {
+    const { data, error } = await sb.from(tableName).upsert(p, { onConflict }).select("*");
+    if (error) throw new Error(`${tableName} upsert failed: ${error.message}`);
+    out.push(...(data || []));
+  }
+  return out;
+}
  
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
+function asNumber(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const s = String(v).trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+function asInt(v) {
+  const n = asNumber(v);
+  return n === null ? null : Math.trunc(n);
+}
+function asBool(v) {
+  if (v === true || v === false) return v;
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim().toLowerCase();
+  if (!s) return null;
+  if (["1", "true", "yes", "si", "sì", "ok"].includes(s)) return true;
+  if (["0", "false", "no"].includes(s)) return false;
+  return null;
+}
+function asDateOnly(v) {
+  const s = norm(v);
+  if (!s) return null;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+function asTimestamptz(v) {
+  const s = norm(v);
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
  
-      - name: Install dependencies
-        run: npm install
+// Returns first linked value, as stored in airtable_raw_records:
+// - could be ["rec..."] or "rec..." (ids)
+// - could be ["Mario Rossi"] or "Mario Rossi" (labels)
+function firstLinkValue(fields, fieldName) {
+  const v = fields?.[fieldName];
+  if (Array.isArray(v) && v.length) return norm(v[0]);
+  if (typeof v === "string") return norm(v);
+  return "";
+}
  
-      - name: Run migration
-        env:
-          AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
-          AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/migrate-airtable-to-supabase.js ${{ github.event.inputs.mode }}
+function ddmmyyyyFromIsoDate(dateStr) {
+  const s = norm(dateStr);
+  if (!s) return "";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "";
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const yy = String(d.getUTCFullYear());
+  return `${dd}/${mm}/${yy}`;
+}
+ 
+async function fetchAllRaw(sb, tableName) {
+  const out = [];
+  const pageSize = 1000;
+  let from = 0;
+ 
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await sb
+      .from("airtable_raw_records")
+      .select("airtable_id, fields")
+      .eq("table_name", tableName)
+      .range(from, to);
+ 
+    if (error) throw new Error(`raw fetch failed for ${tableName}: ${error.message}`);
+    const rows = data || [];
+    out.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+ 
+  return out;
+}
+ 
+async function loadLookup(sb, table, labelCol) {
+  const mapByAirtable = new Map();
+  const mapByLabel = new Map();
+  let from = 0;
+  const page = 1000;
+ 
+  while (true) {
+    const to = from + page - 1;
+    const { data, error } = await sb.from(table).select(`id, airtable_id, ${labelCol}`).range(from, to);
+    if (error) throw new Error(`lookup load failed for ${table}: ${error.message}`);
+ 
+    const rows = data || [];
+    for (const r of rows) {
+      if (r.airtable_id) mapByAirtable.set(r.airtable_id, r.id);
+      if (r[labelCol]) mapByLabel.set(keyLower(r[labelCol]), r.id);
+    }
+ 
+    if (rows.length < page) break;
+    from += page;
+  }
+ 
+  return { mapByAirtable, mapByLabel };
+}
+ 
+function resolveLinkId(v, lkp) {
+  const s = norm(v);
+  if (!s) return null;
+  if (s.startsWith("rec")) return lkp.mapByAirtable.get(s) || null;
+  return lkp.mapByLabel.get(keyLower(s)) || null;
+}
+ 
+// -------------------------
+// RAW migration (Airtable -> airtable_raw_records)
+// -------------------------
+async function migrateRaw() {
+  const sb = supabaseClient();
+  const tables = Object.keys(airtableSchema || {});
+  if (!tables.length) throw new Error("No tables found in lib/airtableSchema.json");
+ 
+  for (const t of tables) {
+    console.log(`[raw] ${t} ...`);
+    const { records } = await airtableList(t, { pageSize: 100 });
+    const rows = (records || []).map((r) => ({
+      table_name: t,
+      airtable_id: r.id,
+      created_time: r.createdTime ? new Date(r.createdTime).toISOString() : null,
+      fields: r.fields || {},
+      synced_at: new Date().toISOString(),
+    }));
+    await upsertRows(sb, "airtable_raw_records", rows, "table_name,airtable_id");
+    console.log(`[raw] ${t}: ${rows.length}`);
+  }
+}
+ 
+// -------------------------
+// CORE migration (from Supabase raw -> normalized tables)
+// -------------------------
+async function migrateCoreFromRaw() {
+  const sb = supabaseClient();
+ 
+  const rawCollaborators = await fetchAllRaw(sb, "COLLABORATORI");
+  const rawPatients = await fetchAllRaw(sb, "ANAGRAFICA");
+  const rawServices = await fetchAllRaw(sb, "PRESTAZIONI");
+  const rawCases = await fetchAllRaw(sb, "CASI CLINICI");
+  const rawSales = await fetchAllRaw(sb, "VENDITE");
+  const rawAppointments = await fetchAllRaw(sb, "APPUNTAMENTI");
+  const rawErogato = await fetchAllRaw(sb, "EROGATO");
+ 
+  // collaborators
+  {
+    const rows = rawCollaborators.map((r) => {
+      const f = r.fields || {};
+      const name = norm(f.Collaboratore || f.Nome || f.Name || r.airtable_id);
+      return { airtable_id: r.airtable_id, name, role: norm(f.Ruolo), airtable_fields: f };
+    });
+    console.log(`[core] collaborators: ${rows.length}`);
+    await upsertRows(sb, "collaborators", rows, "airtable_id");
+  }
+ 
+  // patients
+  {
+    const rows = rawPatients.map((r) => {
+      const f = r.fields || {};
+      return {
+        airtable_id: r.airtable_id,
+        label: norm(f.Paziente || f["Cognome Nome | Età"] || r.airtable_id),
+        cognome: norm(f.Cognome),
+        nome: norm(f.Nome),
+        sesso: norm(f.Sesso),
+        date_of_birth: asDateOnly(f["Data di nascita"]),
+        codice_fiscale: norm(f["Codice Fiscale"] || f["CODICE FISCALE"]),
+        phone: norm(f["Numero di telefono"] || f.Telefono),
+        email: norm(f.Email),
+        comune_nascita: norm(f["Comune di Nascita"]),
+        comune_residenza: norm(f["Comune di residenza"]),
+        provincia_residenza: norm(f["Provincia di residenza"]),
+        indirizzo_residenza: norm(f["Indirizzo di residenza"]),
+        cap: norm(f.Cap),
+        notes: norm(f["Note interne"] || f.Note),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] patients: ${rows.length}`);
+    await upsertRows(sb, "patients", rows, "airtable_id");
+  }
+ 
+  // Build lookups
+  const patientsLkp = await loadLookup(sb, "patients", "label");
+  const collaboratorsLkp = await loadLookup(sb, "collaborators", "name");
+ 
+  // IMPORTANT FIX:
+  // In APPUNTAMENTI raw, Paziente can be stored as "Cognome Nome (dd/mm/yyyy)" (TEXT),
+  // not as recXXXX. So we add extra aliases to patientsLkp.mapByLabel.
+  {
+    let from = 0;
+    const page = 1000;
+    while (true) {
+      const to = from + page - 1;
+      const { data, error } = await sb
+        .from("patients")
+        .select("id, airtable_id, label, cognome, nome, airtable_fields")
+        .range(from, to);
+ 
+      if (error) throw new Error(`patients alias load failed: ${error.message}`);
+      const rows = data || [];
+ 
+      for (const p of rows) {
+        const id = p.id;
+        const label = norm(p.label);
+        const cnEta = norm(p.airtable_fields?.["Cognome Nome | Età"]);
+        const cognome = norm(p.cognome);
+        const nome = norm(p.nome);
+        const dobIso = p.airtable_fields?.["Data di nascita"];
+        const dob = ddmmyyyyFromIsoDate(dobIso);
+ 
+        const keys = [
+          label,
+          cnEta,
+          cognome && nome ? `${cognome} ${nome}` : "",
+          cognome && nome && dob ? `${cognome} ${nome} (${dob})` : "",
+        ]
+          .map((x) => keyLower(x))
+          .filter(Boolean);
+ 
+        for (const k of keys) patientsLkp.mapByLabel.set(k, id);
+      }
+ 
+      if (rows.length < page) break;
+      from += page;
+    }
+  }
+ 
+  // services
+  {
+    const rows = rawServices.map((r) => {
+      const f = r.fields || {};
+      return {
+        airtable_id: r.airtable_id,
+        name: norm(f.Servizio || f.Prestazione || r.airtable_id),
+        code: norm(f.Codice),
+        price: asNumber(f["Costo Seduta singola"] ?? f.Prezzo ?? f.Costo),
+        duration_minutes: asInt(f["Durata Singola"] ?? f.Durata),
+        consumes_session: asBool(f["Consuma seduta?"]),
+        is_evaluation: asBool(f["È valutazione?"]),
+        is_treatment: asBool(f["È trattamento?"]),
+        pays_collaborator: asBool(f["Paga collaboratore?"]),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] services: ${rows.length}`);
+    await upsertRows(sb, "services", rows, "airtable_id");
+  }
+  const servicesLkp = await loadLookup(sb, "services", "name");
+ 
+  // cases
+  {
+    const rows = rawCases.map((r) => {
+      const f = r.fields || {};
+      const paz = firstLinkValue(f, "Paziente");
+      const ref = firstLinkValue(f, "Fisioterapista referente");
+      const code = norm(f["CASO CLINICO"] || f["ID caso clinico"] || f["Caso Clinico"] || r.airtable_id);
+ 
+      return {
+        airtable_id: r.airtable_id,
+        patient_id: resolveLinkId(paz, patientsLkp),
+        referente_id: resolveLinkId(ref, collaboratorsLkp),
+        case_code: code,
+        status: norm(f["Stato caso"] || f.Stato),
+        opened_on: asDateOnly(f["Data apertura"] || f["Data Apertura"]),
+        closed_on: asDateOnly(f["DATA CHIUSURA"]),
+        notes: norm(f["Note caso"] || f.Note),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] cases: ${rows.length}`);
+    await upsertRows(sb, "cases", rows, "airtable_id");
+  }
+  const casesLkp = await loadLookup(sb, "cases", "case_code");
+ 
+  // sales (may be empty if VENDITE raw has 0 records)
+  {
+    const rows = rawSales.map((r) => {
+      const f = r.fields || {};
+      const paz = firstLinkValue(f, "Paziente");
+      const cas = firstLinkValue(f, "Caso clinico");
+      const srv = firstLinkValue(f, "LINK TO PRESTAZIONI");
+ 
+      return {
+        airtable_id: r.airtable_id,
+        patient_id: resolveLinkId(paz, patientsLkp),
+        case_id: resolveLinkId(cas, casesLkp),
+        service_id: resolveLinkId(srv, servicesLkp),
+        status: norm(f["Stato vendita"]),
+        sale_type: norm(f["Tipo di vendita"]),
+        sold_at: asTimestamptz(f["DATA E ORA VENDITA"]),
+        sold_date: asDateOnly(f["Data vendita"]),
+        sessions_sold: asInt(f["Sedute vendute"]),
+        price_total: asNumber(f["Prezzo totale"]),
+        discount_price: asNumber(f["PREZZO SCONTO"]),
+        payment_method: norm(f["Metodo di Pagamento 1"] || f["Modalità di Pagamento 1"]),
+        payment_status: norm(f["Stato Pagamento"]),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] sales: ${rows.length}`);
+    if (rows.length) await upsertRows(sb, "sales", rows, "airtable_id");
+  }
+  const salesLkp = await loadLookup(sb, "sales", "airtable_id"); // mainly for rec... links
+ 
+  // appointments
+  {
+    const rows = rawAppointments.map((r) => {
+      const f = r.fields || {};
+      const paz = firstLinkValue(f, "Paziente"); // can be TEXT like "Cognome Nome (dd/mm/yyyy)"
+      const col = firstLinkValue(f, "Collaboratore"); // seems to be rec... array in your raw
+      const srv = firstLinkValue(f, "Prestazione prevista");
+      const cas = firstLinkValue(f, "Caso clinico"); // in your raw often NULL, so case_id will stay null
+      const sal = firstLinkValue(f, "Vendita collegata");
+ 
+      return {
+        airtable_id: r.airtable_id,
+        patient_id: resolveLinkId(paz, patientsLkp),
+        collaborator_id: resolveLinkId(col, collaboratorsLkp),
+        service_id: resolveLinkId(srv, servicesLkp),
+        case_id: resolveLinkId(cas, casesLkp),
+        sale_id: resolveLinkId(sal, salesLkp),
+        start_at: asTimestamptz(f["Data e ora INIZIO"]),
+        end_at: asTimestamptz(f["Data e ora fine"]),
+        duration_minutes: asInt(f["Durata (minuti)"]),
+        status: norm(f["Stato appuntamento"]),
+        location: norm(f.Sede),
+        agenda_label: norm(f["Voce agenda"]),
+        is_home: asBool(f["DOMICILIO"]),
+        economic_outcome: norm(f["Esito economico"]),
+        work_type: norm(f["Tipo lavoro"]),
+        note: norm(f.Note),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] appointments: ${rows.length}`);
+    await upsertRows(sb, "appointments", rows, "airtable_id");
+  }
+  const appointmentsLkp = await loadLookup(sb, "appointments", "airtable_id");
+ 
+  // erogato
+  {
+    const rows = rawErogato.map((r) => {
+      const f = r.fields || {};
+      const paz = firstLinkValue(f, "Paziente");
+      const col = firstLinkValue(f, "Collaboratore");
+      const app = firstLinkValue(f, "Appuntamento");
+      const cas = firstLinkValue(f, "Caso clinico") || firstLinkValue(f, "CASI CLINICI");
+      const ev = firstLinkValue(f, "Valutazione collegata");
+ 
+      return {
+        airtable_id: r.airtable_id,
+        patient_id: resolveLinkId(paz, patientsLkp),
+        collaborator_id: resolveLinkId(col, collaboratorsLkp),
+        appointment_id: resolveLinkId(app, appointmentsLkp),
+        case_id: resolveLinkId(cas, casesLkp),
+        evaluation_airtable_link: ev || null,
+        start_at: asTimestamptz(f["Data e ora INIZIO"]),
+        end_at: asTimestamptz(f["Data e ora FINE"]),
+        minutes: asInt(f["Minuti lavoro"]),
+        economic_outcome: norm(f["Esito economico"]),
+        work_type: norm(f["Tipo lavoro "] || f["Tipo lavoro (da prestazioni)"]),
+        is_evaluation: asBool(f["È valutazione?"]),
+        is_home: asBool(f["DOMICILIO (from Appuntamento)"]),
+        status: norm(f["Stato appuntamento"]),
+        airtable_fields: f,
+      };
+    });
+    console.log(`[core] erogato: ${rows.length}`);
+    await upsertRows(sb, "erogato", rows, "airtable_id");
+  }
+ 
+  console.log("[core] done (rebuilt from airtable_raw_records + label matching)");
+}
+ 
+async function main() {
+  const mode = (process.argv[2] || "all").toLowerCase();
+  if (mode === "raw") return migrateRaw();
+  if (mode === "core") return migrateCoreFromRaw();
+  if (mode === "all") {
+    await migrateRaw();
+    await migrateCoreFromRaw();
+    return;
+  }
+  console.log("Usage: node scripts/migrate-airtable-to-supabase.js [raw|core|all]");
+  process.exit(2);
+}
+ 
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
