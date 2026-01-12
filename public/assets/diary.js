@@ -1303,6 +1303,10 @@
     return raw;
   }
 
+  function isManagerAllMode() {
+    return getUserRoleNorm() === "manager" && String(prefs?.viewMode || "all") === "all";
+  }
+
   function canEditOperatorColors() {
     const r = getUserRoleNorm();
     return r === "front" || r === "manager";
@@ -1315,6 +1319,8 @@
     if (!set) return;
     const role = getUserRoleNorm();
     if (role === "manager") {
+      // In "all" mode, don't force any operator into the selection.
+      if (isManagerAllMode()) return;
       const email = getUserEmail();
       const physioName = email ? String(knownByEmail.get(email) || "").trim() : "";
       if (physioName) set.add(physioName);
@@ -1384,12 +1390,35 @@
     SLOT_MIN = Number(prefs.slotMin || 30);
     if (![30, 60].includes(SLOT_MIN)) SLOT_MIN = 30;
     multiUser = Boolean(prefs.multiUser);
+    if (!prefs.viewMode) {
+      // Default for Manager/CEO is "all" (see everything).
+      prefs.viewMode = (getUserRoleNorm() === "manager") ? "all" : "mine";
+    }
   }
 
   function initSelectionFromPrefs() {
     // Apply saved preferences immediately (before network fetch),
     // so multi-user view doesn't "pop in" late.
     const me = String(getUserName() || "").trim();
+    if (getUserRoleNorm() === "manager") {
+      // Manager has 2 modes:
+      // - all: multi-user, show all operators once loaded
+      // - mine: single-user, show physio operator mapped by email
+      const mode = String(prefs.viewMode || "all");
+      if (mode === "mine") {
+        multiUser = false;
+        selectedTherapists = new Set();
+        ensureMeInSelection(selectedTherapists);
+        didApplyDefaultSelectionOnce = true;
+        return;
+      }
+      // all
+      multiUser = true;
+      selectedTherapists = new Set((prefs.defaultOperators || []).filter(Boolean));
+      // Don't force me here; we want "all operators".
+      didApplyDefaultSelectionOnce = false;
+      return;
+    }
     if (multiUser) {
       const base = (prefs.defaultOperators || []).filter(Boolean);
       selectedTherapists = new Set(base);
@@ -1701,7 +1730,55 @@
       more.textContent = "+" + String(names.length - shown.length);
       opsDots.appendChild(more);
     }
-    opsText.textContent = names.length ? `${names.length} operatori selezionati` : "Seleziona operatori";
+    if (getUserRoleNorm() === "manager") {
+      opsText.textContent = isManagerAllMode()
+        ? (names.length ? `${names.length} operatori • Modalità: TUTTI` : "Modalità: TUTTI")
+        : "Modalità: SOLO MIA AGENDA";
+    } else {
+      opsText.textContent = names.length ? `${names.length} operatori selezionati` : "Seleziona operatori";
+    }
+
+    // Add a small mode toggle for Manager/CEO directly in the ops bar.
+    try {
+      if (!opsBar) return;
+      let btn = opsBar.querySelector("[data-fp-mode-toggle]");
+      if (getUserRoleNorm() !== "manager") {
+        if (btn) btn.remove();
+        return;
+      }
+      if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.setAttribute("data-fp-mode-toggle", "1");
+        btn.style.padding = "8px 10px";
+        btn.style.fontSize = "12px";
+        btn.style.fontWeight = "900";
+        btn.style.borderRadius = "12px";
+        btn.style.marginLeft = "10px";
+        btn.onclick = (e) => {
+          try { e.preventDefault(); e.stopPropagation(); } catch {}
+          prefs.viewMode = isManagerAllMode() ? "mine" : "all";
+          // Apply mode immediately
+          if (prefs.viewMode === "mine") {
+            multiUser = false;
+            selectedTherapists = new Set();
+            ensureMeInSelection(selectedTherapists);
+          } else {
+            multiUser = true;
+            // If we already know therapists, select them; otherwise keep empty and let load() fill.
+            selectedTherapists = new Set(knownTherapists && knownTherapists.length ? knownTherapists : []);
+          }
+          try { savePrefs(); } catch {}
+          try { syncOpsBar(); } catch {}
+          try { render(); } catch {}
+          try { load({ nocache: true }); } catch {}
+        };
+        opsBar.appendChild(btn);
+      }
+      btn.textContent = isManagerAllMode() ? "SOLO MIA" : "TUTTI";
+      btn.title = isManagerAllMode() ? "Passa a: solo mia agenda" : "Passa a: tutti gli operatori";
+    } catch {}
   }
 
   function openOpsMenu() {
