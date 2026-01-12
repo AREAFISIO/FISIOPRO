@@ -6,6 +6,12 @@
     "node": "24.x"
   },
   "scripts": {
-    "check:api": "node --check api/_auth.js api/_common.js api/auth-login.js api/auth-me.js api/auth-logout.js api/auth-forgot.js api/ping.js api/patient.js api/patients.js api/patient-appointments.js api/appointments.js api/patients-batch.js api/cases.js api/sales.js api/treatments.js api/erogato.js api/insurance.js api/assicurazioni.js api/evaluations.js api/agenda.js api/airtable.js api/anamnesi.js api/fonti.js api/gruppi.js api/preventivi.js api/test-clinici.js api/appointment-field-options.js"
+    "check:api": "node --check api/_auth.js api/_common.js api/auth-login.js api/auth-me.js api/auth-logout.js api/auth-forgot.js api/ping.js api/patient.js api/patients.js api/patient-appointments.js api/appointments.js api/patients-batch.js api/cases.js api/sales.js api/treatments.js api/erogato.js api/insurance.js api/assicurazioni.js api/evaluations.js api/agenda.js api/airtable.js api/anamnesi.js api/fonti.js api/gruppi.js api/preventivi.js api/test-clinici.js api/appointment-field-options.js",
+    "migrate:airtable:raw": "node scripts/migrate-airtable-to-supabase.js raw",
+    "migrate:airtable:core": "node scripts/migrate-airtable-to-supabase.js core",
+    "migrate:airtable:all": "node scripts/migrate-airtable-to-supabase.js all"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1"
   }
 }
