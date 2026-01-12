@@ -3780,16 +3780,47 @@
             throw new Error(errCode || ("HTTP " + res.status));
           }
 
+          // Build an updated item for the details modal (prefer server-mapped appointment).
+          let updatedForModal = null;
+          try {
+            const ap = data?.appointment || data?.record || null;
+            if (ap && typeof ap === "object") {
+              updatedForModal = normalizeItem({
+                id: ap.id || it.id,
+                operator: ap.therapist_name || ap.operator || "",
+                fields: {
+                  start_at: ap.start_at || newStart.toISOString(),
+                  end_at: ap.end_at || newEnd.toISOString(),
+                  therapist_id: ap.therapist_id || payload.therapist_id || "",
+                  therapist_name: ap.therapist_name || "",
+                  service_name: ap.service_name || "",
+                  status: ap.status || "",
+                  patient_name: ap.patient_name || "",
+                  patient_id: ap.patient_id || "",
+                  confirmed_by_patient: Boolean(ap.confirmed_by_patient),
+                  confirmed_in_platform: Boolean(ap.confirmed_in_platform),
+                  internal_note: ap.internal_note || ap.quick_note || "",
+                  patient_note: ap.notes || ap.patient_note || "",
+                  erogato_id: ap.erogato_id || "",
+                  vendita_id: ap.vendita_id || "",
+                },
+              });
+            }
+          } catch {}
+
           // Optimistic local update for immediate UI response.
           // IMPORTANT: `it` is a *copy* (see items.map({ ...x })), so we must update `rawItems`.
           const rawIdx = (rawItems || []).findIndex((x) => String(x?.id || "") === String(it.id || ""));
           if (rawIdx >= 0) {
-            rawItems[rawIdx] = {
-              ...rawItems[rawIdx],
-              startAt: newStart,
-              endAt: newEnd,
-              therapist: (multiUser && therTrim) ? therTrim : rawItems[rawIdx]?.therapist,
-            };
+            rawItems[rawIdx] = updatedForModal
+              ? { ...rawItems[rawIdx], ...updatedForModal }
+              : {
+                  ...rawItems[rawIdx],
+                  startAt: newStart,
+                  endAt: newEnd,
+                  therapist: (multiUser && therTrim) ? therTrim : rawItems[rawIdx]?.therapist,
+                  therapistId: payload.therapist_id || rawItems[rawIdx]?.therapistId || "",
+                };
           } else {
             // Fallback (should be rare): update local copy.
             it.startAt = newStart;
@@ -3800,6 +3831,13 @@
           // Re-render immediately so the block moves visually right away.
           try { render(); } catch {}
           toast?.("Spostato");
+
+          // Open details right after confirming a move (requested UX).
+          try {
+            const itemNow = updatedForModal || ((rawIdx >= 0) ? rawItems[rawIdx] : it);
+            // Defer a tick to avoid fighting with DOM updates from render()
+            setTimeout(() => { try { openDetailsModal(itemNow); } catch {} }, 0);
+          } catch {}
 
           // Reload without cache so server data stays consistent.
           load({ nocache: true }).catch(() => {});
