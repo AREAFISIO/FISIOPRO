@@ -1180,6 +1180,19 @@
     if (Array.isArray(therapist)) therapist = therapist.filter(Boolean).join(", ");
     // If it contains multiple names, pick the first for column placement
     if (typeof therapist === "string" && therapist.includes(",")) therapist = therapist.split(",")[0].trim();
+
+    // Normalize therapistId:
+    // - if already a record id (rec...), keep
+    // - else try to map the display name to an operator record id
+    let therapistIdNorm = therapistId;
+    if (!therapistIdNorm || !String(therapistIdNorm).startsWith("rec")) {
+      const byName = String(operatorNameToId.get(String(therapist || "").trim()) || "").trim();
+      if (byName) therapistIdNorm = byName;
+      else {
+        const byIdLoose = String(operatorNameToId.get(String(therapistIdNorm || "").trim()) || "").trim();
+        if (byIdLoose) therapistIdNorm = byIdLoose;
+      }
+    }
     const service = pickField(f, ["Prestazione", "Servizio", "service_name"]) || "";
     const status = pickField(f, ["Stato appuntamento", "Stato", "status"]) || "";
 
@@ -1220,7 +1233,7 @@
       patient: String(patient || "").trim(),
       patientId,
       therapist: String(therapist || "").trim(),
-      therapistId,
+      therapistId: String(therapistIdNorm || "").trim(),
       service: String(service || "").trim(),
       status: String(status || "").trim(),
       startAt: startOk ? startAt : null,
@@ -3284,7 +3297,12 @@
         if (idx < 0 || idx >= days) return false;
         // Filter by operator id when we have it; if we don't know the id yet, don't hide the appointment.
         if (selectedOperatorIds.size) {
-          const tid = String(x?.therapistId || x?.fields?.therapist_id || "").trim();
+          let tid = String(x?.therapistId || x?.fields?.therapist_id || "").trim();
+          // If we only have a display name, try to map it to an operator id
+          if (tid && !tid.startsWith("rec")) {
+            const mapped = String(operatorNameToId.get(String(tid).trim()) || operatorNameToId.get(String(x?.therapist || "").trim()) || "").trim();
+            if (mapped) tid = mapped;
+          }
           if (tid && !selectedOperatorIds.has(tid)) return false;
         }
         if (!q) return true;
