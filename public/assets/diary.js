@@ -2045,6 +2045,9 @@
           status: ap.status || "",
           patient_name: ap.patient_name || "",
           patient_id: ap.patient_id || "",
+          confirmed_by_patient: Boolean(ap.confirmed_by_patient),
+          confirmed_in_platform: Boolean(ap.confirmed_in_platform),
+          patient_note: ap.notes || ap.patient_note || "",
           // Keep link-like keys if downstream expects them
           erogato_id: ap.erogato_id || "",
           vendita_id: ap.vendita_id || "",
@@ -2099,6 +2102,9 @@
               status: ap.status || "",
               patient_name: ap.patient_name || "",
               patient_id: ap.patient_id || "",
+              confirmed_by_patient: Boolean(ap.confirmed_by_patient),
+              confirmed_in_platform: Boolean(ap.confirmed_in_platform),
+              patient_note: ap.notes || ap.patient_note || "",
               // Keep link-like keys if downstream expects them
               erogato_id: ap.erogato_id || "",
               vendita_id: ap.vendita_id || "",
@@ -2672,13 +2678,22 @@
     const btnDelete = q("[data-det-delete]");
     const btnLoc = q("[data-det-location]");
 
-    // Prefill notes/status/confirm flags from available fields.
+    // Prefill notes/status/confirm flags from normalized fields (from /api/appointments),
+    // plus legacy Airtable field names if present.
     const f = item?.fields || {};
     const currentStatus = String(item?.status || "").trim();
-    const internalNote = String(f["Nota rapida"] ?? f["Nota rapida (interna)"] ?? f["Note interne"] ?? "").trim();
-    const patientNote = String(f["Note"] ?? f["Note paziente"] ?? "").trim();
-    const confByPatient = Boolean(f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false);
-    const confInPlatform = Boolean(f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false);
+    const internalNote = String(
+      f.internal_note ?? f.quick_note ?? f["Nota rapida"] ?? f["Nota rapida (interna)"] ?? f["Note interne"] ?? ""
+    ).trim();
+    const patientNote = String(
+      f.patient_note ?? f.notes ?? f["Note"] ?? f["Note paziente"] ?? ""
+    ).trim();
+    const confByPatient = Boolean(
+      f.confirmed_by_patient ?? f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false
+    );
+    const confInPlatform = Boolean(
+      f.confirmed_in_platform ?? f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false
+    );
 
     if (elInternal) elInternal.value = internalNote;
     if (elPatient) elPatient.value = patientNote;

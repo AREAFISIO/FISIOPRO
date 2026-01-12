@@ -407,19 +407,21 @@ async function resolveSchemaLite(tableEnc, tableName) {
     resolveFieldName(
       tableEnc,
       `appts:field:type:${tableName}`,
-      [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+      // Some bases use "Voce agenda" or "Tipo lavoro" instead of a dedicated "Tipo appuntamento".
+      [process.env.AGENDA_TYPE_FIELD, "Voce agenda", "Tipo lavoro", "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
       tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:service:${tableName}`,
-      [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+      // In this project the common linked field is "Prestazione prevista" (see airtableSchema.json).
+      [process.env.AGENDA_SERVICE_FIELD, "Prestazione prevista", "Prestazione", "Servizio", "Service"].filter(Boolean),
       tableName,
     ),
     resolveFieldName(
       tableEnc,
       `appts:field:duration:${tableName}`,
-      [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+      [process.env.AGENDA_DURATION_FIELD, "Durata (minuti)", "Durata (min)", "Durata", "Minuti"].filter(Boolean),
       tableName,
     ),
     resolveFieldName(
@@ -557,13 +559,13 @@ async function resolveSchema(tableEnc, tableName) {
   const FIELD_TYPE = await resolveFieldName(
     tableEnc,
     `appts:field:type:${tableName}`,
-    [process.env.AGENDA_TYPE_FIELD, "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
+    [process.env.AGENDA_TYPE_FIELD, "Voce agenda", "Tipo lavoro", "Tipo appuntamento", "Tipologia", "Tipo", "Type"].filter(Boolean),
     tableName,
   );
   const FIELD_SERVICE = await resolveFieldName(
     tableEnc,
     `appts:field:service:${tableName}`,
-    [process.env.AGENDA_SERVICE_FIELD, "Prestazione", "Servizio", "Service"].filter(Boolean),
+    [process.env.AGENDA_SERVICE_FIELD, "Prestazione prevista", "Prestazione", "Servizio", "Service"].filter(Boolean),
     tableName,
   );
   const FIELD_LOCATION = await resolveFieldName(
@@ -575,7 +577,7 @@ async function resolveSchema(tableEnc, tableName) {
   const FIELD_DURATION = await resolveFieldName(
     tableEnc,
     `appts:field:duration:${tableName}`,
-    [process.env.AGENDA_DURATION_FIELD, "Durata", "Durata (min)", "Minuti"].filter(Boolean),
+    [process.env.AGENDA_DURATION_FIELD, "Durata (minuti)", "Durata (min)", "Durata", "Minuti"].filter(Boolean),
     tableName,
   );
 
