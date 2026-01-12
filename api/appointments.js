@@ -914,7 +914,7 @@ async function appointmentsKpi({ tableEnc, tableName, schema, startISO, endISO, 
   };
 }
 
-async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite = false }) {
+async function listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite = false, allowUnmapped = false }) {
   if (!schema.FIELD_START) {
     const err = new Error("agenda_schema_mismatch: missing start field");
     err.status = 500;
@@ -931,6 +931,7 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
   const email = String(session.email || "").toLowerCase();
 
   let roleFilter = "TRUE()";
+  let unmappedPhysio = false;
   if (role === "physio") {
     // Prefer linked Collaboratore filter (most reliable); fallback to Email field if present.
     // Some bases don't populate appointment Email consistently, which would hide all appointments for physios.
@@ -940,7 +941,14 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
     } else if (schema.FIELD_EMAIL) {
       roleFilter = `LOWER({${schema.FIELD_EMAIL}}) = LOWER("${escAirtableString(email)}")`;
     } else {
-      roleFilter = "FALSE()";
+      // If we can't map this user to a collaborator AND we don't have an email field,
+      // we cannot safely filter. For the Agenda (mission-critical) allow a controlled fallback.
+      if (allowUnmapped) {
+        roleFilter = "TRUE()";
+        unmappedPhysio = true;
+      } else {
+        roleFilter = "FALSE()";
+      }
     }
   }
 
@@ -990,7 +998,7 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
         locationNamesById: {},
       }),
     );
-    return { appointments };
+    return { appointments, meta: unmappedPhysio ? { unmappedPhysio: true } : {} };
   }
 
   // Resolve linked names for patient + collaborator (for a nice agenda render).
@@ -1070,7 +1078,7 @@ async function listAppointments({ tableEnc, tableName, schema, startISO, endISO,
     }),
   );
 
-  return { appointments };
+  return { appointments, meta: unmappedPhysio ? { unmappedPhysio: true } : {} };
 }
 
 export default async function handler(req, res) {
@@ -1143,6 +1151,7 @@ export default async function handler(req, res) {
       const summary = String(req.query?.summary || "") === "1";
       const kpi = String(req.query?.kpi || "") === "1";
       const kpiType = norm(req.query?.type);
+      const allowUnmapped = String(req.query?.allowUnmapped || "") === "1";
       const schema = lite ? await resolveSchemaLite(tableEnc, tableName) : await resolveSchema(tableEnc, tableName);
 
       let startISO = "";
@@ -1194,9 +1203,9 @@ export default async function handler(req, res) {
       const role = normalizeRole(session.role || "");
       const email = String(session.email || "").toLowerCase();
       const cacheKey = `appts:list:${tableName}:${startISO}:${endISO}:${role}:${email}`;
-      const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite });
-      const { appointments } = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
-      return res.status(200).json({ ok: true, appointments });
+      const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite, allowUnmapped });
+      const { appointments, meta } = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
+      return res.status(200).json({ ok: true, appointments, meta });
     }
 
     // -----------------------------
