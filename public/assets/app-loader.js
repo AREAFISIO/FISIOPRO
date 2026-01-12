@@ -30,12 +30,30 @@
       return;
     }
 
-    // Don't wait too long: we want a fast first paint, but still start app.js quickly.
-    if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(inject, { timeout: 400 });
-    } else {
-      setTimeout(inject, 50);
-    }
+    // Best of both worlds:
+    // - if the user interacts quickly (click/tap/keys), load immediately to avoid "blocked" navigation
+    // - otherwise load on idle soon after first paint
+    const onFirstInteraction = () => {
+      try {
+        window.removeEventListener("pointerdown", onFirstInteraction, true);
+        window.removeEventListener("keydown", onFirstInteraction, true);
+        window.removeEventListener("touchstart", onFirstInteraction, true);
+        window.removeEventListener("mousedown", onFirstInteraction, true);
+        window.removeEventListener("wheel", onFirstInteraction, { capture: true });
+      } catch {}
+      inject();
+    };
+    try {
+      window.addEventListener("pointerdown", onFirstInteraction, true);
+      window.addEventListener("touchstart", onFirstInteraction, true);
+      window.addEventListener("mousedown", onFirstInteraction, true);
+      window.addEventListener("keydown", onFirstInteraction, true);
+      // passive scroll interaction
+      window.addEventListener("wheel", onFirstInteraction, { capture: true, passive: true });
+    } catch {}
+
+    if ("requestIdleCallback" in window) window.requestIdleCallback(inject, { timeout: 400 });
+    else setTimeout(inject, 50);
   } catch {
     // Fail open: if loader breaks, do nothing (page still works via HTML).
   }
