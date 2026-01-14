@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 import { fetchWithTimeout, memGet, memGetOrSet, memSet, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function isYmd(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -174,6 +175,89 @@ export default async function handler(req, res) {
     const APPTS_TABLE_NAME = process.env.AGENDA_TABLE || "APPUNTAMENTI";
 
     const tableEnc = encodeURIComponent(APPTS_TABLE_NAME);
+
+    // -----------------------------------------
+    // Supabase fast-path (enabled via env):
+    // DATA_BACKEND=supabase + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+    // -----------------------------------------
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const role = normalizeRole(session.role);
+      const email = String(session.email || "").toLowerCase();
+
+      // Resolve collaborator record id (Airtable) by email, then map to Supabase collaborator uuid.
+      // (Auth still uses Airtable today, so we keep this mapping.)
+      let collabUuid = "";
+      if (role === "physio") {
+        const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+        const fEmail = `LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}")`;
+        const emailKey = `collabIdByEmail:${String(email)}`;
+        let userRecId = memGet(emailKey) || "";
+        if (!userRecId) {
+          const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+          const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
+          const rec = userData.records?.[0] || null;
+          userRecId = rec?.id || "";
+          if (userRecId) memSet(emailKey, userRecId, 10 * 60_000);
+        }
+
+        if (!userRecId) {
+          // safest: no mapping => return empty list
+          return res.status(200).json({ ok: true, items: [] });
+        }
+
+        const { data: collabRow, error: collabErr } = await sb
+          .from("collaborators")
+          .select("id")
+          .eq("airtable_id", userRecId)
+          .maybeSingle();
+        if (collabErr) throw new Error(`supabase_collaborator_lookup_failed: ${collabErr.message}`);
+        collabUuid = collabRow?.id || "";
+        if (!collabUuid) return res.status(200).json({ ok: true, items: [] });
+      }
+
+      // Fetch appointments in range (and optionally for a specific physio).
+      let q = sb
+        .from("appointments")
+        .select("airtable_id,start_at,airtable_fields,collaborator_id")
+        .gte("start_at", startISO)
+        .lt("start_at", endExclusiveISO)
+        .order("start_at", { ascending: true });
+      if (role === "physio" && collabUuid) q = q.eq("collaborator_id", collabUuid);
+
+      const { data: appts, error: apptErr } = await q;
+      if (apptErr) throw new Error(`supabase_appointments_failed: ${apptErr.message}`);
+
+      // Resolve operator names from collaborators table.
+      const collabIds = Array.from(new Set((appts || []).map((a) => a.collaborator_id).filter(Boolean)));
+      let collabMap = {};
+      if (collabIds.length) {
+        const { data: cols, error: colsErr } = await sb.from("collaborators").select("id,name").in("id", collabIds);
+        if (colsErr) throw new Error(`supabase_collaborators_failed: ${colsErr.message}`);
+        collabMap = Object.fromEntries((cols || []).map((c) => [c.id, String(c.name || "")]));
+      }
+
+      const items = (appts || []).map((a) => {
+        const f = (a.airtable_fields && typeof a.airtable_fields === "object") ? { ...a.airtable_fields } : {};
+        const dt = a.start_at ? new Date(a.start_at).toISOString() : String(f["Data e ora INIZIO"] || "");
+
+        // Normalize for the existing UI: ensure these common keys exist.
+        if (dt) f["Data e ora INIZIO"] = dt;
+        const opName = String(collabMap[a.collaborator_id] || "");
+        if (opName) f["Collaboratore"] = opName;
+
+        return {
+          id: String(a.airtable_id || ""), // keep Airtable-like ids in the UI
+          datetime: dt,
+          date: dt ? dt.slice(0, 10) : "",
+          time: dt ? dt.slice(11, 16) : "",
+          operator: opName,
+          fields: f,
+        };
+      });
+
+      return res.status(200).json({ ok: true, items });
+    }
 
     // Resolve field names:
     // 1) probe explicit candidates (fast if you know exact names)
