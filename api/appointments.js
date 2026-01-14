@@ -4,6 +4,7 @@
 //
 // This endpoint powers the "scheda appuntamento" and is Airtable-backed.
 
+import crypto from "node:crypto";
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 import { asLinkArray, enc, escAirtableString, memGet, memGetOrSet, memSet, norm, readJsonBody, setPrivateCache } from "./_common.js";
 import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
@@ -831,6 +832,124 @@ function overlapMinutesInRange(appt, rangeStart, rangeEnd) {
   return Math.max(0, Math.round(ms / 60_000));
 }
 
+function makeSyntheticId(prefix = "sb") {
+  try {
+    // Node 18+ supports crypto.randomUUID()
+    return `${String(prefix || "sb")}_${crypto.randomUUID()}`;
+  } catch {
+    return `${String(prefix || "sb")}_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  }
+}
+
+function mergeAirtableFields(base, patch) {
+  const a = base && typeof base === "object" ? { ...base } : {};
+  const b = patch && typeof patch === "object" ? patch : {};
+  for (const [k, v] of Object.entries(b)) {
+    if (v === undefined) continue;
+    a[k] = v;
+  }
+  return a;
+}
+
+function boolish(v) {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  const s = String(v ?? "").trim().toLowerCase();
+  if (!s) return false;
+  if (["1", "true", "yes", "si", "sì", "ok"].includes(s)) return true;
+  return false;
+}
+
+async function sbGetOne(sb, table, matchCol, matchVal, cols = "id,airtable_id,name,label") {
+  const { data, error } = await sb.from(table).select(cols).eq(matchCol, matchVal).maybeSingle();
+  if (error) {
+    const err = new Error(`supabase_${table}_lookup_failed: ${error.message}`);
+    err.status = 500;
+    throw err;
+  }
+  return data || null;
+}
+
+async function ensureErogatoForAppointment({
+  sb,
+  apptRow, // full row including uuid id
+  patient,
+  collaborator,
+}) {
+  // 1 Erogato per 1 Appuntamento (A)
+  if (!apptRow?.id) return { erogato: null, erogatoAirtableId: "" };
+  const apptUuid = apptRow.id;
+
+  const startAt = apptRow.start_at ? new Date(apptRow.start_at).toISOString() : "";
+  const endAt = apptRow.end_at ? new Date(apptRow.end_at).toISOString() : "";
+  const minutes =
+    typeof apptRow.duration_minutes === "number" && isFinite(apptRow.duration_minutes)
+      ? Math.max(0, Math.trunc(apptRow.duration_minutes))
+      : (startAt && endAt)
+        ? Math.max(0, Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000))
+        : null;
+
+  // Find existing erogato by appointment_id
+  const { data: existing, error: exErr } = await sb
+    .from("erogato")
+    .select("id,airtable_id,airtable_fields")
+    .eq("appointment_id", apptUuid)
+    .limit(1)
+    .maybeSingle();
+  if (exErr) {
+    const err = new Error(`supabase_erogato_lookup_failed: ${exErr.message}`);
+    err.status = 500;
+    throw err;
+  }
+
+  const erogatoAirtableId = existing?.airtable_id || makeSyntheticId("erogato");
+  const baseFields = existing?.airtable_fields && typeof existing.airtable_fields === "object" ? existing.airtable_fields : {};
+
+  // Build minimal Airtable-like fields for the UI pages (erogato list).
+  const erogatoFields = mergeAirtableFields(baseFields, {
+    "Data e ora INIZIO": startAt || baseFields["Data e ora INIZIO"] || "",
+    "Data e ora FINE": endAt || baseFields["Data e ora FINE"] || "",
+    "Minuti lavoro": minutes ?? baseFields["Minuti lavoro"] ?? "",
+    Paziente: patient?.airtable_id ? [patient.airtable_id] : (baseFields.Paziente ?? []),
+    Collaboratore: collaborator?.airtable_id ? [collaborator.airtable_id] : (baseFields.Collaboratore ?? []),
+    "Stato appuntamento": apptRow.status || baseFields["Stato appuntamento"] || "",
+    "Tipo lavoro ": apptRow.work_type || baseFields["Tipo lavoro "] || "",
+  });
+
+  const payload = {
+    airtable_id: erogatoAirtableId,
+    patient_id: apptRow.patient_id || null,
+    collaborator_id: apptRow.collaborator_id || null,
+    appointment_id: apptUuid,
+    case_id: apptRow.case_id || null,
+    start_at: apptRow.start_at || null,
+    end_at: apptRow.end_at || null,
+    minutes: minutes ?? null,
+    status: apptRow.status || null,
+    work_type: apptRow.work_type || null,
+    is_home: apptRow.is_home ?? null,
+    airtable_fields: erogatoFields,
+  };
+
+  if (existing?.id) {
+    const { data: upd, error } = await sb.from("erogato").update(payload).eq("id", existing.id).select("id,airtable_id").maybeSingle();
+    if (error) {
+      const err = new Error(`supabase_erogato_update_failed: ${error.message}`);
+      err.status = 500;
+      throw err;
+    }
+    return { erogato: upd || null, erogatoAirtableId };
+  }
+
+  const { data: ins, error } = await sb.from("erogato").insert(payload).select("id,airtable_id").maybeSingle();
+  if (error) {
+    const err = new Error(`supabase_erogato_insert_failed: ${error.message}`);
+    err.status = 500;
+    throw err;
+  }
+  return { erogato: ins || null, erogatoAirtableId };
+}
+
 async function appointmentsSummary({ tableEnc, tableName, schema, startISO, endISO, session }) {
   if (!schema.FIELD_START) {
     const err = new Error("agenda_schema_mismatch: missing start field");
@@ -1425,6 +1544,250 @@ export default async function handler(req, res) {
       const run = () => listAppointments({ tableEnc, tableName, schema, startISO, endISO, session, lite, allowUnmapped });
       const { appointments, meta } = noCache ? await run() : await memGetOrSet(cacheKey, 15_000, run);
       return res.status(200).json({ ok: true, appointments, meta });
+    }
+
+    // -----------------------------------------
+    // Supabase write paths (POST/PATCH/DELETE)
+    // - Keeps existing UI contracts
+    // - Also enforces automation: 1 erogato per 1 appointment (A)
+    // -----------------------------------------
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const role = normalizeRole(session.role || "");
+
+      // Helper: load appointment row by Airtable-like id (appointments.airtable_id)
+      const loadApptByAirtableId = async (airtableId) => {
+        const { data, error } = await sb
+          .from("appointments")
+          .select("id,airtable_id,patient_id,collaborator_id,service_id,case_id,start_at,end_at,duration_minutes,status,agenda_label,location,is_home,economic_outcome,work_type,note,airtable_fields")
+          .eq("airtable_id", String(airtableId || ""))
+          .maybeSingle();
+        if (error) {
+          const err = new Error(`supabase_appointment_lookup_failed: ${error.message}`);
+          err.status = 500;
+          throw err;
+        }
+        return data || null;
+      };
+
+      const resolveUuidByAirtable = async (table, airtableId) => {
+        const s = norm(airtableId);
+        if (!s) return "";
+        const row = await sbGetOne(sb, table, "airtable_id", s, "id,airtable_id,name,label");
+        return row?.id || "";
+      };
+
+      if (req.method === "DELETE") {
+        if (role === "physio") return res.status(403).json({ ok: false, error: "forbidden" });
+        const id = norm(req.query?.id);
+        if (!id) return res.status(400).json({ ok: false, error: "missing_id" });
+
+        const appt = await loadApptByAirtableId(id);
+        if (!appt?.id) return res.status(200).json({ ok: true });
+
+        // Best-effort: delete linked erogato first
+        await sb.from("erogato").delete().eq("appointment_id", appt.id);
+        await sb.from("appointments").delete().eq("id", appt.id);
+        return res.status(200).json({ ok: true });
+      }
+
+      if (req.method === "PATCH") {
+        const id = norm(req.query?.id);
+        if (!id) return res.status(400).json({ ok: false, error: "missing_id" });
+
+        const body = await readJsonBody(req);
+        if (!body) return res.status(400).json({ ok: false, error: "invalid_json" });
+
+        const appt = await loadApptByAirtableId(id);
+        if (!appt?.id) return res.status(404).json({ ok: false, error: "not_found" });
+
+        // Map UI payload -> DB columns
+        const updates = {};
+        const f0 = (appt.airtable_fields && typeof appt.airtable_fields === "object") ? appt.airtable_fields : {};
+        let f = { ...f0 };
+
+        if ("status" in body || "stato" in body || "statoAppuntamento" in body) {
+          const s = norm(body.status ?? body.stato ?? body.statoAppuntamento);
+          updates.status = s || null;
+          f = mergeAirtableFields(f, { "Stato appuntamento": s });
+        }
+        if ("appointment_type" in body || "tipoAppuntamento" in body || "type" in body) {
+          const t = norm(body.appointment_type ?? body.tipoAppuntamento ?? body.type);
+          updates.agenda_label = t || null;
+          f = mergeAirtableFields(f, { "Voce agenda": t });
+        }
+        if ("quick_note" in body || "notaRapida" in body || "internal_note" in body) {
+          const txt = norm(body.quick_note ?? body.notaRapida ?? body.internal_note);
+          // store in JSON fields for UI compatibility
+          f = mergeAirtableFields(f, { "Nota rapida": txt, "Note interne": txt });
+        }
+        if ("notes" in body || "note" in body || "patient_note" in body) {
+          const txt = norm(body.notes ?? body.note ?? body.patient_note);
+          updates.note = txt || null;
+          f = mergeAirtableFields(f, { Note: txt });
+        }
+
+        if ("confirmed_by_patient" in body || "confirmedByPatient" in body || "confermatoDalPaziente" in body) {
+          const v = body.confirmed_by_patient ?? body.confirmedByPatient ?? body.confermatoDalPaziente;
+          f = mergeAirtableFields(f, { "Confermato dal paziente": Boolean(v), "Conferma del paziente": Boolean(v) });
+        }
+        if ("confirmed_in_platform" in body || "confirmedInPlatform" in body || "confermaInPiattaforma" in body) {
+          const v = body.confirmed_in_platform ?? body.confirmedInPlatform ?? body.confermaInPiattaforma;
+          f = mergeAirtableFields(f, { "Conferma in InBuoneMani": Boolean(v), "Conferma in piattaforma": Boolean(v) });
+        }
+
+        // Datetime changes (drag/drop)
+        const startRaw = body.start_at ?? body.startAt ?? body.startISO ?? body.start;
+        if (startRaw !== undefined) {
+          const iso = startRaw === null || String(startRaw).trim() === "" ? "" : parseIsoOrThrow(startRaw, "start_at");
+          updates.start_at = iso ? iso : null;
+          f = mergeAirtableFields(f, { "Data e ora INIZIO": iso || "" });
+        }
+        const endRaw = body.end_at ?? body.endAt ?? body.endISO ?? body.end;
+        if (endRaw !== undefined) {
+          const iso = endRaw === null || String(endRaw).trim() === "" ? "" : parseIsoOrThrow(endRaw, "end_at");
+          updates.end_at = iso ? iso : null;
+          f = mergeAirtableFields(f, { "Data e ora fine": iso || "", "Data e ora FINE": iso || "" });
+        }
+
+        // Linked fields (ids are Airtable record ids from UI)
+        const serviceRaw = body.service_id ?? body.serviceId ?? body.prestazioneId;
+        if (serviceRaw !== undefined) {
+          const sid = norm(serviceRaw);
+          const svcUuid = sid ? await resolveUuidByAirtable("services", sid) : "";
+          updates.service_id = svcUuid || null;
+          if (sid) f = mergeAirtableFields(f, { "Prestazione prevista": [sid] });
+        }
+
+        const operatorRaw = body.therapist_id ?? body.operatorId ?? body.collaboratoreId;
+        if (operatorRaw !== undefined) {
+          const oid = norm(operatorRaw);
+          const opUuid = oid ? await resolveUuidByAirtable("collaborators", oid) : "";
+          updates.collaborator_id = opUuid || null;
+          // also keep a human label if present
+          if (oid) f = mergeAirtableFields(f, { Collaboratore: [oid] });
+        }
+
+        const locationRaw = body.location_id ?? body.locationId ?? body.sedeId;
+        if (locationRaw !== undefined) {
+          const loc = norm(locationRaw);
+          updates.location = loc || null;
+          if (loc || loc === "") f = mergeAirtableFields(f, { Sede: loc });
+        }
+
+        const durata = body.duration ?? body.durata ?? body.durationMin;
+        if (durata !== undefined) {
+          if (durata === null || String(durata).trim() === "") {
+            updates.duration_minutes = null;
+            f = mergeAirtableFields(f, { "Durata (minuti)": "" });
+          } else {
+            const n = Number(durata);
+            if (Number.isFinite(n)) {
+              updates.duration_minutes = Math.max(0, Math.trunc(n));
+              f = mergeAirtableFields(f, { "Durata (minuti)": Math.max(0, Math.trunc(n)) });
+            }
+          }
+        }
+
+        // persist updated airtable_fields
+        updates.airtable_fields = f;
+
+        // If end_at and start_at are set but duration is missing, compute it.
+        const startFinal = updates.start_at ?? appt.start_at;
+        const endFinal = updates.end_at ?? appt.end_at;
+        const durFinal = updates.duration_minutes ?? appt.duration_minutes;
+        if ((durFinal === null || durFinal === undefined) && startFinal && endFinal) {
+          const ms = new Date(endFinal).getTime() - new Date(startFinal).getTime();
+          if (Number.isFinite(ms)) {
+            const minutes = Math.max(0, Math.round(ms / 60_000));
+            updates.duration_minutes = minutes;
+            updates.airtable_fields = mergeAirtableFields(updates.airtable_fields, { "Durata (minuti)": minutes });
+          }
+        }
+
+        // Apply update
+        const { data: updated, error } = await sb.from("appointments").update(updates).eq("id", appt.id).select("*").maybeSingle();
+        if (error) return res.status(500).json({ ok: false, error: `supabase_appointment_update_failed: ${error.message}` });
+
+        // Automation: ensure Erogato exists/updated and link it back to appointment fields.
+        const patient = updated.patient_id ? await sbGetOne(sb, "patients", "id", updated.patient_id, "id,airtable_id,label,cognome,nome") : null;
+        const collaborator = updated.collaborator_id ? await sbGetOne(sb, "collaborators", "id", updated.collaborator_id, "id,airtable_id,name") : null;
+        const { erogatoAirtableId } = await ensureErogatoForAppointment({ sb, apptRow: updated, patient, collaborator });
+
+        // Update appointment airtable_fields with the linked erogato id (so UI "billing" sees it).
+        if (erogatoAirtableId) {
+          const f2 = mergeAirtableFields(updated.airtable_fields, { "Erogato collegato": [erogatoAirtableId], EROGATO: [erogatoAirtableId] });
+          await sb.from("appointments").update({ airtable_fields: f2 }).eq("id", updated.id);
+        }
+
+        return res.status(200).json({ ok: true, appointment: { id: updated.airtable_id } });
+      }
+
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        if (!body) return res.status(400).json({ ok: false, error: "invalid_json" });
+
+        const ap = body.appointment || body;
+        const recordId = norm(body.recordId || body.id || ap.recordId || ap.id) || makeSyntheticId("appt");
+
+        const startISO = parseIsoOrThrow(ap["Data e ora INIZIO"] ?? ap.start ?? ap.startISO ?? ap.start_at ?? ap.startAt, "start_at");
+        const endISO = parseIsoOrThrow(ap["Data e ora fine"] ?? ap["Data e ora FINE"] ?? ap.end ?? ap.endISO ?? ap.end_at ?? ap.endAt, "end_at");
+
+        let durata = ap["Durata (minuti)"] ?? ap.durataMinuti ?? ap.durationMinutes ?? ap.duration;
+        if (durata === undefined || durata === null || String(durata).trim() === "") {
+          const ms = new Date(endISO).getTime() - new Date(startISO).getTime();
+          durata = Math.max(0, Math.round(ms / 60000));
+        }
+
+        const pazienteVal = ap.pazienteRecordId ?? ap.patientRecordId ?? ap.PazienteRecordId ?? ap.Paziente ?? ap.paziente ?? ap.patient;
+        const collaboratoreVal = ap.collaboratoreRecordId ?? ap.therapistRecordId ?? ap.operatorRecordId ?? ap.CollaboratoreRecordId ?? ap.Collaboratore ?? ap.collaboratore ?? ap.therapist ?? ap.operator;
+        if (!pazienteVal) return res.status(400).json({ ok: false, error: "missing_paziente" });
+        if (!collaboratoreVal) return res.status(400).json({ ok: false, error: "missing_collaboratore" });
+
+        const patientUuid = await resolveUuidByAirtable("patients", String(pazienteVal));
+        const collabUuid = await resolveUuidByAirtable("collaborators", String(collaboratoreVal));
+        if (!patientUuid) return res.status(400).json({ ok: false, error: "unknown_paziente" });
+        if (!collabUuid) return res.status(400).json({ ok: false, error: "unknown_collaboratore" });
+
+        const airtable_fields = {
+          "Data e ora INIZIO": startISO,
+          "Data e ora fine": endISO,
+          "Durata (minuti)": Number(durata),
+          Paziente: [String(pazienteVal)],
+          Collaboratore: [String(collaboratoreVal)],
+          "Stato appuntamento": norm(ap["Stato appuntamento"] ?? ap.status ?? ""),
+          "Voce agenda": norm(ap["Voce agenda"] ?? ap.appointment_type ?? ""),
+          Note: norm(ap.Note ?? ap.note ?? ""),
+          DOMICILIO: Boolean(ap.DOMICILIO ?? ap.domicilio ?? false),
+        };
+
+        const insertPayload = {
+          airtable_id: recordId,
+          patient_id: patientUuid,
+          collaborator_id: collabUuid,
+          start_at: startISO,
+          end_at: endISO,
+          duration_minutes: Number(durata),
+          status: norm(ap["Stato appuntamento"] ?? ap.status ?? "") || null,
+          agenda_label: norm(ap["Voce agenda"] ?? ap.appointment_type ?? "") || null,
+          is_home: Boolean(ap.DOMICILIO ?? ap.domicilio ?? false),
+          note: norm(ap.Note ?? ap.note ?? "") || null,
+          airtable_fields,
+        };
+
+        const { data: created, error } = await sb.from("appointments").insert(insertPayload).select("*").maybeSingle();
+        if (error) return res.status(500).json({ ok: false, error: `supabase_appointment_insert_failed: ${error.message}` });
+
+        const patient = await sbGetOne(sb, "patients", "id", created.patient_id, "id,airtable_id,label,cognome,nome");
+        const collaborator = await sbGetOne(sb, "collaborators", "id", created.collaborator_id, "id,airtable_id,name");
+        const { erogatoAirtableId } = await ensureErogatoForAppointment({ sb, apptRow: created, patient, collaborator });
+        if (erogatoAirtableId) {
+          const f2 = mergeAirtableFields(created.airtable_fields, { "Erogato collegato": [erogatoAirtableId], EROGATO: [erogatoAirtableId] });
+          await sb.from("appointments").update({ airtable_fields: f2 }).eq("id", created.id);
+        }
+
+        return res.status(200).json({ ok: true, record: { id: created.airtable_id, fields: created.airtable_fields || {}, createdTime: "" } });
+      }
     }
 
     // -----------------------------
