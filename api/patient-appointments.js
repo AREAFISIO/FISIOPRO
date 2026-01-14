@@ -2,6 +2,7 @@
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 import { enc, escAirtableString, memGetOrSet, setPrivateCache } from "./_common.js";
 import { airtableSchema } from "../lib/airtableClient.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
@@ -99,6 +100,56 @@ export default async function handler(req, res) {
 
     const patientId = req.query.id;
     if (!patientId) return res.status(400).json({ error: "Missing id" });
+
+    // Supabase fast-path: read patient appointment history from Supabase.
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+
+      const { data: p, error: pErr } = await sb
+        .from("patients")
+        .select("id,airtable_id")
+        .eq("airtable_id", String(patientId))
+        .maybeSingle();
+      if (pErr) return res.status(500).json({ error: `supabase_patient_lookup_failed: ${pErr.message}` });
+      if (!p?.id) return res.status(200).json({ records: [] });
+
+      const role = normalizeRole(session.role);
+      const email = String(session.email || "").toLowerCase();
+
+      // If physio, map email -> collaborator uuid to restrict history.
+      let collabUuid = "";
+      if (role === "physio") {
+        const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+        const fEmail = `LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}")`;
+        const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+        const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
+        const userRecId = userData.records?.[0]?.id || "";
+        if (userRecId) {
+          const { data: collabRow } = await sb.from("collaborators").select("id").eq("airtable_id", userRecId).maybeSingle();
+          collabUuid = collabRow?.id || "";
+        }
+      }
+
+      let q = sb
+        .from("appointments")
+        .select("airtable_id,start_at,end_at,duration_minutes")
+        .eq("patient_id", p.id)
+        .order("start_at", { ascending: false })
+        .limit(500);
+      if (role === "physio" && collabUuid) q = q.eq("collaborator_id", collabUuid);
+
+      const { data: rows, error } = await q;
+      if (error) return res.status(500).json({ error: `supabase_patient_appointments_failed: ${error.message}` });
+
+      const records = (rows || []).map((r) => ({
+        id: String(r.airtable_id || ""),
+        Email: "",
+        "Data e ora INIZIO": r.start_at ? new Date(r.start_at).toISOString() : "",
+        "Data e ora FINE": r.end_at ? new Date(r.end_at).toISOString() : "",
+        Durata: r.duration_minutes ?? "",
+      }));
+      return res.status(200).json({ records });
+    }
 
     const tableName = process.env.AGENDA_TABLE || "APPUNTAMENTI";
     const tableEnc = enc(tableName);

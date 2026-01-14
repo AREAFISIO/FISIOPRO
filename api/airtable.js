@@ -2,6 +2,7 @@ import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { memGetOrSet, setPrivateCache } from "./_common.js";
 import { airtableListAll } from "./_airtableClient.js";
 import { airtableSchema } from "../lib/airtableClient.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function escAirtableString(s) {
   return String(s ?? "")
@@ -297,6 +298,46 @@ export default async function handler(req, res) {
 
       const maxRecords = Math.min(Number(req.query?.maxRecords || 200) || 200, 500);
       const pageSize = Math.min(Number(req.query?.pageSize || 50) || 50, 100);
+
+      // Supabase fast-path for patient list page.
+      if (isSupabaseEnabled()) {
+        const sb = getSupabaseAdmin();
+        const qq = String(qRaw || "").trim();
+        const like = `%${qq}%`;
+
+        let query = sb
+          .from("patients")
+          .select("airtable_id,cognome,nome,email,phone,date_of_birth,airtable_fields,label")
+          .order("cognome", { ascending: true })
+          .order("nome", { ascending: true })
+          .limit(maxRecords);
+
+        if (qq) {
+          query = query.or(`label.ilike.${like},cognome.ilike.${like},nome.ilike.${like},phone.ilike.${like},email.ilike.${like}`);
+        }
+
+        const { data, error } = await query;
+        if (error) return res.status(500).json({ ok: false, error: `supabase_patients_full_failed: ${error.message}` });
+
+        const items = (data || []).map((p) => {
+          const f = (p.airtable_fields && typeof p.airtable_fields === "object") ? p.airtable_fields : {};
+          const out = {
+            id: p.airtable_id || "",
+            Nome: p.nome || f["Nome"] || "",
+            Cognome: p.cognome || f["Cognome"] || "",
+            "Codice Fiscale": f["Codice Fiscale"] || f["Codice fiscale"] || "",
+            Email: p.email || f["Email"] || "",
+            Telefono: p.phone || f["Numero di telefono"] || f["Telefono"] || "",
+            "Data di nascita": p.date_of_birth || f["Data di nascita"] || "",
+            "Canali di comunicazione preferiti": f["Canali di comunicazione preferiti"] || f["Canali preferiti"] || "",
+            "Cognome e Nome": p.label || f["Cognome e Nome"] || f["Cognome Nome | Età"] || "",
+          };
+          if (includeFields) out._fields = f;
+          return out;
+        });
+
+        return res.status(200).json({ ok: true, items });
+      }
 
       const qs = new URLSearchParams({
         maxRecords: String(maxRecords),

@@ -6,6 +6,7 @@
 
 import { airtableFetch, ensureRes, normalizeRole, requireSession } from "./_auth.js";
 import { asLinkArray, enc, escAirtableString, memGet, memGetOrSet, memSet, norm, readJsonBody, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 import {
   airtableCreate,
   airtableList,
@@ -1159,6 +1160,157 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       setPrivateCache(res, 30);
+
+      // -----------------------------------------
+      // Supabase fast-path (read-only GET)
+      // - Keeps the SAME response shape as current UI expects
+      // - Uses Airtable only to map physio email -> collaborator Airtable recordId
+      // -----------------------------------------
+      if (isSupabaseEnabled()) {
+        const sb = getSupabaseAdmin();
+
+        const date = norm(req.query?.date);
+        const startRaw = norm(req.query?.start);
+        const endRaw = norm(req.query?.end);
+        const summary = String(req.query?.summary || "") === "1";
+        const kpi = String(req.query?.kpi || "") === "1";
+        const kpiType = norm(req.query?.type);
+
+        let startISO = "";
+        let endISO = "";
+        if (date) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ ok: false, error: "date must be YYYY-MM-DD" });
+          const r = ymdToRange(date);
+          startISO = r.startISO;
+          endISO = r.endISO;
+        } else {
+          startISO = parseIsoOrEmpty(startRaw);
+          endISO = parseIsoOrEmpty(endRaw);
+        }
+        if (!startISO || !endISO) return res.status(400).json({ ok: false, error: "missing_start_end" });
+
+        const role = normalizeRole(session.role || "");
+        const email = String(session.email || "").toLowerCase();
+
+        // Map physio to a collaborator UUID in Supabase, based on Airtable collaborator record (by Email).
+        let collabUuid = "";
+        if (role === "physio") {
+          const collabTable = encodeURIComponent(process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI");
+          const fEmail = `LOWER({Email}) = LOWER("${String(email).replace(/"/g, '\\"')}")`;
+          const emailKey = `collabIdByEmail:${String(email)}`;
+          let userRecId = memGet(emailKey) || "";
+          if (!userRecId) {
+            const qsUser = new URLSearchParams({ filterByFormula: fEmail, maxRecords: "1", pageSize: "1" });
+            const userData = await airtableFetch(`${collabTable}?${qsUser.toString()}`);
+            const rec = userData.records?.[0] || null;
+            userRecId = rec?.id || "";
+            if (userRecId) memSet(emailKey, userRecId, 10 * 60_000);
+          }
+          if (!userRecId) {
+            // No mapping => safest: empty list
+            if (summary) return res.status(200).json({ ok: true, counts: { total: 0, missingPatient: 0, needConfirmPatient: 0, needConfirmPlatform: 0 } });
+            if (kpi) return res.status(200).json({ ok: true, kpi: { totalAppointments: 0, filteredAppointments: 0, minutes: 0, slots: 0, type: String(kpiType || "") } });
+            return res.status(200).json({ ok: true, appointments: [], meta: {} });
+          }
+
+          const { data: collabRow, error: collabErr } = await sb
+            .from("collaborators")
+            .select("id")
+            .eq("airtable_id", userRecId)
+            .maybeSingle();
+          if (collabErr) throw new Error(`supabase_collaborator_lookup_failed: ${collabErr.message}`);
+          collabUuid = collabRow?.id || "";
+          if (!collabUuid) {
+            if (summary) return res.status(200).json({ ok: true, counts: { total: 0, missingPatient: 0, needConfirmPatient: 0, needConfirmPlatform: 0 } });
+            if (kpi) return res.status(200).json({ ok: true, kpi: { totalAppointments: 0, filteredAppointments: 0, minutes: 0, slots: 0, type: String(kpiType || "") } });
+            return res.status(200).json({ ok: true, appointments: [], meta: {} });
+          }
+        }
+
+        const wantTypeNorm = String(kpiType || "").trim().toLowerCase();
+
+        // Load appointments (include linked names/airtable_ids needed by UI).
+        let q = sb
+          .from("appointments")
+          .select(
+            "airtable_id,start_at,end_at,duration_minutes,status,agenda_label,location,is_home,work_type,note,airtable_fields,collaborator_id,service_id,patients:patients(airtable_id,label,cognome,nome),collaborators:collaborators(airtable_id,name),services:services(airtable_id,name)"
+          )
+          .gte("start_at", startISO)
+          .lt("start_at", endISO)
+          .order("start_at", { ascending: true });
+        if (role === "physio" && collabUuid) q = q.eq("collaborator_id", collabUuid);
+
+        const { data: rows, error } = await q;
+        if (error) throw new Error(`supabase_appointments_failed: ${error.message}`);
+
+        const appts = (rows || []).map((r) => {
+          const f = (r.airtable_fields && typeof r.airtable_fields === "object") ? r.airtable_fields : {};
+          const patientName = String(f["Paziente"] || r.patients?.label || "").trim();
+          const patientAirtableId = String(r.patients?.airtable_id || "").trim();
+          const therapistAirtableId = String(r.collaborators?.airtable_id || "").trim();
+          const therapistName = String(r.collaborators?.name || "").trim();
+          const serviceAirtableId = String(r.services?.airtable_id || "").trim();
+          const serviceName = String(r.services?.name || "").trim();
+          const startAt = r.start_at ? new Date(r.start_at).toISOString() : "";
+          const endAt = r.end_at ? new Date(r.end_at).toISOString() : "";
+          const appointmentType = String(f["Voce agenda"] || r.agenda_label || r.work_type || "").trim();
+
+          return {
+            id: String(r.airtable_id || ""),
+            created_at: "",
+            patient_id: patientAirtableId,
+            patient_name: patientName,
+            start_at: startAt,
+            end_at: endAt,
+            status: String(r.status || f["Stato appuntamento"] || "").trim(),
+            appointment_type: appointmentType,
+            service_id: serviceAirtableId,
+            service_name: serviceName,
+            location_id: "",
+            location_name: String(r.location || f.Sede || "").trim(),
+            therapist_id: therapistAirtableId,
+            therapist_name: therapistName,
+            duration: r.duration_minutes ?? f["Durata (minuti)"] ?? "",
+            duration_label: r.duration_minutes ? `${r.duration_minutes} min` : "",
+            confirmed_by_patient: Boolean(f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false),
+            confirmed_in_platform: Boolean(f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false),
+            quick_note: String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
+            notes: String(f["Note"] ?? "").trim(),
+            internal_note: String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
+            patient_note: String(f["Note"] ?? "").trim(),
+            tipi_erogati: Array.isArray(f["Tipi Erogati"]) ? f["Tipi Erogati"] : [],
+            valutazioni_ids: Array.isArray(f["VALUTAZIONI"]) ? f["VALUTAZIONI"] : [],
+            trattamenti_ids: Array.isArray(f["TRATTAMENTI"]) ? f["TRATTAMENTI"] : [],
+            erogato_id: (Array.isArray(f["Erogato collegato"]) && f["Erogato collegato"][0]) ? String(f["Erogato collegato"][0]) : "",
+            caso_clinico_id: (Array.isArray(f["Caso clinico"]) && f["Caso clinico"][0]) ? String(f["Caso clinico"][0]) : "",
+            vendita_id: (Array.isArray(f["Vendita collegata"]) && f["Vendita collegata"][0]) ? String(f["Vendita collegata"][0]) : "",
+          };
+        });
+
+        if (summary) {
+          const total = appts.length;
+          const missingPatient = appts.filter((a) => !String(a.patient_id || "")).length;
+          const needConfirmPatient = appts.filter((a) => !a.confirmed_by_patient).length;
+          const needConfirmPlatform = appts.filter((a) => !a.confirmed_in_platform).length;
+          return res.status(200).json({ ok: true, counts: { total, missingPatient, needConfirmPatient, needConfirmPlatform } });
+        }
+
+        if (kpi) {
+          const rangeStart = new Date(startISO);
+          const rangeEnd = new Date(endISO);
+          const want = String(wantTypeNorm || "").trim();
+          const filtered = want ? appts.filter((a) => String(a.appointment_type || "").trim().toLowerCase() === want) : appts;
+          let minutes = 0;
+          for (const a of filtered) minutes += overlapMinutesInRange(a, rangeStart, rangeEnd);
+          const slots = minutes <= 0 ? 0 : Math.ceil(minutes / 60);
+          return res.status(200).json({
+            ok: true,
+            kpi: { totalAppointments: appts.length, filteredAppointments: filtered.length, minutes, slots, type: want || "" },
+          });
+        }
+
+        return res.status(200).json({ ok: true, appointments: appts, meta: {} });
+      }
 
       // -----------------------------
       // NEW CONTRACT (requested):
