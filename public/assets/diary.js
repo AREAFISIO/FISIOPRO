@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260115f";
+    window.__FP_DIARY_BUILD = "fpui-20260115g";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -2145,39 +2145,48 @@
     syncOpsBar();
     render();
 
-    // Best-effort: enrich appointments in background (names for linked records).
-    // If it times out, the agenda still works (it will show what it can from raw fields).
-    apiGet(`/api/appointments?allowUnmapped=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
-      .then((full) => {
-        if (!full?.appointments) return;
-        rawItems = (full.appointments || []).map((a) => {
-          const ap = a || {};
-          return normalizeItem({
-            id: ap.id,
-            operator: ap.therapist_name || "",
-            fields: {
-              start_at: ap.start_at || "",
-              end_at: ap.end_at || "",
-              therapist_name: ap.therapist_name || "",
-              service_name: ap.service_name || "",
-              status: ap.status || "",
-              patient_name: ap.patient_name || "",
-              patient_id: ap.patient_id || "",
-              confirmed_by_patient: Boolean(ap.confirmed_by_patient),
-              confirmed_in_platform: Boolean(ap.confirmed_in_platform),
-              patient_note: ap.notes || ap.patient_note || "",
-              // Keep link-like keys if downstream expects them
-              erogato_id: ap.erogato_id || "",
-              vendita_id: ap.vendita_id || "",
-              internal_note: ap.internal_note || ap.quick_note || "",
-            },
-          });
-        }).filter((x) => x.startAt);
-        rebuildSlotLocationIndex();
-        syncOpsBar();
-        try { render(); } catch {}
-      })
-      .catch(() => {});
+    // Best-effort: enrich appointments in background (full fields).
+    // Do it on idle so it doesn't slow down the first interaction.
+    const enrichFull = () => {
+      apiGet(`/api/appointments?allowUnmapped=1&start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}${nocache}`)
+        .then((full) => {
+          if (!full?.appointments) return;
+          rawItems = (full.appointments || []).map((a) => {
+            const ap = a || {};
+            return normalizeItem({
+              id: ap.id,
+              operator: ap.therapist_name || "",
+              fields: {
+                start_at: ap.start_at || "",
+                end_at: ap.end_at || "",
+                therapist_name: ap.therapist_name || "",
+                therapist_id: ap.therapist_id || "",
+                service_name: ap.service_name || "",
+                status: ap.status || "",
+                patient_name: ap.patient_name || "",
+                patient_id: ap.patient_id || "",
+                confirmed_by_patient: Boolean(ap.confirmed_by_patient),
+                confirmed_in_platform: Boolean(ap.confirmed_in_platform),
+                patient_note: ap.notes || ap.patient_note || "",
+                // Keep link-like keys if downstream expects them
+                erogato_id: ap.erogato_id || "",
+                vendita_id: ap.vendita_id || "",
+                internal_note: ap.internal_note || ap.quick_note || "",
+              },
+            });
+          }).filter((x) => x.startAt);
+          rebuildSlotLocationIndex();
+          syncOpsBar();
+          try { render(); } catch {}
+        })
+        .catch(() => {});
+    };
+    try {
+      if ("requestIdleCallback" in window) window.requestIdleCallback(enrichFull, { timeout: 1200 });
+      else setTimeout(enrichFull, 700);
+    } catch {
+      setTimeout(enrichFull, 700);
+    }
   }
 
   function computeGridRange(start, days) {
