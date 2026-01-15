@@ -143,59 +143,84 @@ function ensureUnifiedSidebarMenu(roleRaw) {
 
   const html = [];
 
-  // --------
-  // Generale (sempre visibile)
-  // --------
+  // =========================
+  // Menu semplificato per ruolo
+  // - Pazienti + Agenda: sempre visibili (richiesta)
+  // - Fisioterapista: poche voci
+  // - Front office: voci operative/front
+  // - Manager/CEO: vede tutto
+  // =========================
+
+  const isManager = role === "manager";
+
+  // Generale (sempre)
   html.push(section("Generale"));
-  html.push(link("dashboard.html", "Dashboard"));
-  // Richiesto: la voce "Pazienti" deve mostrare l'anagrafica pazienti
   html.push(link("anagrafica.html", "Pazienti"));
   html.push(link("agenda.html", "Agenda"));
 
-  // --------
-  // Operativo (voci poche e mirate)
-  // --------
-  html.push(section("Operativo"));
-  html.push(link("operativo.html", "Oggi"));
-  if (["front", "back", "manager"].includes(role)) {
-    html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
-  }
-  if (["front", "manager"].includes(role)) html.push(link("fatturazione.html", "Fatturazione"));
-
-  // --------
-  // Ruolo-specifico
-  // --------
+  // Fisioterapista (menu ridotto)
   if (role === "physio") {
-    html.push(section("Fisioterapisti"));
-    html.push(link("fisioterapisti.html", "Home"));
+    html.push(section("Operativo"));
+    html.push(link("operativo.html", "Oggi"));
+    html.push(section("Clinico"));
     html.push(link("anamnesi.html", "Anamnesi"));
   }
+
+  // Front office (menu operativo + front)
   if (role === "front") {
+    html.push(section("Operativo"));
+    html.push(link("operativo.html", "Oggi"));
+    html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+    html.push(link("fatturazione.html", "Fatturazione"));
+
     html.push(section("Front Office"));
     html.push(link("front-office.html", "Home"));
     html.push(link("vendite.html", "Vendite"));
     html.push(link("pratiche-assicurative.html", "Assicurazioni"));
     html.push(link("archivio-documenti.html", "Archivio documenti"));
-    html.push(link("anamnesi.html", "Anamnesi"));
-    html.push(link("erogato.html", "Erogato"));
   }
+
+  // Back office (lasciamo un set essenziale)
   if (role === "back") {
     html.push(section("Back Office"));
     html.push(link("back-office.html", "Home"));
     html.push(link("gestione-contabile.html", "Gestione contabile"));
-    html.push(link("vendite.html", "Vendite"));
     html.push(link("erogato.html", "Erogato"));
+    html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
   }
-  if (role === "manager") {
+
+  // Manager/CEO: vede tutto (unione delle aree)
+  if (isManager) {
+    html.push(section("Dashboard"));
+    html.push(link("dashboard.html", "Dashboard"));
+    html.push(link("dashboard-controllo.html", "Dashboard controllo"));
+    html.push(link("dashboard-costi.html", "Dashboard costi"));
+
+    html.push(section("Operativo"));
+    html.push(link("operativo.html", "Oggi"));
+    html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+    html.push(link("fatturazione.html", "Fatturazione"));
+
+    html.push(section("Front Office"));
+    html.push(link("front-office.html", "Home"));
+    html.push(link("vendite.html", "Vendite"));
+    html.push(link("pratiche-assicurative.html", "Assicurazioni"));
+    html.push(link("archivio-documenti.html", "Archivio documenti"));
+
+    html.push(section("Back Office"));
+    html.push(link("back-office.html", "Home"));
+    html.push(link("gestione-contabile.html", "Gestione contabile"));
+    html.push(link("erogato.html", "Erogato"));
+
+    html.push(section("Clinico"));
+    html.push(link("anamnesi.html", "Anamnesi"));
+    html.push(link("fisioterapisti.html", "Fisioterapisti"));
+
     html.push(section("Manager"));
+    html.push(link("manager.html", "Home Manager"));
+    html.push(link("/manager/dashboard.html", "Dashboard CFO"));
     html.push(link("/manager/riepilogo-mensile.html", "Riepilogo mensile"));
     html.push(link("/manager/costi-per-categoria.html", "Costi per categoria"));
-
-    html.push(section("Ruolo"));
-    html.push(link("front-office.html", "Front Office"));
-    html.push(link("fisioterapisti.html", "Fisioterapisti"));
-    html.push(link("back-office.html", "Back Office"));
-    html.push(link("manager.html", "Manager"));
   }
 
   // --------
