@@ -1499,12 +1499,35 @@ body.fp-theme-pro .fp-av-dayhead input{
   color: rgba(13,23,44,.92);
 }
 
-/* Agenda “OsteoEasy-like” (legacy): card/modale bianchi -> testo scuro */
+/* ============================================================
+   Agenda “OsteoEasy-like”: modal/hovercard coerenti col tema
+   (usa i token Standard/Pro definiti a inizio file)
+   ============================================================ */
+
 .oe-hovercard,
 .oe-modal{
-  color: rgba(0,0,0,.88);
+  color: var(--text);
 }
+
+.oe-modal__backdrop{
+  background: rgba(0,0,0,.45);
+}
+
+.oe-hovercard{
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.oe-modal{
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.oe-modal__created{ color: var(--muted); }
 .oe-modal__patientlink{ color: var(--accent); }
+.oe-modal__dt{ color: var(--text); }
 
 /* ============================================================
    Appuntamento: modal “Dettagli” più simile allo screenshot
@@ -1535,14 +1558,14 @@ body.fp-theme-pro .fp-av-dayhead input{
   align-items:center;
   justify-content:center;
   gap: 8px;
-  height: 40px;
-  padding: 0 14px;
+  height: 38px;
+  padding: 0 12px;
   border-radius: 12px;
-  border: 2px solid rgba(0,0,0,.18);
-  background: #fff;
-  color: rgba(0,0,0,.85);
-  font-weight: 900;
-  letter-spacing: .04em;
+  border: 1px solid var(--border);
+  background: var(--btnBg);
+  color: var(--text);
+  font-weight: 850;
+  letter-spacing: .02em;
   cursor:pointer;
   text-decoration:none;
   user-select:none;
@@ -1551,10 +1574,19 @@ body.fp-theme-pro .fp-av-dayhead input{
   opacity: .5;
   pointer-events:none;
 }
-.oe-chipbtn:hover{ background: rgba(0,0,0,.03); }
-.oe-chipbtn--accent{ border-color: rgba(0,180,160,.85); color: rgba(0,140,125,.98); }
-.oe-chipbtn--accent2{ border-color: rgba(0,170,140,.85); color: rgba(0,140,125,.98); }
-.oe-chipbtn--danger{ border-color: rgba(0,0,0,.55); color: rgba(0,0,0,.88); }
+.oe-chipbtn:hover{ background: var(--btnBgHover); }
+.oe-chipbtn--accent{
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
+}
+.oe-chipbtn--accent2{
+  border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+  color: var(--accent-2);
+}
+.oe-chipbtn--danger{
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
+}
 
 .oe-modal__patientCenter{
   display:flex;
@@ -1563,7 +1595,7 @@ body.fp-theme-pro .fp-av-dayhead input{
   justify-content:center;
   gap: 10px;
   padding: 8px 0 10px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid var(--border);
 }
 .oe-modal__patientnameRow{
   display:flex;
@@ -1573,8 +1605,8 @@ body.fp-theme-pro .fp-av-dayhead input{
   justify-content:center;
 }
 .oe-modal__patientname{
-  font-size: 30px;
-  font-weight: 950;
+  font-size: 26px;
+  font-weight: 900;
   letter-spacing: -.2px;
 }
 .oe-badge{
@@ -1583,9 +1615,9 @@ body.fp-theme-pro .fp-av-dayhead input{
   height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(0,180,160,.14);
-  border: 2px solid rgba(0,180,160,.40);
-  color: rgba(0,140,125,.98);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
   font-weight: 950;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -1600,17 +1632,17 @@ body.fp-theme-pro .fp-av-dayhead input{
   flex-wrap:wrap;
 }
 .oe-modal__patientlink{
-  font-weight: 900;
-  color: rgba(0,0,0,.65);
+  font-weight: 850;
+  color: var(--accent);
   text-decoration:none;
 }
 .oe-modal__patientlink:hover{ text-decoration: underline; }
 
 .oe-modal__section{ padding: 14px 0 10px; }
 .oe-modal__dt{
-  font-size: 26px;
-  font-weight: 950;
-  color: rgba(0,0,0,.88);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
 }
 
 .oe-grid--2{ grid-template-columns: 1fr 1fr; }
@@ -1632,17 +1664,34 @@ body.fp-theme-pro .fp-av-dayhead input{
   display:flex;
   align-items:center;
   gap: 10px;
-  font-weight: 900;
-  color: rgba(0,0,0,.70);
+  font-weight: 850;
+  color: var(--text);
 }
 .oe-check input{ width: 20px; height: 20px; }
 
 .oe-counter{
   margin-top: 6px;
   text-align:right;
-  color: rgba(0,0,0,.55);
+  color: var(--muted);
   font-weight: 800;
   font-size: 13px;
+}
+
+/* Form fields inside the modal: match theme */
+.oe-field{ color: var(--text); }
+.oe-field span{ opacity: 1; color: var(--muted); font-weight: 700; letter-spacing: .01em; }
+.oe-field input,
+.oe-field select,
+.oe-field textarea{
+  background: var(--panel-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.oe-field input:focus,
+.oe-field select:focus,
+.oe-field textarea:focus{
+  outline: 2px solid color-mix(in srgb, var(--focusRing) 70%, transparent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 980px){
