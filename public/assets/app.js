@@ -1855,7 +1855,6 @@ function buildModal() {
           <div class="oe-modal__topActions">
             <button class="oe-chipbtn oe-chipbtn--accent" type="button" data-action-repeat>RIPETI</button>
             <button class="oe-chipbtn" type="button" data-action-notify>NOTIFICHE</button>
-            <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-action-location>LUOGO</button>
             <button class="oe-chipbtn oe-chipbtn--danger" type="button" data-action-delete>ELIMINA</button>
           </div>
           <div class="oe-modal__created" data-created></div>
@@ -1868,7 +1867,7 @@ function buildModal() {
           </div>
           <div class="oe-modal__patientActions">
             <a class="oe-chipbtn" data-call href="#" aria-disabled="true">CHIAMA</a>
-            <a class="oe-chipbtn oe-chipbtn--accent" data-wa href="#" aria-disabled="true">+39… WhatsApp</a>
+            <a class="oe-chipbtn oe-chipbtn--wa" data-wa href="#" aria-disabled="true">WhatsApp</a>
             <a class="oe-chipbtn" data-email href="#" aria-disabled="true">EMAIL</a>
             <a class="oe-modal__patientlink" data-plink href="#">Apri scheda paziente</a>
           </div>
@@ -1880,8 +1879,15 @@ function buildModal() {
 
         <div class="oe-grid oe-grid--2">
           <label class="oe-field oe-field--wide">
-            <span>Esito appuntamento</span>
-            <select data-f-status></select>
+            <span>Stato appuntamento</span>
+            <div class="fp-statuspick" data-statuspick>
+              <button type="button" class="fp-statuspick__btn" data-status-btn></button>
+              <div class="fp-statuspick__menu" data-status-menu style="display:none">
+                <input class="fp-statuspick__search" data-status-search placeholder="Cerca un'opzione" />
+                <div class="fp-statuspick__list" data-status-list></div>
+              </div>
+              <select data-f-status style="display:none"></select>
+            </div>
           </label>
         </div>
 
@@ -1892,21 +1898,17 @@ function buildModal() {
           </label>
           <label class="oe-field">
             <span>Durata (min)</span>
-            <input type="number" min="0" step="1" data-f-duration />
+            <input type="number" min="30" max="120" step="30" inputmode="numeric" data-f-duration />
           </label>
           <label class="oe-field">
             <span>Agenda</span>
             <select data-f-operator></select>
           </label>
-          <label class="oe-field oe-field--wide">
-            <span>Luogo</span>
-            <select data-f-location></select>
-          </label>
         </div>
 
         <div class="oe-modal__checks">
-          <label class="oe-check"><input type="checkbox" data-f-confirm-patient /> <span>Confermato dal paziente</span></label>
-          <label class="oe-check"><input type="checkbox" data-f-confirm-platform /> <span>Conferma in InBuoneMani</span></label>
+          <label class="oe-check"><input type="checkbox" data-f-home /> <span>Trattamento domiciliare</span></label>
+          <label class="oe-check oe-check--readonly"><input type="checkbox" data-f-confirm-patient disabled /> <span>Confermato dal paziente</span></label>
         </div>
 
         <div class="oe-grid oe-grid--2">
@@ -1931,6 +1933,129 @@ function buildModal() {
   `;
   document.body.appendChild(wrap);
   return wrap;
+}
+
+function clampDurationMinutes(v) {
+  const n = Number(String(v ?? "").trim());
+  if (!Number.isFinite(n)) return 60;
+  const clamped = Math.max(30, Math.min(120, Math.round(n / 30) * 30));
+  return clamped;
+}
+
+function statusTone(statusRaw) {
+  const s = String(statusRaw || "").trim().toLowerCase();
+  if (!s) return "muted";
+  if (s.includes("programm")) return "yellow";
+  if (s.includes("eseg")) return "green";
+  if (s.includes("no-show") || s.includes("no show")) return "red";
+  if (s.includes("annull")) return "blue";
+  return "muted";
+}
+
+function renderStatusPicker(modal) {
+  const root = modal.querySelector("[data-statuspick]");
+  const sel = modal.querySelector("[data-f-status]");
+  if (!root || !sel) return;
+
+  const btn = root.querySelector("[data-status-btn]");
+  const menu = root.querySelector("[data-status-menu]");
+  const list = root.querySelector("[data-status-list]");
+  const search = root.querySelector("[data-status-search]");
+
+  const options = Array.from(sel.options || [])
+    .filter((o) => String(o.value || "").trim() !== "")
+    .map((o) => ({ value: String(o.value || ""), label: String(o.textContent || o.value || "") }));
+
+  const closeMenu = () => { if (menu) menu.style.display = "none"; };
+  const openMenu = () => { if (menu) menu.style.display = "block"; if (search) search.focus(); };
+  const toggleMenu = () => (menu && menu.style.display === "block" ? closeMenu() : openMenu());
+
+  const setValue = (v) => {
+    sel.value = String(v || "");
+    const label = options.find((x) => x.value === sel.value)?.label || sel.value || "—";
+    const tone = statusTone(sel.value);
+    if (btn) {
+      btn.innerHTML = `<span class="fp-pill fp-pill--${tone}">${label}</span>`;
+    }
+  };
+
+  const renderList = () => {
+    if (!list) return;
+    const q = String(search?.value || "").trim().toLowerCase();
+    const filtered = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
+    list.innerHTML = "";
+
+    if (!filtered.length) {
+      const empty = document.createElement("div");
+      empty.className = "fp-statuspick__empty";
+      empty.textContent = "Nessun risultato";
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const o of filtered) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "fp-statuspick__item";
+      const tone = statusTone(o.value);
+      b.innerHTML = `<span class="fp-pill fp-pill--${tone}">${o.label}</span>`;
+      b.onclick = () => {
+        setValue(o.value);
+        closeMenu();
+      };
+      list.appendChild(b);
+    }
+  };
+
+  if (btn) btn.onclick = (e) => { e.preventDefault(); toggleMenu(); };
+  if (search) search.oninput = renderList;
+
+  // Close when clicking outside
+  modal.addEventListener("click", (e) => {
+    if (!menu || menu.style.display !== "block") return;
+    if (root.contains(e.target)) return;
+    closeMenu();
+  });
+
+  // Initial
+  if (!btn.textContent.trim()) setValue(sel.value || "");
+  renderList();
+
+  // Expose updater for callers
+  root.__fpSetStatusValue = setValue;
+}
+
+async function fpConfirmDialog({ title = "Conferma", message = "", confirmText = "Conferma", cancelText = "Annulla", danger = false } = {}) {
+  return await new Promise((resolve) => {
+    const back = document.createElement("div");
+    back.className = "oe-modal__backdrop fp-confirm__backdrop";
+    back.innerHTML = `
+      <div class="oe-modal fp-confirm__modal" role="dialog" aria-modal="true">
+        <div class="oe-modal__header">
+          <div class="oe-modal__title">${String(title || "Conferma")}</div>
+          <button class="oe-modal__x" data-x aria-label="Chiudi">×</button>
+        </div>
+        <div class="oe-modal__body">
+          <div class="fp-confirm__msg">${String(message || "")}</div>
+        </div>
+        <div class="oe-modal__footer">
+          <button class="oe-btn" data-cancel>${String(cancelText || "Annulla")}</button>
+          <button class="oe-btn ${danger ? "oe-btn--danger" : "oe-btn--primary"}" data-ok>${String(confirmText || "Conferma")}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(back);
+
+    const close = (val) => {
+      try { back.remove(); } catch {}
+      resolve(Boolean(val));
+    };
+
+    back.querySelector("[data-x]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-cancel]")?.addEventListener("click", () => close(false));
+    back.querySelector("[data-ok]")?.addEventListener("click", () => close(true));
+    back.addEventListener("click", (e) => { if (e.target === back) close(false); });
+  });
 }
 
 function setSelectOptions(selectEl, items, { placeholder = "—", allowEmpty = true } = {}) {
@@ -1988,21 +2113,17 @@ async function ensureModalStaticOptions(modal) {
 
   const serviceSel = modal.querySelector("[data-f-service]");
   const operatorSel = modal.querySelector("[data-f-operator]");
-  const locationSel = modal.querySelector("[data-f-location]");
   const treatmentsSel = modal.querySelector("[data-f-treatments]");
   const statusSel = modal.querySelector("[data-f-status]");
 
   try {
-    const [ops, serv, loc, tr] = await Promise.all([
+    const [ops, serv, tr] = await Promise.all([
       api("/api/operators"),
       api("/api/services"),
-      // Positions are stored in Airtable table "AZIENDA" (requested).
-      api("/api/locations?table=AZIENDA&nameField=Sede"),
       treatmentsSel ? api("/api/treatments?activeOnly=1") : Promise.resolve({ items: [] }),
     ]);
     setSelectOptions(operatorSel, ops.items || [], { placeholder: "—" });
     setSelectOptions(serviceSel, serv.items || [], { placeholder: "—" });
-    setSelectOptions(locationSel, loc.items || [], { placeholder: "—" });
     // Status is a single-select in Airtable: load choices (Meta API) or inferred values.
     try {
       const st = await api("/api/appointment-field-options?field=Stato appuntamento");
@@ -2011,6 +2132,7 @@ async function ensureModalStaticOptions(modal) {
       console.warn("Status options not available", e);
       setSelectOptions(statusSel, [], { placeholder: "—" });
     }
+    renderStatusPicker(modal);
 
     if (treatmentsSel) {
       treatmentsSel.innerHTML = "";
@@ -2025,8 +2147,8 @@ async function ensureModalStaticOptions(modal) {
     console.warn("Modal static options not available", e);
     setSelectOptions(operatorSel, [], { placeholder: "(non disponibile)" });
     setSelectOptions(serviceSel, [], { placeholder: "(non disponibile)" });
-    setSelectOptions(locationSel, [], { placeholder: "(non disponibile)" });
     setSelectOptions(statusSel, [], { placeholder: "(non disponibile)" });
+    renderStatusPicker(modal);
     if (treatmentsSel) {
       treatmentsSel.innerHTML = "";
       const opt = document.createElement("option");
@@ -2152,7 +2274,7 @@ async function openModal(modal, appt, onSaved) {
     else a.setAttribute("aria-disabled", "true");
   };
   setLink(callA, "", "CHIAMA");
-  setLink(waA, "", "+39… WhatsApp");
+  setLink(waA, "", "WhatsApp");
   setLink(emailA, "", "EMAIL");
   if (appt.patient_id) {
     try {
@@ -2160,11 +2282,19 @@ async function openModal(modal, appt, onSaved) {
       const telRaw = String(p.Telefono || "").trim();
       const tel = telRaw.replace(/[^\d+]/g, "");
       const telHref = tel ? `tel:${tel}` : "";
-      const waHref = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
+      let waHref = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
       const email = String(p.Email || "").trim();
       const emailHref = email ? `mailto:${email}` : "";
       setLink(callA, telHref, "CHIAMA");
-      setLink(waA, waHref, telRaw ? `${telRaw} WhatsApp` : "+39… WhatsApp");
+      // Build WhatsApp reminder message with confirmation link (best-effort).
+      try {
+        const linkData = await api(`/api/patient-confirm-link?id=${encodeURIComponent(appt.id)}`);
+        const msg = String(linkData?.message || "").trim();
+        if (msg && tel) {
+          waHref = `https://wa.me/${tel.replace(/^\+/, "")}?text=${encodeURIComponent(msg)}`;
+        }
+      } catch {}
+      setLink(waA, waHref, telRaw ? `${telRaw} WhatsApp` : "WhatsApp");
       setLink(emailA, emailHref, email || "EMAIL");
     } catch (e) {
       console.warn("Patient contact not available", e);
@@ -2173,33 +2303,32 @@ async function openModal(modal, appt, onSaved) {
 
   const servSel = modal.querySelector("[data-f-service]");
   const opSel = modal.querySelector("[data-f-operator]");
-  const locSel = modal.querySelector("[data-f-location]");
   ensureSelectHasValue(servSel, appt.service_id, appt.service_name || appt.service_id);
   ensureSelectHasValue(opSel, appt.therapist_id, appt.therapist_name || appt.therapist_id);
-  ensureSelectHasValue(locSel, appt.location_id, appt.location_name || appt.location_id);
   if (servSel) servSel.value = appt.service_id || "";
   if (opSel) opSel.value = appt.therapist_id || "";
-  if (locSel) locSel.value = appt.location_id || "";
 
   const statusSel = modal.querySelector("[data-f-status]");
   ensureSelectHasValue(statusSel, appt.status, appt.status);
   if (statusSel) statusSel.value = appt.status || "";
+  modal.querySelector("[data-statuspick]")?.__fpSetStatusValue?.(appt.status || "");
 
   const durEl = modal.querySelector("[data-f-duration]");
   if (durEl) {
-    durEl.value =
+    const raw =
       (appt.duration !== undefined && appt.duration !== null && String(appt.duration).trim() !== "")
         ? appt.duration
         : (String(appt.duration_label || "").replace(/[^\d]/g, "") || "");
+    durEl.value = String(clampDurationMinutes(raw));
   }
 
   modal.querySelector("[data-f-quick]").value = appt.quick_note || appt.internal_note || "";
   modal.querySelector("[data-f-notes]").value = appt.notes || appt.patient_note || "";
 
   const chkPatient = modal.querySelector("[data-f-confirm-patient]");
-  const chkPlatform = modal.querySelector("[data-f-confirm-platform]");
   if (chkPatient) chkPatient.checked = Boolean(appt.confirmed_by_patient);
-  if (chkPlatform) chkPlatform.checked = Boolean(appt.confirmed_in_platform);
+  const chkHome = modal.querySelector("[data-f-home]");
+  if (chkHome) chkHome.checked = Boolean(appt.domiciliare);
 
   const updateCounters = () => {
     const internal = modal.querySelector("[data-f-quick]");
@@ -2221,14 +2350,18 @@ async function openModal(modal, appt, onSaved) {
   modal.onclick = (e) => { if (e.target === modal) close(); };
 
   // Header actions (currently placeholders except delete/location)
-  const locBtn = modal.querySelector("[data-action-location]");
-  if (locBtn) locBtn.onclick = () => modal.querySelector("[data-f-location]")?.focus?.();
-
   const delBtn = modal.querySelector("[data-action-delete]");
   if (delBtn) delBtn.onclick = async () => {
     const a = modal.__current;
     if (!a) return;
-    if (!confirm("Eliminare questo appuntamento?")) return;
+    const ok = await fpConfirmDialog({
+      title: "Eliminare appuntamento?",
+      message: `Vuoi eliminare l'appuntamento di <b>${String(a.patient_name || "Paziente")}</b>?<br/><br/>Questa operazione non si può annullare.`,
+      confirmText: "Elimina",
+      cancelText: "Annulla",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       delBtn.disabled = true;
       await api(`/api/appointments?id=${encodeURIComponent(a.id)}`, { method: "DELETE" });
@@ -2237,7 +2370,7 @@ async function openModal(modal, appt, onSaved) {
       if (typeof onSaved === "function") onSaved({ ...a, __deleted: true });
     } catch (e) {
       console.error(e);
-      alert("Errore eliminazione. Controlla Console/Network.");
+      alert("Errore eliminazione. Riprova.");
     } finally {
       delBtn.disabled = false;
     }
@@ -2251,10 +2384,8 @@ async function openModal(modal, appt, onSaved) {
       status: modal.querySelector("[data-f-status]")?.value || "",
       serviceId: modal.querySelector("[data-f-service]").value,
       collaboratoreId: modal.querySelector("[data-f-operator]").value,
-      sedeId: modal.querySelector("[data-f-location]").value,
-      durata: modal.querySelector("[data-f-duration]").value,
-      confirmed_by_patient: Boolean(modal.querySelector("[data-f-confirm-patient]")?.checked),
-      confirmed_in_platform: Boolean(modal.querySelector("[data-f-confirm-platform]")?.checked),
+      durata: String(clampDurationMinutes(modal.querySelector("[data-f-duration]").value)),
+      domiciliare: Boolean(modal.querySelector("[data-f-home]")?.checked),
       notaRapida: modal.querySelector("[data-f-quick]").value,
       note: modal.querySelector("[data-f-notes]").value,
     };
@@ -2274,7 +2405,7 @@ async function openModal(modal, appt, onSaved) {
       if (typeof onSaved === "function") onSaved(apptUpdated);
     } catch (err) {
       console.error(err);
-      alert("Errore salvataggio su Airtable. Controlla Console/Network.");
+      alert("Errore salvataggio. Riprova.");
     } finally {
       modal.querySelector("[data-save]").disabled = false;
     }

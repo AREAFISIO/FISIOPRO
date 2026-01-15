@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles, requireSession } from "./_auth.js";
 import { memGetOrSet, memSet, readJsonBody, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function pickName(fields) {
   const f = fields || {};
@@ -34,6 +35,88 @@ export default async function handler(req, res) {
     const tableName = process.env.AIRTABLE_COLLABORATORI_TABLE || "COLLABORATORI";
     const table = encodeURIComponent(tableName);
     const COLOR_FIELD = String(process.env.AIRTABLE_COLLABORATORI_COLOR_FIELD || "Colore agenda").trim() || "Colore agenda";
+
+    // Supabase fast-path
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+
+      if (req.method === "GET") {
+        // Filter "active physiotherapists" using Airtable fields stored in JSON.
+        // We keep this logic in JS because the dataset is small and bases vary.
+        const { data, error } = await sb
+          .from("collaborators")
+          .select("id,airtable_id,name,airtable_fields")
+          .limit(500);
+        if (error) return res.status(500).json({ ok: false, error: `supabase_operators_failed: ${error.message}` });
+
+        const items = (data || [])
+          .map((r) => {
+            const f = (r.airtable_fields && typeof r.airtable_fields === "object") ? r.airtable_fields : {};
+            const ruolo = String(f.Ruolo || "").trim();
+            const attivo = f.Attivo === undefined ? true : Boolean(f.Attivo);
+            const email = String(f.Email || "").trim().toLowerCase();
+            const color = normalizeHexColor(f[COLOR_FIELD] ?? "");
+            return {
+              id: String(r.airtable_id || ""), // UI expects Airtable record id
+              name: String(r.name || "").trim(),
+              email,
+              role: ruolo,
+              active: attivo,
+              color,
+            };
+          })
+          .filter((x) => x.name)
+          .filter((x) => x.active)
+          .filter((x) => String(x.role || "").includes("Fisioterapista"))
+          .sort((a, b) => a.name.localeCompare(b.name, "it"));
+
+        return res.status(200).json({ ok: true, items, colorField: COLOR_FIELD });
+      }
+
+      if (req.method === "PATCH") {
+        const user = requireRoles(req, res, ["front", "manager"]);
+        if (!user) return;
+
+        const body = await readJsonBody(req);
+        if (!body) return res.status(400).json({ ok: false, error: "invalid_json" });
+
+        const colorsRaw = body.colors && typeof body.colors === "object" ? body.colors : null;
+        const singleId = String(body.id || "").trim();
+        const singleColor = normalizeHexColor(body.color);
+
+        const pairs = [];
+        if (colorsRaw) {
+          for (const [id, c] of Object.entries(colorsRaw)) {
+            const rid = String(id || "").trim();
+            const col = normalizeHexColor(c);
+            if (!rid || !col) continue;
+            pairs.push([rid, col]);
+          }
+        } else if (singleId && singleColor) {
+          pairs.push([singleId, singleColor]);
+        }
+        if (!pairs.length) return res.status(400).json({ ok: false, error: "missing_colors" });
+
+        // Update collaborators.airtable_fields[COLOR_FIELD] in Supabase.
+        for (const [airtableId, color] of pairs) {
+          const { data: row, error: rowErr } = await sb
+            .from("collaborators")
+            .select("id,airtable_fields")
+            .eq("airtable_id", airtableId)
+            .maybeSingle();
+          if (rowErr) return res.status(500).json({ ok: false, error: `supabase_operator_lookup_failed: ${rowErr.message}` });
+          if (!row?.id) continue;
+          const f = (row.airtable_fields && typeof row.airtable_fields === "object") ? { ...row.airtable_fields } : {};
+          f[COLOR_FIELD] = color;
+          const { error: upErr } = await sb.from("collaborators").update({ airtable_fields: f }).eq("id", row.id);
+          if (upErr) return res.status(500).json({ ok: false, error: `supabase_operator_update_failed: ${upErr.message}` });
+        }
+
+        return res.status(200).json({ ok: true, updated: pairs.length, colorField: COLOR_FIELD });
+      }
+
+      return res.status(405).json({ ok: false, error: "method_not_allowed" });
+    }
 
     // Only active physiotherapists (operators) by default.
     // Support both:

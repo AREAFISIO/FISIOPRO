@@ -1,6 +1,7 @@
 import { ensureRes, requireSession } from "./_auth.js";
 import { memGet, memSet } from "./_common.js";
 import { airtableGet, airtableGetMany } from "../lib/airtableClient.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function enc(x) {
   return encodeURIComponent(String(x));
@@ -125,6 +126,62 @@ export default async function handler(req, res) {
 
     const patientId = req.query?.recordId || req.query?.id;
     if (!patientId) return res.status(400).json({ error: "Missing id" });
+
+    // Supabase fast-path (enabled via env).
+    // Keeps the same response shape the UI expects, but uses Supabase as data source.
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+
+      const { data: p, error: pErr } = await sb
+        .from("patients")
+        .select("id,airtable_id,label,cognome,nome,phone,email,date_of_birth,airtable_fields")
+        .eq("airtable_id", String(patientId))
+        .maybeSingle();
+
+      if (pErr) return res.status(500).json({ error: `supabase_patient_failed: ${pErr.message}` });
+      if (!p) return res.status(404).json({ error: "not_found" });
+
+      // Linked: cases from Supabase (fast) + anamnesi from Airtable (for now).
+      const { data: caseRows, error: cErr } = await sb
+        .from("cases")
+        .select("airtable_id,airtable_fields")
+        .eq("patient_id", p.id)
+        .order("opened_on", { ascending: false });
+      if (cErr) return res.status(500).json({ error: `supabase_cases_failed: ${cErr.message}` });
+
+      // Anamnesi: keep Airtable until we add a normalized table.
+      let anamnesi = { records: [] };
+      try {
+        const record = await airtableGet(process.env.AIRTABLE_PATIENTS_TABLE || "ANAGRAFICA", String(patientId));
+        const fAt = record.fields || {};
+        const anamIdsRaw = fAt["Anamnesi e Consenso"];
+        const anamIds = Array.isArray(anamIdsRaw) ? anamIdsRaw.filter((x) => String(x || "").startsWith("rec")) : [];
+        anamnesi = await airtableGetMany("ANAMNESI E CONSENSO", anamIds, {
+          fields: ["ANAGRAFICA | DATA | PATOLOGIA", "DATA ", "ANAMNESI", "CONSENSO INFORMATO", "URL ANAMNESI", "URL CONSENSO"],
+        });
+      } catch {
+        // best-effort
+        anamnesi = { records: [] };
+      }
+
+      const f = (p.airtable_fields && typeof p.airtable_fields === "object") ? p.airtable_fields : {};
+      return res.status(200).json({
+        id: p.airtable_id,
+        Nome: p.nome || f["Nome"] || "",
+        Cognome: p.cognome || f["Cognome"] || "",
+        Telefono: p.phone || f["Numero di telefono"] || f["Telefono"] || "",
+        Email: p.email || f["Email"] || "",
+        "Data di nascita": p.date_of_birth || f["Data di nascita"] || "",
+        Note: f["Note interne"] || f["Note"] || "",
+        recordId: p.airtable_id,
+        recordIdText: f["Record ID"] || "",
+        fields: f,
+        linked: {
+          cases: (caseRows || []).map((r) => ({ id: r.airtable_id, fields: r.airtable_fields || {} })),
+          anamnesi: (anamnesi.records || []).map((r) => ({ id: r.id, fields: r.fields || {} })),
+        },
+      });
+    }
 
     // NOTE: requirement: the patient card must be viewable even if the patient has no appointments yet.
     // So we do not gate access on appointment history.

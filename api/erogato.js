@@ -7,6 +7,7 @@ import {
   escAirtableString as escAirtableStringLib,
   resolveLinkedIds,
 } from "../lib/airtableClient.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function parseIsoOrThrow(v, label = "datetime") {
   const s = String(v ?? "").trim();
@@ -44,6 +45,88 @@ export default async function handler(req, res) {
     const tableEnc = enc(tableName);
 
     if (req.method === "GET") {
+      // Supabase fast-path (read-only GET)
+      if (isSupabaseEnabled()) {
+        const sb = getSupabaseAdmin();
+
+        // Range query used by dashboards: /api/erogato?from=ISO&to=ISO&collaboratore=...
+        const fromISOParam = norm(req.query?.from);
+        const toISOParam = norm(req.query?.to);
+        if (fromISOParam && toISOParam) {
+          const fromISO = parseIsoOrThrow(fromISOParam, "from");
+          const toISO = parseIsoOrThrow(toISOParam, "to");
+
+          let q = sb
+            .from("erogato")
+            .select("airtable_id,start_at,end_at,minutes,airtable_fields,collaborator_id,patient_id,case_id")
+            .gte("start_at", fromISO)
+            .lte("start_at", toISO)
+            .order("start_at", { ascending: true })
+            .limit(5000);
+
+          const collaboratoreParam = norm(req.query?.collaboratore);
+          if (collaboratoreParam) {
+            // Accept collaborator Airtable recordId or name.
+            if (collaboratoreParam.startsWith("rec")) {
+              const { data: c } = await sb.from("collaborators").select("id").eq("airtable_id", collaboratoreParam).maybeSingle();
+              if (c?.id) q = q.eq("collaborator_id", c.id);
+            } else {
+              const { data: c } = await sb.from("collaborators").select("id").ilike("name", `%${collaboratoreParam}%`).limit(1);
+              const cid = c?.[0]?.id || "";
+              if (cid) q = q.eq("collaborator_id", cid);
+            }
+          }
+
+          const { data: rows, error } = await q;
+          if (error) return res.status(500).json({ ok: false, error: `supabase_erogato_failed: ${error.message}` });
+
+          return res.status(200).json({
+            ok: true,
+            records: (rows || []).map((r) => ({ id: r.airtable_id, createdTime: "", fields: r.airtable_fields || {} })),
+          });
+        }
+
+        // Patient view: /api/erogato?patientId=rec...
+        const patientId = norm(req.query?.patientId);
+        const maxRecords = Math.min(Number(req.query?.maxRecords || 100) || 100, 200);
+
+        let patientUuid = "";
+        if (patientId) {
+          const { data: p, error: pErr } = await sb.from("patients").select("id").eq("airtable_id", patientId).maybeSingle();
+          if (pErr) return res.status(500).json({ ok: false, error: `supabase_patient_lookup_failed: ${pErr.message}` });
+          patientUuid = p?.id || "";
+        }
+
+        let q2 = sb
+          .from("erogato")
+          .select("airtable_id,start_at,airtable_fields,patient_id")
+          .order("start_at", { ascending: false })
+          .limit(maxRecords);
+        if (patientUuid) q2 = q2.eq("patient_id", patientUuid);
+
+        const { data: rows, error } = await q2;
+        if (error) return res.status(500).json({ ok: false, error: `supabase_erogato_failed: ${error.message}` });
+
+        const items = (rows || []).map((r) => {
+          const f = (r.airtable_fields && typeof r.airtable_fields === "object") ? r.airtable_fields : {};
+          return {
+            id: String(r.airtable_id || ""),
+            patientId,
+            prestazione: f["Tipo lavoro "] ?? f["Tipo lavoro (da prestazioni)"] ?? f.Prestazione ?? f["Voce prezzario"] ?? "",
+            operatore: f.Collaboratore ?? f.Operatore ?? "",
+            data: f["Data erogazione"] ?? f.Data ?? (r.start_at ? new Date(r.start_at).toISOString() : ""),
+            durata: f.Durata ?? f["Minuti lavoro"] ?? "",
+            valore: f.Valore ?? f["Esito economico"] ?? "",
+            stato: f.Stato ?? f["Stato appuntamento"] ?? "",
+            appuntamento: f["Appuntamento collegato"] ?? f.Appuntamento ?? "",
+            note: f.Note ?? "",
+            _fields: f,
+          };
+        });
+
+        return res.status(200).json({ ok: true, items, offset: null });
+      }
+
       // -----------------------------
       // NEW CONTRACT (requested):
       // GET /api/erogato?from=ISO&to=ISO&collaboratore=...

@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { memGetOrSet, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
@@ -71,6 +72,42 @@ export default async function handler(req, res) {
     const table = encodeURIComponent(tableName);
 
     const debug = String(req.query?.debug || "").trim() === "1";
+
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      // No normalized table for locations: derive options from airtable_raw_records (JSONB).
+      const cacheKey = `locations:sb:${tableName}:${nameField}`;
+      const items = await memGetOrSet(cacheKey, 10 * 60_000, async () => {
+        const { data: rows, error } = await sb
+          .from("airtable_raw_records")
+          .select("airtable_id,fields")
+          .eq("table_name", tableName)
+          .limit(2000);
+        if (error) throw new Error(`supabase_locations_raw_failed: ${error.message}`);
+
+        const uniq = new Map(); // name -> name
+        for (const r of rows || []) {
+          const f = (r.fields && typeof r.fields === "object") ? r.fields : {};
+          const v = f[nameField] ?? f.Nome ?? f.Name ?? f.Sede ?? f["Nome sede"] ?? "";
+          if (typeof v === "string") {
+            const s = v.trim();
+            if (s) uniq.set(s, s);
+          } else if (Array.isArray(v)) {
+            for (const x of v) {
+              if (typeof x !== "string") continue;
+              const s = x.trim();
+              if (s) uniq.set(s, s);
+            }
+          }
+        }
+        return Array.from(uniq.values())
+          .map((name) => ({ id: name, name }))
+          .sort((a, b) => a.name.localeCompare(b.name, "it"));
+      });
+
+      if (debug) return res.status(200).json({ ok: true, items, debug: { tableName, nameField, count: items.length, source: "supabase_raw" } });
+      return res.status(200).json({ ok: true, items });
+    }
 
     const cacheKey = `locations:${tableName}:${nameField}`;
     const items = await memGetOrSet(cacheKey, 10 * 60_000, async () => {

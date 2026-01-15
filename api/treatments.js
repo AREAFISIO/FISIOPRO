@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { enc } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
@@ -30,6 +31,42 @@ export default async function handler(req, res) {
 
     const activeOnly = String(req.query?.activeOnly ?? "1") !== "0";
     const q = String(req.query?.q || "").trim().toLowerCase();
+
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      // Read from raw records (catalog differs across bases).
+      const { data: rows, error } = await sb
+        .from("airtable_raw_records")
+        .select("airtable_id,fields")
+        .eq("table_name", tableName)
+        .limit(2000);
+      if (error) return res.status(500).json({ ok: false, error: `supabase_treatments_raw_failed: ${error.message}` });
+
+      const q2 = q ? q.toLowerCase() : "";
+      const items = (rows || [])
+        .map((r) => {
+          const f = (r.fields && typeof r.fields === "object") ? r.fields : {};
+          const name = String(
+            f[fieldName] ??
+            f["Nome trattamento"] ??
+            f["Tipo trattamento"] ??
+            f["Trattamento"] ??
+            f["Nome"] ??
+            f["Name"] ??
+            "",
+          ).trim();
+          if (!name) return null;
+          const activeVal = f[fieldActive] ?? f.Attivo ?? f.Active ?? f.Abilitato ?? undefined;
+          const active = activeVal === undefined ? true : Boolean(activeVal);
+          return { id: String(r.airtable_id || ""), name, active };
+        })
+        .filter(Boolean)
+        .filter((it) => (activeOnly ? Boolean(it.active) : true))
+        .filter((it) => (q2 ? String(it.name || "").toLowerCase().includes(q2) : true))
+        .sort((a, b) => a.name.localeCompare(b.name, "it"));
+
+      return res.status(200).json({ ok: true, items });
+    }
 
     const qs = new URLSearchParams({ pageSize: "100" });
 

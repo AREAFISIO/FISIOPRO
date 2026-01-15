@@ -4,14 +4,12 @@
 -- 2) Normalized "core" tables for performance (patients/cases/appointments/sales/erogato...)
 --
 -- Apply in Supabase SQL editor.
- 
 -- Needed for gen_random_uuid()
 create extension if not exists pgcrypto;
- 
+
 -- ----------------------------
 -- 1) Raw import (complete dump)
 -- ----------------------------
- 
 create table if not exists public.airtable_raw_records (
   table_name text not null,
   airtable_id text not null,
@@ -20,17 +18,15 @@ create table if not exists public.airtable_raw_records (
   synced_at timestamptz not null default now(),
   primary key (table_name, airtable_id)
 );
- 
 create index if not exists airtable_raw_records_table_name_idx
   on public.airtable_raw_records (table_name);
- 
+
 create index if not exists airtable_raw_records_fields_gin_idx
   on public.airtable_raw_records using gin (fields);
- 
+
 -- ----------------------------
 -- 2) Normalized "core" tables
 -- ----------------------------
- 
 create table if not exists public.collaborators (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -40,7 +36,6 @@ create table if not exists public.collaborators (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create table if not exists public.patients (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -62,10 +57,8 @@ create table if not exists public.patients (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create index if not exists patients_codice_fiscale_idx on public.patients (codice_fiscale);
 create index if not exists patients_email_idx on public.patients (email);
- 
 create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -81,7 +74,6 @@ create table if not exists public.services (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create table if not exists public.cases (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -96,11 +88,9 @@ create table if not exists public.cases (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create index if not exists cases_patient_id_idx on public.cases (patient_id);
 create index if not exists cases_opened_on_idx on public.cases (opened_on);
 create index if not exists cases_status_idx on public.cases (status);
- 
 create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -120,11 +110,9 @@ create table if not exists public.sales (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create index if not exists sales_patient_id_idx on public.sales (patient_id);
 create index if not exists sales_case_id_idx on public.sales (case_id);
 create index if not exists sales_sold_at_idx on public.sales (sold_at);
- 
 create table if not exists public.appointments (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -147,12 +135,10 @@ create table if not exists public.appointments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create index if not exists appointments_patient_id_idx on public.appointments (patient_id);
 create index if not exists appointments_case_id_idx on public.appointments (case_id);
 create index if not exists appointments_start_at_idx on public.appointments (start_at);
 create index if not exists appointments_collaborator_id_idx on public.appointments (collaborator_id);
- 
 create table if not exists public.erogato (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -173,12 +159,10 @@ create table if not exists public.erogato (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create index if not exists erogato_patient_id_idx on public.erogato (patient_id);
 create index if not exists erogato_case_id_idx on public.erogato (case_id);
 create index if not exists erogato_start_at_idx on public.erogato (start_at);
 create index if not exists erogato_collaborator_id_idx on public.erogato (collaborator_id);
- 
 create table if not exists public.evaluations (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -195,7 +179,6 @@ create table if not exists public.evaluations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
- 
 create table if not exists public.treatments (
   id uuid primary key default gen_random_uuid(),
   airtable_id text unique,
@@ -212,3 +195,4 @@ create table if not exists public.treatments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Optional: a generic updated_at trigger helper (kept minimal; not required for migration).

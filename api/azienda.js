@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { fetchWithTimeout, memGetOrSet, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function normalizeKeyLoose(s) {
   return String(s ?? "")
@@ -126,6 +127,48 @@ export default async function handler(req, res) {
     const sedeRaw = String(req.query?.sede || process.env.AIRTABLE_AZIENDA_SEDE || "BOLOGNA").trim();
     const sede = sedeRaw || "BOLOGNA";
     const cacheKey = `azienda:${TABLE}:${sede.toLowerCase()}`;
+
+    // Supabase fast-path: read from raw records (no Airtable).
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const out = await memGetOrSet(cacheKey, 60_000, async () => {
+        const { data: rows, error } = await sb
+          .from("airtable_raw_records")
+          .select("airtable_id,fields")
+          .eq("table_name", TABLE)
+          .limit(500);
+        if (error) throw new Error(`supabase_azienda_raw_failed: ${error.message}`);
+
+        const pickAttachmentUrl = (val) => {
+          if (Array.isArray(val) && val.length) {
+            const a = val[0] || {};
+            const t = a.thumbnails || {};
+            return t.small?.url || t.large?.url || t.full?.url || a.url || "";
+          }
+          if (typeof val === "string") return val.trim();
+          return "";
+        };
+
+        let chosen = null;
+        for (const r of rows || []) {
+          const f = (r.fields && typeof r.fields === "object") ? r.fields : {};
+          const match =
+            String(f.Sede || f.Nome || f.Name || f["Ragione Sociale"] || "").trim().toLowerCase() === sede.toLowerCase();
+          if (!match) continue;
+          const logoUrl = pickAttachmentUrl(f.Logo || f.logo || f.LOGO || "");
+          if (logoUrl) { chosen = { f, logoUrl }; break; }
+          if (!chosen) chosen = { f, logoUrl: "" };
+        }
+        if (!chosen && rows?.[0]) {
+          const f = rows[0].fields || {};
+          chosen = { f, logoUrl: pickAttachmentUrl(f.Logo || f.logo || f.LOGO || "") };
+        }
+        const fields = chosen?.f || {};
+        return { sede, name: fields.Nome || fields.Name || fields["Ragione Sociale"] || "", logoUrl: chosen?.logoUrl || "" };
+      });
+      return res.status(200).json({ ok: true, ...out });
+    }
+
     const out = await memGetOrSet(cacheKey, 60_000, async () => {
       // Prefer Meta API so we can see fields even when empty in records.
       const meta = await discoverTableMeta(TABLE);

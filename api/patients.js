@@ -1,6 +1,7 @@
 import { ensureRes, requireSession } from "./_auth.js";
 import patientHandler from "./patient.js";
 import { airtableList, escAirtableString } from "../lib/airtableClient.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function norm(v) {
   const s = String(v ?? "").trim();
@@ -35,6 +36,39 @@ export default async function handler(req, res) {
     }
 
     if (!q) return res.status(200).json({ ok: true, patients: [] });
+
+    // Supabase fast-path (enabled via env).
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const qq = norm(q);
+      const like = `%${qq}%`;
+
+      const { data, error } = await sb
+        .from("patients")
+        .select("airtable_id,label,cognome,nome,phone,airtable_fields")
+        .or(`label.ilike.${like},cognome.ilike.${like},nome.ilike.${like},phone.ilike.${like}`)
+        .order("cognome", { ascending: true })
+        .order("nome", { ascending: true })
+        .limit(50);
+
+      if (error) return res.status(500).json({ ok: false, error: `supabase_patients_failed: ${error.message}` });
+
+      const patients = (data || []).map((p) => {
+        const f = (p.airtable_fields && typeof p.airtable_fields === "object") ? p.airtable_fields : {};
+        return {
+          id: p.airtable_id || "", // keep Airtable recordId in the UI
+          recordId: p.airtable_id || "",
+          paziente: p.label || f["Paziente"] || "",
+          cognome: p.cognome || f["Cognome"] || "",
+          nome: p.nome || f["Nome"] || "",
+          telefono: p.phone || f["Numero di telefono"] || "",
+          recordIdText: f["Record ID"] || "",
+          fields: f,
+        };
+      });
+
+      return res.status(200).json({ ok: true, patients });
+    }
 
     const { records } = await airtableList("ANAGRAFICA", {
       filterByFormula: toSearchFormula(q),

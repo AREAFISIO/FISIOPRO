@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { memGetOrSet, setPrivateCache } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function isUnknownFieldError(msg) {
   const s = String(msg || "").toLowerCase();
@@ -29,6 +30,16 @@ export default async function handler(req, res) {
     if (req.method !== "GET") return res.status(405).json({ ok: false, error: "method_not_allowed" });
 
     setPrivateCache(res, 60);
+
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const { data, error } = await sb.from("services").select("airtable_id,name").order("name", { ascending: true }).limit(1000);
+      if (error) return res.status(500).json({ ok: false, error: `supabase_services_failed: ${error.message}` });
+      const items = (data || [])
+        .map((r) => ({ id: String(r.airtable_id || ""), name: String(r.name || "").trim() }))
+        .filter((x) => x.id && x.name);
+      return res.status(200).json({ ok: true, items });
+    }
 
     const tableName = process.env.AIRTABLE_SERVICES_TABLE || process.env.AIRTABLE_PRESTAZIONI_TABLE || "PRESTAZIONI";
     const nameField = process.env.AIRTABLE_SERVICES_NAME_FIELD || "Prestazione";

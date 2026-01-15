@@ -1,5 +1,6 @@
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
 import { asLinkArray, enc, norm, readJsonBody, filterByLinkedRecordId } from "./_common.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 export default async function handler(req, res) {
   ensureRes(res);
@@ -23,6 +24,47 @@ export default async function handler(req, res) {
       const patientId = norm(req.query?.patientId);
       const maxRecords = Math.min(Number(req.query?.maxRecords || 50) || 50, 200);
       const qs = new URLSearchParams({ pageSize: "100", maxRecords: String(maxRecords) });
+
+      // Supabase fast-path (read-only GET).
+      if (isSupabaseEnabled()) {
+        const sb = getSupabaseAdmin();
+        if (!patientId) return res.status(200).json({ ok: true, items: [], offset: null });
+
+        // This table isn't normalized yet: read from airtable_raw_records.
+        // In your base the patient link is often "LINK TO ANAGRAFICA" (array of rec...).
+        const { data: rows, error } = await sb
+          .from("airtable_raw_records")
+          .select("airtable_id,fields")
+          .eq("table_name", tableName)
+          .limit(2000);
+        if (error) return res.status(500).json({ ok: false, error: `supabase_anamnesi_raw_failed: ${error.message}` });
+
+        const pid = String(patientId);
+        const items = (rows || [])
+          .map((r) => {
+            const f = (r.fields && typeof r.fields === "object") ? r.fields : {};
+            const links = f["LINK TO ANAGRAFICA"] || f[fieldPatient] || f.Paziente || [];
+            const asArr = Array.isArray(links) ? links : typeof links === "string" ? [links] : [];
+            const match = asArr.some((x) => String(x || "").trim() === pid);
+            if (!match) return null;
+            return {
+              id: String(r.airtable_id || ""),
+              patientId: pid,
+              consenso: Boolean(f[fieldConsent] ?? f["CONSENSO INFORMATO"] ?? f["Consenso informato"] ?? false),
+              dataConsenso: f[fieldConsentDate] || f["DATA "] || f.Data || "",
+              anamnesiRemota: f[fieldRemote] || f["ANAMNESI"] || "",
+              anamnesiRecente: f[fieldRecent] || "",
+              farmaci: f[fieldDrugs] || "",
+              allergie: f[fieldAllergies] || "",
+              note: f[fieldNotes] || f.Note || "",
+              _fields: f,
+            };
+          })
+          .filter(Boolean)
+          .slice(0, maxRecords);
+
+        return res.status(200).json({ ok: true, items, offset: null });
+      }
 
       if (patientId) {
         const formula = filterByLinkedRecordId({ linkField: fieldPatient, recordId: patientId });
