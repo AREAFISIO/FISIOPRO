@@ -1733,7 +1733,17 @@ export default async function handler(req, res) {
           await sb.from("appointments").update({ airtable_fields: f2 }).eq("id", updated.id);
         }
 
-        return res.status(200).json({ ok: true, appointment: { id: updated.airtable_id } });
+        return res.status(200).json({
+          ok: true,
+          appointment: {
+            id: updated.airtable_id,
+            start_at: updated.start_at ? new Date(updated.start_at).toISOString() : "",
+            end_at: updated.end_at ? new Date(updated.end_at).toISOString() : "",
+            therapist_id: collaborator?.airtable_id || "",
+            therapist_name: collaborator?.name || "",
+            status: String(updated.status || "").trim(),
+          },
+        });
       }
 
       if (req.method === "POST") {
