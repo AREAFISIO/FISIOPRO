@@ -2611,7 +2611,9 @@ function removeLegacyRightDrawer() {
 async function ensureDiaryLoaded() {
   const p = location.pathname || "";
   if (!p.endsWith("/pages/agenda.html") && !p.endsWith("/agenda.html")) return;
-  if (!document.querySelector("[data-diary]")) return;
+  const hasDiaryRoot = Boolean(document.querySelector("[data-diary]"));
+  const hasGrid = Boolean(document.querySelector("[data-cal-grid]"));
+  if (!hasDiaryRoot && !hasGrid) return;
 
   if (typeof window.fpDiaryInit === "function") {
     window.fpDiaryInit();
