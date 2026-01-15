@@ -3083,6 +3083,13 @@
     back.style.display = "flex";
   }
 
+  function closeModal() {
+    const back = document.querySelector("[data-cal-modal]");
+    if (!back) return;
+    back.style.display = "none";
+    try { back.setAttribute("aria-hidden", "true"); } catch {}
+  }
+
   // NOTE: openCreateModal removed. New appointments now use openDetailsModal in "new" mode.
 
   function render() {
