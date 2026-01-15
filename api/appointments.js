@@ -1374,6 +1374,10 @@ export default async function handler(req, res) {
           const endAt = r.end_at ? new Date(r.end_at).toISOString() : "";
           const appointmentType = String(f["Voce agenda"] || r.agenda_label || r.work_type || "").trim();
 
+          // Keep "Airtable-like" fields in sync for UI compatibility.
+          const isHome = Boolean(r.is_home ?? f["DOMICILIO"] ?? f["Domicilio"] ?? false);
+          if (isHome) f["DOMICILIO"] = true;
+
           return {
             id: String(r.airtable_id || ""),
             created_at: "",
@@ -1387,6 +1391,7 @@ export default async function handler(req, res) {
             service_name: serviceName,
             location_id: "",
             location_name: String(r.location || f.Sede || "").trim(),
+            domiciliare: isHome,
             therapist_id: therapistAirtableId,
             therapist_name: therapistName,
             duration: r.duration_minutes ?? f["Durata (minuti)"] ?? "",
@@ -1634,6 +1639,14 @@ export default async function handler(req, res) {
         if ("confirmed_in_platform" in body || "confirmedInPlatform" in body || "confermaInPiattaforma" in body) {
           const v = body.confirmed_in_platform ?? body.confirmedInPlatform ?? body.confermaInPiattaforma;
           f = mergeAirtableFields(f, { "Conferma in InBuoneMani": Boolean(v), "Conferma in piattaforma": Boolean(v) });
+        }
+
+        // Domiciliare (checkbox)
+        if ("domiciliare" in body || "is_home" in body || "domicilio" in body) {
+          const v = body.domiciliare ?? body.is_home ?? body.domicilio;
+          const b = boolish(v);
+          updates.is_home = b;
+          f = mergeAirtableFields(f, { DOMICILIO: b });
         }
 
         // Datetime changes (drag/drop)
