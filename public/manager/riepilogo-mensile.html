@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>FisioPro • Manager • Riepilogo mensile</title>
 
-  <link rel="stylesheet" href="/assets/app.css?v=fpui-20260115a" />
+  <link rel="stylesheet" href="/assets/app.css?v=fpui-20260115c" />
   <script src="/assets/session-timeout.js"></script>
 
   <style>
@@ -53,7 +53,7 @@
       async function authCheck() {
         const r = await fetch("/api/auth-check", { credentials: "include" });
         const data = await r.json().catch(() => ({}));
-        if (!r.ok || !data?.ok || data?.role !== "Manager") return { ok: false };
+        if (!r.ok || !data?.ok) return { ok: false };
 
         const u = data.user || {};
         window.FP_USER = {
@@ -61,7 +61,7 @@
           nome: u.nome || "",
           cognome: u.cognome || "",
           role: "manager",
-          roleLabel: u.roleLabel || "Manager",
+          roleLabel: u.roleLabel || data.role || "CEO",
         };
         window.FP_SESSION = { role: "manager", email: window.FP_USER.email };
         return { ok: true, user: window.FP_USER, session: window.FP_SESSION };
@@ -168,7 +168,7 @@
   <div class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="/assets/app.js?v=fpui-20260115a"></script>
+  <script src="/assets/app.js?v=fpui-20260115c"></script>
 
   <script>
     (function () {
