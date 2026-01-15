@@ -1278,7 +1278,9 @@ export default async function handler(req, res) {
     const tableEnc = enc(tableName);
 
     if (req.method === "GET") {
-      setPrivateCache(res, 30);
+      // `lite=1` is used for the agenda first paint; cache slightly longer.
+      const lite = String(req.query?.lite || "") === "1";
+      setPrivateCache(res, lite ? 120 : 30);
 
       // -----------------------------------------
       // Supabase fast-path (read-only GET)
@@ -1291,6 +1293,7 @@ export default async function handler(req, res) {
         const date = norm(req.query?.date);
         const startRaw = norm(req.query?.start);
         const endRaw = norm(req.query?.end);
+        const isLite = String(req.query?.lite || "") === "1";
         const summary = String(req.query?.summary || "") === "1";
         const kpi = String(req.query?.kpi || "") === "1";
         const kpiType = norm(req.query?.type);
@@ -1348,12 +1351,15 @@ export default async function handler(req, res) {
 
         const wantTypeNorm = String(kpiType || "").trim().toLowerCase();
 
-        // Load appointments (include linked names/airtable_ids needed by UI).
+        // Load appointments (include only what we need).
+        // NOTE: /pages/agenda.html first calls with lite=1 for fastest first paint.
+        const selectCols = isLite
+          ? "airtable_id,start_at,end_at,duration_minutes,status,agenda_label,location,collaborator_id,service_id,patients:patients(airtable_id,label),collaborators:collaborators(airtable_id,name),services:services(airtable_id,name)"
+          : "airtable_id,start_at,end_at,duration_minutes,status,agenda_label,location,is_home,work_type,note,airtable_fields,collaborator_id,service_id,patients:patients(airtable_id,label,cognome,nome),collaborators:collaborators(airtable_id,name),services:services(airtable_id,name)";
+
         let q = sb
           .from("appointments")
-          .select(
-            "airtable_id,start_at,end_at,duration_minutes,status,agenda_label,location,is_home,work_type,note,airtable_fields,collaborator_id,service_id,patients:patients(airtable_id,label,cognome,nome),collaborators:collaborators(airtable_id,name),services:services(airtable_id,name)"
-          )
+          .select(selectCols)
           .gte("start_at", startISO)
           .lt("start_at", endISO)
           .order("start_at", { ascending: true });
@@ -1363,8 +1369,8 @@ export default async function handler(req, res) {
         if (error) throw new Error(`supabase_appointments_failed: ${error.message}`);
 
         const appts = (rows || []).map((r) => {
-          const f = (r.airtable_fields && typeof r.airtable_fields === "object") ? r.airtable_fields : {};
-          const patientName = String(f["Paziente"] || r.patients?.label || "").trim();
+          const f = (!isLite && r.airtable_fields && typeof r.airtable_fields === "object") ? r.airtable_fields : {};
+          const patientName = String((!isLite ? f["Paziente"] : "") || r.patients?.label || "").trim();
           const patientAirtableId = String(r.patients?.airtable_id || "").trim();
           const therapistAirtableId = String(r.collaborators?.airtable_id || "").trim();
           const therapistName = String(r.collaborators?.name || "").trim();
@@ -1372,11 +1378,11 @@ export default async function handler(req, res) {
           const serviceName = String(r.services?.name || "").trim();
           const startAt = r.start_at ? new Date(r.start_at).toISOString() : "";
           const endAt = r.end_at ? new Date(r.end_at).toISOString() : "";
-          const appointmentType = String(f["Voce agenda"] || r.agenda_label || r.work_type || "").trim();
+          const appointmentType = String((!isLite ? f["Voce agenda"] : "") || r.agenda_label || (!isLite ? r.work_type : "") || "").trim();
 
           // Keep "Airtable-like" fields in sync for UI compatibility.
-          const isHome = Boolean(r.is_home ?? f["DOMICILIO"] ?? f["Domicilio"] ?? false);
-          if (isHome) f["DOMICILIO"] = true;
+          const isHome = isLite ? false : Boolean(r.is_home ?? f["DOMICILIO"] ?? f["Domicilio"] ?? false);
+          if (!isLite && isHome) f["DOMICILIO"] = true;
 
           return {
             id: String(r.airtable_id || ""),
@@ -1396,18 +1402,18 @@ export default async function handler(req, res) {
             therapist_name: therapistName,
             duration: r.duration_minutes ?? f["Durata (minuti)"] ?? "",
             duration_label: r.duration_minutes ? `${r.duration_minutes} min` : "",
-            confirmed_by_patient: Boolean(f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false),
-            confirmed_in_platform: Boolean(f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false),
-            quick_note: String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
-            notes: String(f["Note"] ?? "").trim(),
-            internal_note: String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
-            patient_note: String(f["Note"] ?? "").trim(),
-            tipi_erogati: Array.isArray(f["Tipi Erogati"]) ? f["Tipi Erogati"] : [],
-            valutazioni_ids: Array.isArray(f["VALUTAZIONI"]) ? f["VALUTAZIONI"] : [],
-            trattamenti_ids: Array.isArray(f["TRATTAMENTI"]) ? f["TRATTAMENTI"] : [],
-            erogato_id: (Array.isArray(f["Erogato collegato"]) && f["Erogato collegato"][0]) ? String(f["Erogato collegato"][0]) : "",
-            caso_clinico_id: (Array.isArray(f["Caso clinico"]) && f["Caso clinico"][0]) ? String(f["Caso clinico"][0]) : "",
-            vendita_id: (Array.isArray(f["Vendita collegata"]) && f["Vendita collegata"][0]) ? String(f["Vendita collegata"][0]) : "",
+            confirmed_by_patient: isLite ? false : Boolean(f["Confermato dal paziente"] ?? f["Conferma del paziente"] ?? false),
+            confirmed_in_platform: isLite ? false : Boolean(f["Conferma in InBuoneMani"] ?? f["Conferma in piattaforma"] ?? false),
+            quick_note: isLite ? "" : String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
+            notes: isLite ? "" : String(f["Note"] ?? "").trim(),
+            internal_note: isLite ? "" : String(f["Nota rapida"] ?? f["Note interne"] ?? "").trim(),
+            patient_note: isLite ? "" : String(f["Note"] ?? "").trim(),
+            tipi_erogati: isLite ? [] : (Array.isArray(f["Tipi Erogati"]) ? f["Tipi Erogati"] : []),
+            valutazioni_ids: isLite ? [] : (Array.isArray(f["VALUTAZIONI"]) ? f["VALUTAZIONI"] : []),
+            trattamenti_ids: isLite ? [] : (Array.isArray(f["TRATTAMENTI"]) ? f["TRATTAMENTI"] : []),
+            erogato_id: isLite ? "" : ((Array.isArray(f["Erogato collegato"]) && f["Erogato collegato"][0]) ? String(f["Erogato collegato"][0]) : ""),
+            caso_clinico_id: isLite ? "" : ((Array.isArray(f["Caso clinico"]) && f["Caso clinico"][0]) ? String(f["Caso clinico"][0]) : ""),
+            vendita_id: isLite ? "" : ((Array.isArray(f["Vendita collegata"]) && f["Vendita collegata"][0]) ? String(f["Vendita collegata"][0]) : ""),
           };
         });
 
@@ -1490,7 +1496,6 @@ export default async function handler(req, res) {
       const startRaw = norm(req.query?.start);
       const endRaw = norm(req.query?.end);
       const noCache = String(req.query?.nocache || "") === "1";
-      const lite = String(req.query?.lite || "") === "1";
       const summary = String(req.query?.summary || "") === "1";
       const kpi = String(req.query?.kpi || "") === "1";
       const kpiType = norm(req.query?.type);
