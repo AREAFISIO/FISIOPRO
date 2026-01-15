@@ -1263,6 +1263,18 @@
     return rgbaFromColor(solid, 0.18) || "rgba(34,230,195,.14)";
   }
 
+  function solidForAppointment(it) {
+    const oc = prefs?.operatorColors && typeof prefs.operatorColors === "object" ? prefs.operatorColors : {};
+    const tid = String(it?.therapistId || "").trim();
+    if (tid && tid.startsWith("rec")) {
+      const byTid = normalizeHexColor(oc[tid]);
+      if (byTid) return byTid;
+    }
+    // fallback: map by therapist label (and any single-user overrides inside solidForTherapist)
+    const n = String(it?.therapist || tid || "").trim();
+    return solidForTherapist(n);
+  }
+
   function solidForTherapist(name) {
     const n = String(name || "").trim();
     const oc = prefs?.operatorColors && typeof prefs.operatorColors === "object" ? prefs.operatorColors : {};
@@ -1273,6 +1285,8 @@
     // Back-compat: userColor (applies to "me" only)
     const me = String(getUserName() || "").trim();
     const my = normalizeHexColor(prefs.userColor);
+    // In single-user view, apply the user's chosen color even if name mapping fails.
+    if (my && !multiUser) return my;
     if (my) {
       if (me && n === me) return my;
       // If appointment label differs but maps to the same operator id, still apply my color.
@@ -3693,7 +3707,7 @@
       ev.style.top = top + "px";
       ev.style.height = height + "px";
       {
-        const solid = solidForTherapist(it.therapist);
+        const solid = solidForAppointment(it);
         // Requested: make appointment block more evident (no transparency).
         // Use a solid tinted panel so text stays readable in both themes.
         ev.style.background = `color-mix(in srgb, ${solid} 32%, var(--panelSolid) 68%)`;
@@ -3701,7 +3715,7 @@
         ev.style.borderLeftColor = `color-mix(in srgb, ${solid} 85%, rgba(0,0,0,.18))`;
       }
 
-      const dotSolid = solidForTherapist(it.therapist);
+      const dotSolid = solidForAppointment(it);
       const dot = `<span class="dot" style="background:${dotSolid}; box-shadow:0 10px 22px ${rgbaFromColor(dotSolid, 0.22)};"></span>`;
       const line = prefs.showService
         ? [it.service, it.status].filter(Boolean).join(" • ")
@@ -3714,7 +3728,7 @@
       `;
       // Highlight on hover (slot-like) + keep existing preview behavior
       {
-        const solid = solidForTherapist(it.therapist);
+        const solid = solidForAppointment(it);
         const applyHover = (on) => {
           if (ev.classList.contains("isDragging")) return;
           ev.classList.toggle("isHover", Boolean(on));
