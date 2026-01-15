@@ -1659,7 +1659,7 @@ body.fp-theme-pro .fp-pill--yellow{ background: rgba(255, 179, 0, .18); border-c
   flex-wrap:wrap;
 }
 .oe-modal__created{
-  color: rgba(0,0,0,.55);
+  color: var(--muted);
   font-weight: 700;
   text-align:right;
   white-space: nowrap;
