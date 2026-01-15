@@ -3639,14 +3639,289 @@ function isBillingNow() {
   return p.endsWith("/pages/fatturazione.html") || p.endsWith("/fatturazione.html");
 }
 
+function isManagerNow() {
+  const p = location.pathname || "";
+  // Manager "home" lives under /pages/manager.html; CFO dashboards live under /manager/*
+  return p.endsWith("/pages/manager.html") || p.includes("/manager/");
+}
+
+function ensureManagerSettingsModal() {
+  if (document.querySelector("[data-fp-mgr-back]")) return;
+
+  const back = document.createElement("div");
+  back.className = "fp-set-back";
+  back.setAttribute("data-fp-mgr-back", "1");
+  back.innerHTML = `
+    <div class="fp-set-panel" role="dialog" aria-modal="true" style="width:920px;">
+      <div class="fp-set-head">
+        <div class="fp-set-title"><span style="font-size:18px;">⚙️</span> Impostazioni Manager</div>
+        <button class="btn" type="button" data-fp-mgr-close>Chiudi</button>
+      </div>
+      <div class="fp-set-body">
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="min-width:0;">
+              <div style="font-weight:950;">Collaboratori</div>
+              <div style="margin-top:4px; color:var(--muted);">
+                Aggiungi / disattiva collaboratori e gestisci il flag “Attivo”.
+              </div>
+            </div>
+            <button class="btn" type="button" data-mgr-refresh>Aggiorna</button>
+          </div>
+
+          <div style="margin-top:12px; display:grid; grid-template-columns: 1.3fr 1fr; gap:12px;">
+            <label class="field" style="gap:6px;">
+              <span class="fpFormLabel">Cerca</span>
+              <input class="input" data-mgr-q placeholder="Nome / email…" />
+            </label>
+            <label class="field" style="gap:6px;">
+              <span class="fpFormLabel">Mostra</span>
+              <select class="select" data-mgr-filter>
+                <option value="all">Tutti</option>
+                <option value="active">Solo attivi</option>
+                <option value="inactive">Solo non attivi</option>
+              </select>
+            </label>
+          </div>
+
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+            <div style="font-weight:900;">Nuovo collaboratore</div>
+            <div style="margin-top:10px; display:grid; grid-template-columns: 1.2fr 1fr 220px 140px; gap:10px; align-items:end;">
+              <label class="field" style="gap:6px;">
+                <span class="fpFormLabel">Nome</span>
+                <input class="input" data-mgr-new-name placeholder="Es. Mario Rossi" />
+              </label>
+              <label class="field" style="gap:6px;">
+                <span class="fpFormLabel">Email</span>
+                <input class="input" data-mgr-new-email placeholder="nome@azienda.it" />
+              </label>
+              <label class="field" style="gap:6px;">
+                <span class="fpFormLabel">Ruolo</span>
+                <select class="select" data-mgr-new-role>
+                  <option value="Fisioterapista">Fisioterapista</option>
+                  <option value="Front office">Front office</option>
+                  <option value="Back office">Back office</option>
+                  <option value="CEO">CEO</option>
+                </select>
+              </label>
+              <label class="field" style="gap:6px;">
+                <span class="fpFormLabel">Attivo</span>
+                <label class="switch" style="margin-top:6px;">
+                  <input type="checkbox" checked data-mgr-new-active />
+                  <span class="slider"></span>
+                </label>
+              </label>
+            </div>
+            <div style="margin-top:10px; display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+              <button class="btn primary" type="button" data-mgr-new-save>Aggiungi</button>
+            </div>
+            <div style="margin-top:8px; color:var(--muted); font-size:13px;">
+              Nota: “Rimuovere” un collaboratore = renderlo <b>non attivo</b> (soft delete).
+            </div>
+          </div>
+
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <div style="font-weight:900;">Elenco</div>
+              <div style="color:var(--muted); font-size:13px;" data-mgr-count>—</div>
+            </div>
+            <div style="margin-top:10px;" data-mgr-list></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(back);
+
+  // Close behavior
+  const close = () => { back.style.display = "none"; };
+  back.querySelector("[data-fp-mgr-close]")?.addEventListener("click", close);
+  back.addEventListener("click", (e) => { if (e.target === back) close(); });
+}
+
+async function openManagerSettingsModal() {
+  ensureManagerSettingsModal();
+  const back = document.querySelector("[data-fp-mgr-back]");
+  if (!back) return;
+
+  const qEl = back.querySelector("[data-mgr-q]");
+  const fEl = back.querySelector("[data-mgr-filter]");
+  const listEl = back.querySelector("[data-mgr-list]");
+  const countEl = back.querySelector("[data-mgr-count]");
+  const btnRefresh = back.querySelector("[data-mgr-refresh]");
+
+  const newName = back.querySelector("[data-mgr-new-name]");
+  const newEmail = back.querySelector("[data-mgr-new-email]");
+  const newRole = back.querySelector("[data-mgr-new-role]");
+  const newActive = back.querySelector("[data-mgr-new-active]");
+  const btnNewSave = back.querySelector("[data-mgr-new-save]");
+
+  let items = [];
+  const roleOpts = ["Fisioterapista", "Front office", "Back office", "CEO"];
+
+  const esc = (x) =>
+    String(x ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+
+  async function load() {
+    try {
+      listEl.innerHTML = `<div style="padding:12px; color:var(--muted); font-weight:800;">Caricamento…</div>`;
+      const data = await window.fpApi("/api/manager-collaborators");
+      items = Array.isArray(data.items) ? data.items : [];
+      render();
+    } catch (e) {
+      console.error(e);
+      listEl.innerHTML = `<div style="padding:12px; color:rgba(255,214,222,.95); font-weight:900;">Errore caricamento collaboratori</div>`;
+    }
+  }
+
+  function filtered() {
+    const q = String(qEl?.value || "").trim().toLowerCase();
+    const mode = String(fEl?.value || "all");
+    return (items || []).filter((x) => {
+      const active = Boolean(x.active);
+      if (mode === "active" && !active) return false;
+      if (mode === "inactive" && active) return false;
+      if (!q) return true;
+      return (
+        String(x.name || "").toLowerCase().includes(q) ||
+        String(x.email || "").toLowerCase().includes(q) ||
+        String(x.roleLabel || "").toLowerCase().includes(q) ||
+        String(x.id || "").toLowerCase().includes(q)
+      );
+    });
+  }
+
+  function render() {
+    const rows = filtered();
+    if (countEl) countEl.textContent = `${rows.length} / ${(items || []).length}`;
+    if (!rows.length) {
+      listEl.innerHTML = `<div style="padding:12px; color:var(--muted); font-weight:800;">Nessun collaboratore.</div>`;
+      return;
+    }
+    listEl.innerHTML = rows
+      .map((x) => {
+        const id = String(x.id || "");
+        const name = String(x.name || "");
+        const email = String(x.email || "");
+        const role = String(x.roleLabel || "");
+        const active = Boolean(x.active);
+        return `
+          <div data-mgr-row="${esc(id)}" class="card" style="padding:12px; margin-bottom:10px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+              <div style="min-width:0;">
+                <div style="font-weight:950;">${esc(name)}</div>
+                <div style="margin-top:4px; color:var(--muted); font-size:13px;">${esc(email)} • <span style="opacity:.85;">${esc(id)}</span></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <label class="field" style="gap:6px; min-width:220px;">
+                  <span class="fpFormLabel">Ruolo</span>
+                  <select class="select" data-mgr-role>
+                    ${roleOpts.map((r) => `<option value="${esc(r)}" ${r === role ? "selected" : ""}>${esc(r)}</option>`).join("")}
+                  </select>
+                </label>
+                <label class="field" style="gap:6px;">
+                  <span class="fpFormLabel">Attivo</span>
+                  <label class="switch" style="margin-top:6px;">
+                    <input type="checkbox" ${active ? "checked" : ""} data-mgr-active />
+                    <span class="slider"></span>
+                  </label>
+                </label>
+                <button class="btn ${active ? "" : "primary"}" type="button" data-mgr-toggle>${active ? "Disattiva" : "Riattiva"}</button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    // bind row events
+    listEl.querySelectorAll("[data-mgr-row]").forEach((row) => {
+      const id = String(row.getAttribute("data-mgr-row") || "");
+      const roleSel = row.querySelector("[data-mgr-role]");
+      const activeChk = row.querySelector("[data-mgr-active]");
+      const btnToggle = row.querySelector("[data-mgr-toggle]");
+
+      const find = () => (items || []).find((x) => String(x.id || "") === id) || null;
+
+      const patch = async (p) => {
+        await window.fpApi("/api/manager-collaborators", { method: "PATCH", body: JSON.stringify({ id, ...p }) });
+        const it = find();
+        if (it) {
+          if (p.roleLabel !== undefined) it.roleLabel = String(p.roleLabel || "");
+          if (p.active !== undefined) it.active = Boolean(p.active);
+        }
+      };
+
+      roleSel?.addEventListener("change", async () => {
+        const v = String(roleSel.value || "");
+        try { await patch({ roleLabel: v }); toast("Salvato"); } catch (e) { console.error(e); toast("Errore"); }
+      });
+      activeChk?.addEventListener("change", async () => {
+        const v = Boolean(activeChk.checked);
+        try { await patch({ active: v }); toast("Salvato"); load().catch(() => {}); } catch (e) { console.error(e); toast("Errore"); }
+      });
+      btnToggle?.addEventListener("click", async () => {
+        const it = find();
+        const next = !(it && it.active);
+        try { await patch({ active: next }); toast("Salvato"); load().catch(() => {}); } catch (e) { console.error(e); toast("Errore"); }
+      });
+    });
+  }
+
+  btnRefresh?.addEventListener("click", () => load().catch(() => {}));
+  qEl?.addEventListener("input", render);
+  fEl?.addEventListener("change", render);
+
+  btnNewSave?.addEventListener("click", async () => {
+    const name = String(newName?.value || "").trim();
+    const email = String(newEmail?.value || "").trim().toLowerCase();
+    const roleLabel = String(newRole?.value || "").trim();
+    const active = Boolean(newActive?.checked);
+    if (!name || !email || !roleLabel) return toast("Compila Nome, Email e Ruolo");
+    try {
+      btnNewSave.disabled = true;
+      await window.fpApi("/api/manager-collaborators", { method: "POST", body: JSON.stringify({ name, email, roleLabel, active }) });
+      toast("Creato");
+      if (newName) newName.value = "";
+      if (newEmail) newEmail.value = "";
+      await load();
+    } catch (e) {
+      console.error(e);
+      toast("Errore creazione");
+    } finally {
+      btnNewSave.disabled = false;
+    }
+  });
+
+  back.style.display = "block";
+  await load();
+}
+
 function normalizeRightbar() {
   const rb = document.querySelector(".app > .rightbar");
   if (!rb) return;
 
   const isAgenda = isAgendaNow();
   const isBilling = isBillingNow();
+  const isMgr = isManagerNow() && String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim() === "manager";
 
   rb.className = "rightbar fp-rbar";
+
+  // Manager pages: keep only the settings gear, and open Manager settings (not Agenda).
+  if (isMgr) {
+    rb.innerHTML = `
+      <button class="rbBtn" data-open-manager-settings title="Impostazioni Manager">
+        <span class="rbIcon">⚙️</span>
+        <span class="rbLabel">Impostazioni Manager</span>
+      </button>
+    `;
+    return;
+  }
 
   // On Fatturazione we want billing-specific settings (and no “agenda” items).
   if (isBilling) {
@@ -3784,6 +4059,13 @@ function setupSpaRouter() {
       if (openRight) {
         e.preventDefault();
         document.body.classList.toggle("fp-right-expanded");
+        return;
+      }
+
+      const openMgr = e.target?.closest?.("[data-open-manager-settings]");
+      if (openMgr) {
+        e.preventDefault();
+        openManagerSettingsModal().catch(() => {});
         return;
       }
 

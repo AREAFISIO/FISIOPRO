@@ -2911,109 +2911,126 @@
 
     modalTitle.textContent = "Nuovo appuntamento";
     modalBody.innerHTML = `
-      <div style="padding: 8px 0 14px; border-bottom: 1px dashed rgba(255,255,255,.12);">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:14px;">
-          <div style="font-weight: 1000; font-size: 22px; letter-spacing: .04em; text-transform: uppercase;">
-            ${dayUpper || "—"}
-          </div>
-          <div style="font-weight: 1000; font-size: 26px;">
-            ${timeStr || "—"}
-          </div>
+      <div class="oe-modal__top" style="margin-top:0;">
+        <div class="oe-modal__topActions">
+          <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-f-focus-location>LUOGO</button>
         </div>
-        <div style="margin-top:6px; opacity:.80; font-weight: 900; font-size: 16px;">
-          ${dateStr || "—"}
+        <div class="oe-modal__created" style="color: var(--muted);">
+          <div style="font-weight:1000; letter-spacing:.04em;">${escapeHtml(dayUpper || "—")}</div>
+          <div style="margin-top:4px; font-weight:900;">${escapeHtml(dateStr || "—")} • ${escapeHtml(timeStr || "—")}</div>
         </div>
       </div>
-      <div style="height:10px;"></div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Voce agenda</span>
-          <select class="select" data-f-voce><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Durata</span>
-          <select class="select" data-f-duration>
-            ${durOptions.map((m) => `<option value="${m}">${m === 30 ? "30 min" : (m % 60 === 0 ? (m/60) + " h" : (Math.floor(m/60) + " h " + (m%60) + " min"))}</option>`).join("")}
-          </select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Stato appuntamento</span>
-          <select class="select" data-f-status><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Posizione</span>
-          <select class="select" data-f-location><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Paziente</span>
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input class="input" data-f-patient-q placeholder="Cerca paziente..." />
-            <button class="btn" data-f-patient-clear type="button">Svuota</button>
-          </div>
-          <div data-f-patient-picked style="margin-top:8px; color: rgba(255,255,255,.90); font-weight:800; display:none;"></div>
-          <div data-f-patient-results style="margin-top:8px; display:none; border:1px solid rgba(255,255,255,.10); border-radius:12px; overflow:hidden;"></div>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Prestazione</span>
-          <input class="input" data-f-service-q placeholder="Cerca prestazione..." />
-          <select class="select" data-f-service style="margin-top:8px;"><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Operatore</span>
-          <select class="select" data-f-operator></select>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Tipi Erogati (separati da virgola)</span>
-          <input class="input" data-f-tipi placeholder="Es. FKT, MASSO" />
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Caso clinico</span>
-          <select class="select" data-f-case><option value="">—</option></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">Vendita collegata</span>
-          <select class="select" data-f-sale><option value="">—</option></select>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Erogato collegato</span>
-          <select class="select" data-f-erogato><option value="">—</option></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">VALUTAZIONI</span>
-          <select class="select" multiple size="4" data-f-evals></select>
-        </label>
-
-        <label class="field" style="gap:6px;">
-          <span class="fpFormLabel">TRATTAMENTI</span>
-          <select class="select" multiple size="4" data-f-treatments><option value="">Carico…</option></select>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Note interne</span>
-          <textarea class="textarea" data-f-internal placeholder="Note interne..."></textarea>
-        </label>
-
-        <label class="field" style="gap:6px; grid-column:1 / -1;">
-          <span class="fpFormLabel">Note</span>
-          <textarea class="textarea" data-f-notes placeholder="Note..."></textarea>
-        </label>
+      <div class="oe-modal__patientCenter" style="margin-top:6px;">
+        <div class="oe-modal__patientnameRow">
+          <div class="oe-modal__patientname" data-f-pname>Seleziona paziente</div>
+          <div class="oe-badge" data-f-tag style="display:none"></div>
+        </div>
+        <div class="oe-modal__patientActions">
+          <a class="oe-chipbtn" data-f-call href="#" aria-disabled="true">CHIAMA</a>
+          <a class="oe-chipbtn oe-chipbtn--accent" data-f-wa href="#" aria-disabled="true">WhatsApp</a>
+          <a class="oe-chipbtn" data-f-email href="#" aria-disabled="true">EMAIL</a>
+          <a class="oe-modal__patientlink" data-f-plink href="#" aria-disabled="true">Apri scheda paziente</a>
+        </div>
       </div>
 
-      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
-        <button class="btn" data-f-cancel type="button">Annulla</button>
-        <button class="btn primary" data-f-save type="button">Salva</button>
+      <div class="oe-modal__section" style="padding-top:12px;">
+        <div class="oe-grid--3">
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Esito appuntamento</span>
+            <select class="select" data-f-status><option value="">Carico…</option></select>
+          </label>
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Voce prezzario</span>
+            <select class="select" data-f-service><option value="">Carico…</option></select>
+          </label>
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Durata</span>
+            <select class="select" data-f-duration>
+              ${durOptions.map((m) => `<option value="${m}">${m === 30 ? "30 min" : (m % 60 === 0 ? (m/60) + " h" : (Math.floor(m/60) + " h " + (m%60) + " min"))}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Agenda</span>
+            <select class="select" data-f-operator></select>
+          </label>
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Luogo</span>
+            <select class="select" data-f-location><option value="">Carico…</option></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
+            <span class="fpFormLabel">Voce agenda</span>
+            <select class="select" data-f-voce><option value="">Carico…</option></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
+            <span class="fpFormLabel">Paziente</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <input class="input" data-f-patient-q placeholder="Cerca paziente..." />
+              <button class="btn" data-f-patient-clear type="button">Svuota</button>
+            </div>
+            <div data-f-patient-picked style="margin-top:8px; font-weight:900; display:none;"></div>
+            <div data-f-patient-results style="margin-top:8px; display:none; border:1px solid var(--border); border-radius:12px; overflow:hidden;"></div>
+          </label>
+
+          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
+            <span class="fpFormLabel">Cerca prestazione</span>
+            <input class="input" data-f-service-q placeholder="Cerca prestazione..." />
+          </label>
+
+          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
+            <span class="fpFormLabel">Tipi Erogati (separati da virgola)</span>
+            <input class="input" data-f-tipi placeholder="Es. FKT, MASSO" />
+          </label>
+
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Caso clinico</span>
+            <select class="select" data-f-case><option value="">—</option></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Vendita collegata</span>
+            <select class="select" data-f-sale><option value="">—</option></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
+            <span class="fpFormLabel">Erogato collegato</span>
+            <select class="select" data-f-erogato><option value="">—</option></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">VALUTAZIONI</span>
+            <select class="select" multiple size="4" data-f-evals></select>
+          </label>
+
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">TRATTAMENTI</span>
+            <select class="select" multiple size="4" data-f-treatments><option value="">Carico…</option></select>
+          </label>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Note interne</span>
+            <textarea class="textarea" maxlength="255" data-f-internal placeholder="Note interne..."></textarea>
+            <div class="oe-counter"><span data-f-count-internal>0</span> / 255</div>
+          </label>
+
+          <label class="field oe-field" style="gap:6px;">
+            <span class="fpFormLabel">Note visibili al paziente</span>
+            <textarea class="textarea" maxlength="255" data-f-notes placeholder="Note..."></textarea>
+            <div class="oe-counter"><span data-f-count-notes>0</span> / 255</div>
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:14px;">
+          <button class="btn" data-f-cancel type="button">Annulla</button>
+          <button class="btn primary" data-f-save type="button">Salva</button>
+        </div>
       </div>
     `;
 
@@ -3032,6 +3049,38 @@
     const elTreatments = modalBody.querySelector("[data-f-treatments]");
     const elInternal = modalBody.querySelector("[data-f-internal]");
     const elNotes = modalBody.querySelector("[data-f-notes]");
+    const elPName = modalBody.querySelector("[data-f-pname]");
+    const aCall = modalBody.querySelector("[data-f-call]");
+    const aWa = modalBody.querySelector("[data-f-wa]");
+    const aEmail = modalBody.querySelector("[data-f-email]");
+    const aPlink = modalBody.querySelector("[data-f-plink]");
+
+    // Quick action: scroll/focus location
+    modalBody.querySelector("[data-f-focus-location]")?.addEventListener("click", () => {
+      try { elLoc?.focus?.(); } catch {}
+      try { elLoc?.scrollIntoView?.({ behavior: "smooth", block: "center" }); } catch {}
+    });
+
+    const setActionLink = (a, { href, text } = {}, enabled = true) => {
+      if (!a) return;
+      if (!enabled) {
+        a.setAttribute("aria-disabled", "true");
+        a.setAttribute("href", "#");
+        return;
+      }
+      a.removeAttribute("aria-disabled");
+      if (href) a.setAttribute("href", href);
+      if (text) a.textContent = text;
+    };
+
+    const digitsOnly = (s) => String(s || "").replace(/\D/g, "");
+    const toWaLink = (phone) => {
+      const d = digitsOnly(phone);
+      if (!d) return "";
+      // If local italian 10 digits, prefix +39. Otherwise keep as-is.
+      const wa = (d.length === 10) ? ("39" + d) : d;
+      return `https://wa.me/${wa}`;
+    };
 
     const parseCommaList = (s) =>
       String(s || "")
@@ -3170,7 +3219,7 @@
       .catch((e) => renderSelectError(elTreatments, "TRATTAMENTI", e));
 
     // patient search
-    let patientPicked = { id: "", label: "" };
+    let patientPicked = { id: "", label: "", phone: "", email: "" };
     const qInput = modalBody.querySelector("[data-f-patient-q]");
     const pickedEl = modalBody.querySelector("[data-f-patient-picked]");
     const resultsEl = modalBody.querySelector("[data-f-patient-results]");
@@ -3179,13 +3228,25 @@
     let reqSeq = 0;
 
     function setPicked(p) {
-      patientPicked = p || { id: "", label: "" };
+      patientPicked = p || { id: "", label: "", phone: "", email: "" };
       if (patientPicked.id) {
         pickedEl.style.display = "";
         pickedEl.textContent = patientPicked.label;
+        if (elPName) elPName.textContent = patientPicked.label || "Paziente";
+        setActionLink(aPlink, { href: `/pages/paziente.html?id=${encodeURIComponent(String(patientPicked.id))}` }, true);
+        const phone = String(patientPicked.phone || "").trim();
+        const email = String(patientPicked.email || "").trim();
+        setActionLink(aCall, { href: phone ? `tel:${phone}` : "#", text: phone ? `CHIAMA ${phone}` : "CHIAMA" }, Boolean(phone));
+        setActionLink(aWa, { href: phone ? toWaLink(phone) : "#", text: phone ? "WhatsApp" : "WhatsApp" }, Boolean(phone));
+        setActionLink(aEmail, { href: email ? `mailto:${email}` : "#", text: email ? "EMAIL" : "EMAIL" }, Boolean(email));
       } else {
         pickedEl.style.display = "none";
         pickedEl.textContent = "";
+        if (elPName) elPName.textContent = "Seleziona paziente";
+        setActionLink(aPlink, {}, false);
+        setActionLink(aCall, {}, false);
+        setActionLink(aWa, {}, false);
+        setActionLink(aEmail, {}, false);
       }
     }
 
@@ -3270,7 +3331,25 @@
       t = setTimeout(() => doSearch().catch(()=>{}), 90);
     });
     qInput.addEventListener("focus", () => doSearch().catch(()=>{}));
-    clearBtn.addEventListener("click", () => { qInput.value = ""; setPicked({ id:"", label:"" }); hideResults(); refreshPatientLinks("").catch(()=>{}); });
+    clearBtn.addEventListener("click", () => {
+      qInput.value = "";
+      setPicked({ id: "", label: "", phone: "", email: "" });
+      hideResults();
+      refreshPatientLinks("").catch(() => {});
+    });
+
+    // Counters (same behavior as "Dettagli appuntamento")
+    const updateCounters = () => {
+      const ci = modalBody.querySelector("[data-f-count-internal]");
+      const cn = modalBody.querySelector("[data-f-count-notes]");
+      if (ci && elInternal) ci.textContent = String((elInternal.value || "").length);
+      if (cn && elNotes) cn.textContent = String((elNotes.value || "").length);
+    };
+    try {
+      elInternal?.addEventListener("input", updateCounters);
+      elNotes?.addEventListener("input", updateCounters);
+    } catch {}
+    updateCounters();
 
     // cancel/save
     modalBody.querySelector("[data-f-cancel]").onclick = closeModal;
