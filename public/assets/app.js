@@ -2594,8 +2594,8 @@ function bootstrapOverlayControl() {
     .filter((el) => !el.classList.contains("toast"));
 
   if (!nodes.length) return;
-  host.innerHTML = nodes.map((el) => el.outerHTML).join("\n");
-  nodes.forEach((el) => el.remove());
+  host.innerHTML = "";
+  nodes.forEach((el) => host.appendChild(el));
 }
 
 function removeLegacyRightDrawer() {
@@ -2652,6 +2652,11 @@ async function runRouteInits() {
 
   const role = String((window.FP_USER?.role || window.FP_SESSION?.role || "")).trim();
   if (role) roleGuard(role);
+
+  // Notify agenda layout to re-measure after shell updates.
+  if (isAgendaNow()) {
+    try { window.dispatchEvent(new CustomEvent("fpAgendaLayoutReady")); } catch {}
+  }
 
   // Non-blocking: keep navigation/UI responsive, update later.
   updateInboxBadge().catch(() => {});
