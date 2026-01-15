@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260115b";
+    window.__FP_DIARY_BUILD = "fpui-20260115e";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -2612,7 +2612,20 @@
           }
 
           const therapistName = multiUser ? String(col.dataset.therapist || "").trim() : (Array.from(selectedTherapists)[0] || "");
-          openCreateModal({ startAt: dt, therapistName });
+          const therapistId = String(operatorNameToId.get(String(therapistName || "").trim()) || "").trim();
+          const draft = {
+            id: "",
+            fields: {},
+            patient: "",
+            patientId: "",
+            therapist: therapistName,
+            therapistId,
+            service: "",
+            status: "",
+            startAt: dt,
+            endAt: new Date(dt.getTime() + 60 * 60000),
+          };
+          openDetailsModal(draft);
         });
 
         gridEl.appendChild(col);
@@ -2630,7 +2643,8 @@
     const roleNorm = getUserRoleNorm();
     const canDelete = roleNorm === "front" || roleNorm === "manager";
 
-    titleEl.textContent = "Dettagli appuntamento";
+    const isNew = !item?.id;
+    titleEl.textContent = isNew ? "Nuovo appuntamento" : "Dettagli appuntamento";
 
     const startAt = item?.startAt instanceof Date ? item.startAt : null;
     const endAt = item?.endAt instanceof Date ? item.endAt : null;
@@ -2645,28 +2659,45 @@
 
     const guessedLocationName = inferSlotLocation(startAt ? toYmd(startAt) : "", item?.therapist || "") || "";
 
+    const patientName = String(item?.patient || "").trim();
+    const patientId = String(item?.patientId || "").trim();
+    const patientLinkHref = patientId ? `/pages/paziente.html?id=${encodeURIComponent(patientId)}` : "#";
+
     bodyEl.innerHTML = `
       <div class="oe-modal__top" style="margin-top:0;">
         <div class="oe-modal__topActions">
-          <button class="oe-chipbtn oe-chipbtn--accent" type="button" data-det-repeat>RIPETI</button>
-          <button class="oe-chipbtn" type="button" data-det-notify>NOTIFICHE</button>
+          <button class="oe-chipbtn oe-chipbtn--accent" type="button" data-det-repeat ${isNew ? "disabled" : ""}>RIPETI</button>
+          <button class="oe-chipbtn" type="button" data-det-notify ${isNew ? "disabled" : ""}>NOTIFICHE</button>
           <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-det-location>LUOGO</button>
-          <button class="oe-chipbtn oe-chipbtn--danger" type="button" data-det-delete ${canDelete ? "" : "disabled"}>${canDelete ? "ELIMINA" : "ELIMINA"}</button>
+          <button class="oe-chipbtn oe-chipbtn--danger" type="button" data-det-delete ${(!isNew && canDelete) ? "" : "disabled"}>ELIMINA</button>
         </div>
         <div class="oe-modal__created" data-det-created></div>
       </div>
 
       <div class="oe-modal__patientCenter" style="margin-top:6px;">
         <div class="oe-modal__patientnameRow">
-          <div class="oe-modal__patientname" data-det-pname>${escapeHtml(item?.patient || "")}</div>
+          <div class="oe-modal__patientname" data-det-pname>${escapeHtml(patientName || (isNew ? "Seleziona paziente" : ""))}</div>
           <div class="oe-badge" data-det-tag style="display:none"></div>
         </div>
         <div class="oe-modal__patientActions">
           <a class="oe-chipbtn" data-det-call href="#" aria-disabled="true">CHIAMA</a>
           <a class="oe-chipbtn oe-chipbtn--accent" data-det-wa href="#" aria-disabled="true">+39… WhatsApp</a>
           <a class="oe-chipbtn" data-det-email href="#" aria-disabled="true">EMAIL</a>
-          <a class="oe-modal__patientlink" data-det-plink href="/pages/paziente.html?id=${encodeURIComponent(String(item?.patientId || ""))}">Apri scheda paziente</a>
+          <a class="oe-modal__patientlink" data-det-plink href="${patientLinkHref}" ${patientId ? "" : 'aria-disabled="true"'}>Apri scheda paziente</a>
         </div>
+        ${isNew ? `
+          <div style="margin-top:10px; width:min(760px, 96%);">
+            <label class="field" style="gap:6px;">
+              <span class="fpFormLabel">Cerca paziente</span>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <input class="input" data-det-patient-q placeholder="Cerca paziente..." />
+                <button class="btn" data-det-patient-clear type="button">Svuota</button>
+              </div>
+              <div data-det-patient-picked style="margin-top:8px; font-weight:900; display:none;"></div>
+              <div data-det-patient-results style="margin-top:8px; display:none; border:1px solid var(--border); border-radius:12px; overflow:hidden;"></div>
+            </label>
+          </div>
+        ` : ``}
       </div>
 
       <div class="oe-modal__section" style="padding-top:12px;">
@@ -2738,6 +2769,10 @@
     const btnCancel = q("[data-det-cancel]");
     const btnDelete = q("[data-det-delete]");
     const btnLoc = q("[data-det-location]");
+    const plink = q("[data-det-plink]");
+
+    // Patient picker state (new appointment only)
+    let patientPicked = { id: patientId, label: patientName, phone: "", email: "" };
 
     // Prefill notes/status/confirm flags from normalized fields (from /api/appointments),
     // plus legacy Airtable field names if present.
@@ -2789,7 +2824,10 @@
           elOperator.innerHTML = `<option value="">—</option>` + ops.map((o) =>
             `<option value="${escapeAttr(o.id)}">${escapeHtml(o.name || o.id)}</option>`
           ).join("");
-          const opId = operatorNameToId.get(String(item?.therapist || "").trim()) || "";
+          const opId =
+            String(item?.therapistId || "").trim() ||
+            operatorNameToId.get(String(item?.therapist || "").trim()) ||
+            "";
           if (opId) elOperator.value = opId;
         }
         // Locations
@@ -2817,29 +2855,35 @@
     })();
 
     // Patient contacts
-    (async () => {
-      const callA = q("[data-det-call]");
-      const waA = q("[data-det-wa]");
-      const emailA = q("[data-det-email]");
-      const setLink = (a, href, text) => {
-        if (!a) return;
-        a.textContent = text || a.textContent;
-        a.href = href || "#";
-        if (href) a.removeAttribute("aria-disabled");
-        else a.setAttribute("aria-disabled", "true");
-      };
+    const callA = q("[data-det-call]");
+    const waA = q("[data-det-wa]");
+    const emailA = q("[data-det-email]");
+    const setLink = (a, href, text) => {
+      if (!a) return;
+      a.textContent = text || a.textContent;
+      a.href = href || "#";
+      if (href) a.removeAttribute("aria-disabled");
+      else a.setAttribute("aria-disabled", "true");
+    };
+    const normalizePhone = (raw) => String(raw || "").trim().replace(/[^\d+]/g, "");
+    const refreshPatientContacts = async () => {
       setLink(callA, "", "CHIAMA");
       setLink(waA, "", "+39… WhatsApp");
       setLink(emailA, "", "EMAIL");
-      const pid = String(item?.patientId || "").trim();
+      const pid = String(patientPicked?.id || item?.patientId || "").trim();
       if (!pid) return;
       try {
-        const p = await apiGet(`/api/patient?id=${encodeURIComponent(pid)}`);
-        const telRaw = String(p.Telefono || "").trim();
-        const tel = telRaw.replace(/[^\d+]/g, "");
+        // If we have the patient from search picker, use that immediately.
+        let telRaw = String(patientPicked?.phone || "").trim();
+        let email = String(patientPicked?.email || "").trim();
+        if (!telRaw && !email && !isNew) {
+          const p = await apiGet(`/api/patient?id=${encodeURIComponent(pid)}`);
+          telRaw = String(p.Telefono || "").trim();
+          email = String(p.Email || "").trim();
+        }
+        const tel = normalizePhone(telRaw);
         const telHref = tel ? `tel:${tel}` : "";
         const waHref = tel ? `https://wa.me/${tel.replace(/^\+/, "")}` : "";
-        const email = String(p.Email || "").trim();
         const emailHref = email ? `mailto:${email}` : "";
         setLink(callA, telHref, "CHIAMA");
         setLink(waA, waHref, telRaw ? `${telRaw} WhatsApp` : "+39… WhatsApp");
@@ -2847,7 +2891,86 @@
       } catch (e) {
         console.warn("Patient contact not available", e);
       }
-    })();
+    };
+    refreshPatientContacts().catch(() => {});
+
+    // Patient search (new appointment only)
+    if (isNew) {
+      const qInput = q("[data-det-patient-q]");
+      const pickedEl = q("[data-det-patient-picked]");
+      const resultsEl = q("[data-det-patient-results]");
+      const clearBtn = q("[data-det-patient-clear]");
+      let t = null;
+      let reqSeq = 0;
+
+        const setPicked = (p) => {
+        patientPicked = p || { id: "", label: "", phone: "", email: "" };
+        const name = String(patientPicked.label || "").trim();
+        const pid = String(patientPicked.id || "").trim();
+        const pnameEl = q("[data-det-pname]");
+        if (pnameEl) pnameEl.textContent = name || "Seleziona paziente";
+        if (pickedEl) {
+          pickedEl.style.display = pid ? "" : "none";
+          pickedEl.textContent = pid ? name : "";
+        }
+        if (plink) {
+          if (pid) {
+            plink.setAttribute("href", `/pages/paziente.html?id=${encodeURIComponent(pid)}`);
+            plink.removeAttribute("aria-disabled");
+          } else {
+            plink.setAttribute("href", "#");
+            plink.setAttribute("aria-disabled", "true");
+          }
+        }
+          refreshPatientContacts().catch(() => {});
+      };
+
+      const hideResults = () => {
+        if (!resultsEl) return;
+        resultsEl.style.display = "none";
+        resultsEl.innerHTML = "";
+      };
+
+      const doSearch = async () => {
+        if (!qInput || !resultsEl) return;
+        const qv = String(qInput.value || "").trim();
+        if (qv.length < 1) return hideResults();
+        const mySeq = ++reqSeq;
+        resultsEl.style.display = "";
+        resultsEl.innerHTML = `<div style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); opacity:.85;">Carico…</div>`;
+        const results = await searchPatients(qv);
+        if (mySeq !== reqSeq) return;
+        if (!results.length) return hideResults();
+        resultsEl.innerHTML = results.slice(0, 10).map((r) => `
+          <div data-pick="${escapeAttr(r.id)}" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); cursor:pointer;">
+            <div style="font-weight:900;">${escapeHtml(r.label)}</div>
+            <div style="opacity:.75; font-size:12px; margin-top:2px;">${[r.phone, r.email].filter(Boolean).join(" • ")}</div>
+          </div>
+        `).join("");
+        resultsEl.querySelectorAll("[data-pick]").forEach((row) => {
+          row.addEventListener("click", () => {
+            const id = row.getAttribute("data-pick");
+            const picked = results.find((x) => x.id === id);
+            setPicked(picked);
+            hideResults();
+            if (qInput) qInput.value = picked?.label || "";
+            refreshPatientContacts().catch(() => {});
+          });
+        });
+        resultsEl.style.display = "";
+      };
+
+      qInput?.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => doSearch().catch(() => {}), 90);
+      });
+      qInput?.addEventListener("focus", () => doSearch().catch(() => {}));
+      clearBtn?.addEventListener("click", () => {
+        if (qInput) qInput.value = "";
+        setPicked({ id: "", label: "", phone: "", email: "" });
+        hideResults();
+      });
+    }
 
     const close = () => { back.style.display = "none"; };
     if (btnCancel) btnCancel.onclick = close;
@@ -2855,6 +2978,7 @@
     if (btnLoc) btnLoc.onclick = () => { try { elLocation?.focus?.(); } catch {} };
 
     if (btnDelete) btnDelete.onclick = async () => {
+      if (isNew) return;
       if (!canDelete) return;
       if (!confirm("Eliminare questo appuntamento?")) return;
       try {
@@ -2873,12 +2997,66 @@
     if (btnSave) btnSave.onclick = async () => {
       try {
         btnSave.disabled = true;
+        if (!startAt) throw new Error("Data/ora non valida. Riprova selezionando lo slot in agenda.");
+
+        const dur = q("[data-det-duration]") ? Number.parseInt(String(q("[data-det-duration]").value || "60"), 10) : 60;
+        const durMinSafe = Number.isFinite(dur) && dur > 0 ? dur : 60;
+        const endAtNew = new Date(startAt.getTime() + durMinSafe * 60000);
+
+        const statusVal = elStatus ? String(elStatus.value || "") : "";
+        const serviceId = elService ? String(elService.value || "") : "";
+        const therapistId = elOperator ? String(elOperator.value || "") : "";
+        const locationId = elLocation ? String(elLocation.value || "") : "";
+
+        if (!therapistId) throw new Error("Seleziona un Operatore.");
+        const patientText = isNew ? String(q("[data-det-patient-q]")?.value || "").trim() : "";
+        if (isNew && patientText && !(patientPicked && patientPicked.id)) {
+          throw new Error("Seleziona il paziente dalla lista (non solo testo) oppure premi Svuota.");
+        }
+
+        if (isNew) {
+          const payload = {
+            startAt: toLocalDateTimeISO(startAt),
+            endAt: toLocalDateTimeISO(endAtNew),
+            therapistId,
+            patientId: (patientPicked && patientPicked.id) ? String(patientPicked.id) : "",
+            serviceId,
+            locationId,
+            status: statusVal,
+            durationMin: durMinSafe,
+            confirmed_by_patient: Boolean(elConfP?.checked),
+            confirmed_in_platform: Boolean(elConfPl?.checked),
+            internalNote: elInternal ? String(elInternal.value || "") : "",
+            notes: elPatient ? String(elPatient.value || "") : "",
+          };
+
+          const res = await fetch("/api/appointment-create", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data?.ok) throw new Error(data?.error || ("HTTP " + res.status));
+
+          close();
+          await load({ nocache: true }).catch(() => {});
+          const createdId = String(data.id || "").trim();
+          if (createdId) {
+            const found = (rawItems || []).find((x) => String(x.id || "").trim() === createdId) || null;
+            if (found) {
+              setTimeout(() => { try { openDetailsModal(found); } catch {} }, 0);
+            }
+          }
+          return;
+        }
+
         const payload = {
-          status: elStatus ? String(elStatus.value || "") : "",
-          serviceId: elService ? String(elService.value || "") : "",
-          collaboratoreId: elOperator ? String(elOperator.value || "") : "",
-          sedeId: elLocation ? String(elLocation.value || "") : "",
-          durata: q("[data-det-duration]") ? String(q("[data-det-duration]").value || "") : "",
+          status: statusVal,
+          serviceId,
+          collaboratoreId: therapistId,
+          sedeId: locationId,
+          durata: String(durMinSafe),
           confirmed_by_patient: Boolean(elConfP?.checked),
           confirmed_in_platform: Boolean(elConfPl?.checked),
           notaRapida: elInternal ? String(elInternal.value || "") : "",
@@ -2907,597 +3085,7 @@
     back.style.display = "flex";
   }
 
-  function openCreateModal(ctx) {
-    if (!modalBack) return;
-    const startAt = ctx?.startAt instanceof Date ? ctx.startAt : new Date();
-    const therapistName = String(ctx?.therapistName || "").trim();
-
-    // Header strings (requested: day full, uppercase; date/time larger)
-    let dayUpper = "";
-    let dateStr = "";
-    let timeStr = "";
-    try {
-      dayUpper = String(startAt.toLocaleDateString("it-IT", { weekday: "long" }) || "").toUpperCase();
-      dateStr = String(startAt.toLocaleDateString("it-IT", { year: "numeric", month: "2-digit", day: "2-digit" }) || "");
-      timeStr = String(startAt.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) || "");
-    } catch {
-      // fallback: keep empty strings
-    }
-
-    // calcola durata max fino al prossimo appuntamento (stesso giorno e stesso operatore)
-    const startMin = minutesOfDay(startAt);
-    // Max duration limited by last "working" slot (if defined), else 20:00.
-    let endDayMin = 20 * 60;
-    try {
-      const key = normTherapistKeyForSlots(therapistName);
-      const wIdx = String(weekdayIdxMon0(startAt));
-      const byDay = prefs.workSlots?.[key]?.[wIdx] || null;
-      if (byDay) {
-        let maxOn = null;
-        for (const [k, v] of Object.entries(byDay)) {
-          if (!v || typeof v !== "object") continue;
-          if (v.on !== true) continue;
-          const mm = Number(k);
-          if (!Number.isFinite(mm)) continue;
-          maxOn = (maxOn === null) ? (mm + BASE_SLOT_MIN) : Math.max(maxOn, mm + BASE_SLOT_MIN);
-        }
-        if (maxOn !== null) endDayMin = clamp(maxOn, 60, 24 * 60);
-      }
-    } catch {}
-    let nextMin = endDayMin;
-    for (const it of rawItems || []) {
-      if (!it.startAt) continue;
-      if (therapistName && String(it.therapist || "").trim() !== therapistName) continue;
-      const sameDay =
-        it.startAt.getFullYear() === startAt.getFullYear() &&
-        it.startAt.getMonth() === startAt.getMonth() &&
-        it.startAt.getDate() === startAt.getDate();
-      if (!sameDay) continue;
-      const m = minutesOfDay(it.startAt);
-      if (m > startMin && m < nextMin) nextMin = m;
-    }
-    const maxDur = Math.max(30, Math.min(360, nextMin - startMin)); // fino a 6h per sicurezza UI
-    const durOptions = [];
-    for (let m = 30; m <= maxDur; m += 30) durOptions.push(m);
-
-    modalTitle.textContent = "Nuovo appuntamento";
-    modalBody.innerHTML = `
-      <div class="oe-modal__top" style="margin-top:0;">
-        <div class="oe-modal__topActions">
-          <button class="oe-chipbtn oe-chipbtn--accent2" type="button" data-f-focus-location>LUOGO</button>
-        </div>
-        <div class="oe-modal__created" style="color: var(--muted);">
-          <div style="font-weight:1000; letter-spacing:.04em;">${escapeHtml(dayUpper || "—")}</div>
-          <div style="margin-top:4px; font-weight:900;">${escapeHtml(dateStr || "—")} • ${escapeHtml(timeStr || "—")}</div>
-        </div>
-      </div>
-
-      <div class="oe-modal__patientCenter" style="margin-top:6px;">
-        <div class="oe-modal__patientnameRow">
-          <div class="oe-modal__patientname" data-f-pname>Seleziona paziente</div>
-          <div class="oe-badge" data-f-tag style="display:none"></div>
-        </div>
-        <div class="oe-modal__patientActions">
-          <a class="oe-chipbtn" data-f-call href="#" aria-disabled="true">CHIAMA</a>
-          <a class="oe-chipbtn oe-chipbtn--accent" data-f-wa href="#" aria-disabled="true">WhatsApp</a>
-          <a class="oe-chipbtn" data-f-email href="#" aria-disabled="true">EMAIL</a>
-          <a class="oe-modal__patientlink" data-f-plink href="#" aria-disabled="true">Apri scheda paziente</a>
-        </div>
-      </div>
-
-      <div class="oe-modal__section" style="padding-top:12px;">
-        <div class="oe-grid--3">
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Esito appuntamento</span>
-            <select class="select" data-f-status><option value="">Carico…</option></select>
-          </label>
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Voce prezzario</span>
-            <select class="select" data-f-service><option value="">Carico…</option></select>
-          </label>
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Durata</span>
-            <select class="select" data-f-duration>
-              ${durOptions.map((m) => `<option value="${m}">${m === 30 ? "30 min" : (m % 60 === 0 ? (m/60) + " h" : (Math.floor(m/60) + " h " + (m%60) + " min"))}</option>`).join("")}
-            </select>
-          </label>
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Agenda</span>
-            <select class="select" data-f-operator></select>
-          </label>
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Luogo</span>
-            <select class="select" data-f-location><option value="">Carico…</option></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
-            <span class="fpFormLabel">Voce agenda</span>
-            <select class="select" data-f-voce><option value="">Carico…</option></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
-            <span class="fpFormLabel">Paziente</span>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <input class="input" data-f-patient-q placeholder="Cerca paziente..." />
-              <button class="btn" data-f-patient-clear type="button">Svuota</button>
-            </div>
-            <div data-f-patient-picked style="margin-top:8px; font-weight:900; display:none;"></div>
-            <div data-f-patient-results style="margin-top:8px; display:none; border:1px solid var(--border); border-radius:12px; overflow:hidden;"></div>
-          </label>
-
-          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
-            <span class="fpFormLabel">Cerca prestazione</span>
-            <input class="input" data-f-service-q placeholder="Cerca prestazione..." />
-          </label>
-
-          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
-            <span class="fpFormLabel">Tipi Erogati (separati da virgola)</span>
-            <input class="input" data-f-tipi placeholder="Es. FKT, MASSO" />
-          </label>
-
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Caso clinico</span>
-            <select class="select" data-f-case><option value="">—</option></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Vendita collegata</span>
-            <select class="select" data-f-sale><option value="">—</option></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px; grid-column:1 / -1;">
-            <span class="fpFormLabel">Erogato collegato</span>
-            <select class="select" data-f-erogato><option value="">—</option></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">VALUTAZIONI</span>
-            <select class="select" multiple size="4" data-f-evals></select>
-          </label>
-
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">TRATTAMENTI</span>
-            <select class="select" multiple size="4" data-f-treatments><option value="">Carico…</option></select>
-          </label>
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Note interne</span>
-            <textarea class="textarea" maxlength="255" data-f-internal placeholder="Note interne..."></textarea>
-            <div class="oe-counter"><span data-f-count-internal>0</span> / 255</div>
-          </label>
-
-          <label class="field oe-field" style="gap:6px;">
-            <span class="fpFormLabel">Note visibili al paziente</span>
-            <textarea class="textarea" maxlength="255" data-f-notes placeholder="Note..."></textarea>
-            <div class="oe-counter"><span data-f-count-notes>0</span> / 255</div>
-          </label>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:14px;">
-          <button class="btn" data-f-cancel type="button">Annulla</button>
-          <button class="btn primary" data-f-save type="button">Salva</button>
-        </div>
-      </div>
-    `;
-
-    const elVoce = modalBody.querySelector("[data-f-voce]");
-    const elDur = modalBody.querySelector("[data-f-duration]");
-    const elStatus = modalBody.querySelector("[data-f-status]");
-    const elServQ = modalBody.querySelector("[data-f-service-q]");
-    const elServ = modalBody.querySelector("[data-f-service]");
-    const elOp = modalBody.querySelector("[data-f-operator]");
-    const elLoc = modalBody.querySelector("[data-f-location]");
-    const elTipi = modalBody.querySelector("[data-f-tipi]");
-    const elCase = modalBody.querySelector("[data-f-case]");
-    const elSale = modalBody.querySelector("[data-f-sale]");
-    const elErogato = modalBody.querySelector("[data-f-erogato]");
-    const elEvals = modalBody.querySelector("[data-f-evals]");
-    const elTreatments = modalBody.querySelector("[data-f-treatments]");
-    const elInternal = modalBody.querySelector("[data-f-internal]");
-    const elNotes = modalBody.querySelector("[data-f-notes]");
-    const elPName = modalBody.querySelector("[data-f-pname]");
-    const aCall = modalBody.querySelector("[data-f-call]");
-    const aWa = modalBody.querySelector("[data-f-wa]");
-    const aEmail = modalBody.querySelector("[data-f-email]");
-    const aPlink = modalBody.querySelector("[data-f-plink]");
-
-    // Quick action: scroll/focus location
-    modalBody.querySelector("[data-f-focus-location]")?.addEventListener("click", () => {
-      try { elLoc?.focus?.(); } catch {}
-      try { elLoc?.scrollIntoView?.({ behavior: "smooth", block: "center" }); } catch {}
-    });
-
-    const setActionLink = (a, { href, text } = {}, enabled = true) => {
-      if (!a) return;
-      if (!enabled) {
-        a.setAttribute("aria-disabled", "true");
-        a.setAttribute("href", "#");
-        return;
-      }
-      a.removeAttribute("aria-disabled");
-      if (href) a.setAttribute("href", href);
-      if (text) a.textContent = text;
-    };
-
-    const digitsOnly = (s) => String(s || "").replace(/\D/g, "");
-    const toWaLink = (phone) => {
-      const d = digitsOnly(phone);
-      if (!d) return "";
-      // If local italian 10 digits, prefix +39. Otherwise keep as-is.
-      const wa = (d.length === 10) ? ("39" + d) : d;
-      return `https://wa.me/${wa}`;
-    };
-
-    const parseCommaList = (s) =>
-      String(s || "")
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-    const getMultiValues = (sel) => Array.from(sel?.selectedOptions || []).map((o) => String(o.value)).filter(Boolean);
-    const setSelectOptions = (sel, items, { placeholder = "—" } = {}) => {
-      if (!sel) return;
-      sel.innerHTML =
-        `<option value="">${placeholder}</option>` +
-        (items || []).map((x) => `<option value="${String(x.id || "")}">${String(x.name || x.label || x.id || "")}</option>`).join("");
-    };
-    const setMultiOptions = (sel, items, labelFn) => {
-      if (!sel) return;
-      sel.innerHTML = (items || [])
-        .map((x) => `<option value="${String(x.id || "")}">${String(labelFn ? labelFn(x) : (x.name || x.label || x.id || ""))}</option>`)
-        .join("");
-    };
-
-    // operator select
-    const ops = (knownOperators || []).slice();
-    elOp.innerHTML = ops
-      .map((o) => {
-        const name = String(o.name || "").trim();
-        const role = normalizeRoleLabel(o.role || "");
-        const label = name + (role ? " • " + role : "");
-        return `<option value="${String(o.id || "")}">${label}</option>`;
-      })
-      .join("");
-    const defaultOpId = therapistName ? (operatorNameToId.get(therapistName) || "") : "";
-    if (defaultOpId) elOp.value = defaultOpId;
-
-    // services (with searchable select)
-    const renderSelectError = (selEl, label, err) => {
-      if (!selEl) return;
-      const msg = String(err?.message || err || "Errore caricamento");
-      selEl.innerHTML = `<option value="">${label}: ERRORE</option>`;
-      // Also show details in console to avoid silent failures.
-      console.error(label + " load error:", err);
-      // Add a small helper row below the select (best-effort).
-      const wrap = selEl.closest("label.field");
-      if (wrap) {
-        let hint = wrap.querySelector("[data-fp-loaderr]");
-        if (!hint) {
-          hint = document.createElement("div");
-          hint.setAttribute("data-fp-loaderr", "1");
-          hint.style.marginTop = "6px";
-          hint.style.fontSize = "12px";
-          hint.style.opacity = ".85";
-          hint.style.display = "flex";
-          hint.style.alignItems = "center";
-          hint.style.gap = "10px";
-          wrap.appendChild(hint);
-        }
-        hint.innerHTML = `<span style="color: rgba(255,214,222,.95); font-weight:900;">${msg}</span>
-          <button class="btn" type="button" data-fp-debugbtn style="padding:7px 10px; font-size:12px;">Debug</button>`;
-        const btn = hint.querySelector("[data-fp-debugbtn]");
-        btn.onclick = async () => {
-          try {
-            const dbgUrl = "/api/services?debug=1";
-            const dbg = await apiGet(dbgUrl);
-            alert(JSON.stringify(dbg?.debug || dbg, null, 2));
-          } catch (e) {
-            alert(String(e?.message || e || "debug_failed"));
-          }
-        };
-      }
-    };
-
-    let allServices = [];
-    function renderServicesFiltered() {
-      const q = String(elServQ?.value || "").trim().toLowerCase();
-      const selected = String(elServ?.value || "");
-      const filtered = q
-        ? allServices.filter((x) => String(x.name || "").toLowerCase().includes(q))
-        : allServices;
-
-      elServ.innerHTML =
-        `<option value="">—</option>` +
-        filtered.map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
-
-      // try to keep selection
-      if (selected && filtered.some((x) => x.id === selected)) elServ.value = selected;
-    }
-
-    loadServices()
-      .then((arr) => {
-        allServices = Array.isArray(arr) ? arr : [];
-        renderServicesFiltered();
-        if (!allServices.length) {
-          renderSelectError(elServ, "PRESTAZIONI", "Nessuna prestazione trovata (tabella vuota o campo nome senza valori). Premi Debug.");
-        }
-      })
-      .catch((e) => renderSelectError(elServ, "PRESTAZIONI", e));
-
-    elServQ?.addEventListener("input", () => renderServicesFiltered());
-
-    // Voce agenda + Stato appuntamento options (from Airtable)
-    apiGet(`/api/appointment-field-options?table=${encodeURIComponent("APPUNTAMENTI")}&field=${encodeURIComponent("Voce agenda")}`)
-      .then((d) => {
-        const items = d.items || [];
-        setSelectOptions(elVoce, items, { placeholder: "—" });
-        // default: keep empty, user picks
-      })
-      .catch((e) => renderSelectError(elVoce, "VOCE AGENDA", e));
-
-    apiGet(`/api/appointment-field-options?table=${encodeURIComponent("APPUNTAMENTI")}&field=${encodeURIComponent("Stato appuntamento")}`)
-      .then((d) => {
-        const items = d.items || [];
-        setSelectOptions(elStatus, items, { placeholder: "—" });
-      })
-      .catch((e) => renderSelectError(elStatus, "STATO APPUNTAMENTO", e));
-
-    // positions (AZIENDA)
-    const startMinOfDay = (startAt?.getHours?.() || 0) * 60 + (startAt?.getMinutes?.() || 0);
-    const ruleLoc = getSlotRule(therapistName, startAt, startMinOfDay);
-    const inferredLocName = (ruleLoc?.locationName || inferSlotLocation(toYmd(startAt), therapistName));
-    loadLocations()
-      .then((arr) => {
-        const items = Array.isArray(arr) ? arr : [];
-        setSelectOptions(elLoc, items, { placeholder: "—" });
-        if (inferredLocName) {
-          const found = items.find((x) => String(x.name || "").trim().toLowerCase() === String(inferredLocName).trim().toLowerCase());
-          if (found?.id) elLoc.value = String(found.id);
-        }
-      })
-      .catch((e) => renderSelectError(elLoc, "POSIZIONE", e));
-
-    // treatments (multi)
-    loadTreatments()
-      .then((arr) => {
-        const items = Array.isArray(arr) ? arr : [];
-        setMultiOptions(elTreatments, items, (x) => x.name || x.id);
-      })
-      .catch((e) => renderSelectError(elTreatments, "TRATTAMENTI", e));
-
-    // patient search
-    let patientPicked = { id: "", label: "", phone: "", email: "" };
-    const qInput = modalBody.querySelector("[data-f-patient-q]");
-    const pickedEl = modalBody.querySelector("[data-f-patient-picked]");
-    const resultsEl = modalBody.querySelector("[data-f-patient-results]");
-    const clearBtn = modalBody.querySelector("[data-f-patient-clear]");
-    let t = null;
-    let reqSeq = 0;
-
-    function setPicked(p) {
-      patientPicked = p || { id: "", label: "", phone: "", email: "" };
-      if (patientPicked.id) {
-        pickedEl.style.display = "";
-        pickedEl.textContent = patientPicked.label;
-        if (elPName) elPName.textContent = patientPicked.label || "Paziente";
-        setActionLink(aPlink, { href: `/pages/paziente.html?id=${encodeURIComponent(String(patientPicked.id))}` }, true);
-        const phone = String(patientPicked.phone || "").trim();
-        const email = String(patientPicked.email || "").trim();
-        setActionLink(aCall, { href: phone ? `tel:${phone}` : "#", text: phone ? `CHIAMA ${phone}` : "CHIAMA" }, Boolean(phone));
-        setActionLink(aWa, { href: phone ? toWaLink(phone) : "#", text: phone ? "WhatsApp" : "WhatsApp" }, Boolean(phone));
-        setActionLink(aEmail, { href: email ? `mailto:${email}` : "#", text: email ? "EMAIL" : "EMAIL" }, Boolean(email));
-      } else {
-        pickedEl.style.display = "none";
-        pickedEl.textContent = "";
-        if (elPName) elPName.textContent = "Seleziona paziente";
-        setActionLink(aPlink, {}, false);
-        setActionLink(aCall, {}, false);
-        setActionLink(aWa, {}, false);
-        setActionLink(aEmail, {}, false);
-      }
-    }
-
-    async function refreshPatientLinks(patientId) {
-      const pid = String(patientId || "").trim();
-      // reset selects
-      setSelectOptions(elCase, [], { placeholder: "—" });
-      setSelectOptions(elSale, [], { placeholder: "—" });
-      setSelectOptions(elErogato, [], { placeholder: "—" });
-      if (elEvals) elEvals.innerHTML = "";
-      if (!pid) return;
-
-      try {
-        const [cases, sales, erogato, evals] = await Promise.all([
-          loadCasesForPatient(pid),
-          loadSalesForPatient(pid),
-          loadErogatoForPatient(pid),
-          loadEvaluationsForPatient(pid),
-        ]);
-
-        setSelectOptions(
-          elCase,
-          (cases || []).map((x) => ({ id: x.id, name: [x.data, x.titolo].filter(Boolean).join(" • ") || x.id })),
-          { placeholder: "—" },
-        );
-        setSelectOptions(
-          elSale,
-          (sales || []).map((x) => ({ id: x.id, name: [x.data, x.voce].filter(Boolean).join(" • ") || x.id })),
-          { placeholder: "—" },
-        );
-        setSelectOptions(
-          elErogato,
-          (erogato || []).map((x) => ({ id: x.id, name: [x.data, x.prestazione].filter(Boolean).join(" • ") || x.id })),
-          { placeholder: "—" },
-        );
-
-        setMultiOptions(elEvals, evals || [], (x) => [x.data, x.tipo].filter(Boolean).join(" • ") || x.id);
-      } catch (e) {
-        console.warn("refreshPatientLinks failed", e);
-      }
-    }
-    function hideResults() {
-      resultsEl.style.display = "none";
-      resultsEl.innerHTML = "";
-    }
-    async function doSearch() {
-      const q = String(qInput.value || "").trim();
-      // Requested: start searching as soon as user types (1+ characters).
-      if (q.length < 1) return hideResults();
-
-      // Immediate feedback while typing
-      const mySeq = ++reqSeq;
-      resultsEl.style.display = "";
-      resultsEl.innerHTML = `<div style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); opacity:.85;">Carico…</div>`;
-
-      const results = await searchPatients(q);
-      // Ignore late responses
-      if (mySeq !== reqSeq) return;
-      if (!results.length) return hideResults();
-      resultsEl.innerHTML = results.slice(0, 10).map((r) => `
-        <div data-pick="${r.id}" style="padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.10); cursor:pointer;">
-          <div style="font-weight:900;">${r.label}</div>
-          <div style="opacity:.75; font-size:12px; margin-top:2px;">${[r.phone, r.email].filter(Boolean).join(" • ")}</div>
-        </div>
-      `).join("");
-      resultsEl.querySelectorAll("[data-pick]").forEach((row) => {
-        row.addEventListener("click", () => {
-          const id = row.getAttribute("data-pick");
-          const picked = results.find((x) => x.id === id);
-          setPicked(picked);
-          hideResults();
-          qInput.value = picked?.label || "";
-          refreshPatientLinks(picked?.id || "").catch(()=>{});
-        });
-      });
-      resultsEl.style.display = "";
-    }
-
-    qInput.addEventListener("input", () => {
-      clearTimeout(t);
-      // Snappier live search
-      t = setTimeout(() => doSearch().catch(()=>{}), 90);
-    });
-    qInput.addEventListener("focus", () => doSearch().catch(()=>{}));
-    clearBtn.addEventListener("click", () => {
-      qInput.value = "";
-      setPicked({ id: "", label: "", phone: "", email: "" });
-      hideResults();
-      refreshPatientLinks("").catch(() => {});
-    });
-
-    // Counters (same behavior as "Dettagli appuntamento")
-    const updateCounters = () => {
-      const ci = modalBody.querySelector("[data-f-count-internal]");
-      const cn = modalBody.querySelector("[data-f-count-notes]");
-      if (ci && elInternal) ci.textContent = String((elInternal.value || "").length);
-      if (cn && elNotes) cn.textContent = String((elNotes.value || "").length);
-    };
-    try {
-      elInternal?.addEventListener("input", updateCounters);
-      elNotes?.addEventListener("input", updateCounters);
-    } catch {}
-    updateCounters();
-
-    // cancel/save
-    modalBody.querySelector("[data-f-cancel]").onclick = closeModal;
-    modalBody.querySelector("[data-f-save]").onclick = async () => {
-      const btn = modalBody.querySelector("[data-f-save]");
-      btn.disabled = true;
-      try {
-        // Basic client-side validation to avoid "silent" Airtable rejects.
-        // Note: some inputs show a label, but their value must be the underlying id (rec...).
-        const patientText = String(qInput?.value || "").trim();
-        const therapistId = String(elOp?.value || "").trim();
-        const serviceId = String(elServ?.value || "").trim();
-
-        // Patient is picked only when clicking a search result (we need the record id).
-        if (patientText && !(patientPicked && patientPicked.id)) {
-          throw new Error("Seleziona il paziente dalla lista (non solo testo) oppure premi Svuota.");
-        }
-        if (!therapistId) {
-          throw new Error("Seleziona un Operatore.");
-        }
-        if (String(elServQ?.value || "").trim() && !serviceId) {
-          throw new Error("Seleziona una Prestazione dalla lista.");
-        }
-
-        const durMin = Number.parseInt(String(elDur?.value || "30"), 10);
-        if (!Number.isFinite(durMin) || durMin <= 0) {
-          throw new Error("Durata non valida. Seleziona una durata in minuti.");
-        }
-
-        const endAt = new Date(startAt.getTime() + durMin * 60000);
-        if (!Number.isFinite(startAt?.getTime?.()) || !Number.isFinite(endAt?.getTime?.())) {
-          throw new Error("Data/ora non valida. Riprova selezionando lo slot in agenda.");
-        }
-
-        const payload = {
-          startAt: toLocalDateTimeISO(startAt),
-          endAt: toLocalDateTimeISO(endAt),
-          therapistId,
-          patientId: (patientPicked && patientPicked.id) ? patientPicked.id : "",
-          serviceId,
-          locationId: String(elLoc?.value || ""),
-          voceAgenda: String(elVoce?.value || ""),
-          status: String(elStatus?.value || ""),
-          durationMin: durMin,
-          internalNote: String(elInternal.value || ""),
-          notes: String(elNotes?.value || ""),
-          tipiErogati: parseCommaList(elTipi?.value || ""),
-          valutazioniIds: getMultiValues(elEvals),
-          trattamentiIds: getMultiValues(elTreatments),
-          casoClinicoId: String(elCase?.value || ""),
-          venditaId: String(elSale?.value || ""),
-          erogatoId: String(elErogato?.value || ""),
-        };
-
-        // create uses POST; use fetch directly with a timeout to avoid "stuck" UI.
-        const ac = new AbortController();
-        const t = setTimeout(() => ac.abort(), 20000);
-        const res = await fetch("/api/appointment-create", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: ac.signal,
-        }).finally(() => clearTimeout(t));
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.ok) {
-          const details = data?.details?.lastError ? `\n\nDettagli: ${String(data.details.lastError)}` : "";
-          throw new Error((data?.error ? String(data.error) : ("HTTP " + res.status)) + details);
-        }
-
-        // Ensure the appointment shows under the chosen collaborator.
-        try {
-          const opId = String(elOp.value || "").trim();
-          const opName = (knownOperators || []).find((x) => String(x.id || "") === opId)?.name || "";
-          if (multiUser && opName) selectedTherapists.add(String(opName).trim());
-        } catch {}
-
-        closeModal();
-        load().catch(()=>{});
-      } catch (e) {
-        console.error(e);
-        const msg = String(e?.name || "") === "AbortError"
-          ? "Timeout durante il salvataggio (rete lenta o Airtable non risponde). Riprova."
-          : (e?.message || "Errore salvataggio appuntamento");
-        alert(msg);
-      } finally {
-        btn.disabled = false;
-      }
-    };
-
-    modalBack.style.display = "flex";
-  }
-
-  function closeModal() {
-    if (!modalBack) return;
-    modalBack.style.display = "none";
-  }
+  // NOTE: openCreateModal removed. New appointments now use openDetailsModal in "new" mode.
 
   function render() {
     const start = view === "day"
