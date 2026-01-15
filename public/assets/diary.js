@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260110e";
+    window.__FP_DIARY_BUILD = "fpui-20260115b";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -1391,13 +1391,48 @@
     }
   }
 
+  function prefsKeyForEmail(email) {
+    const e = String(email || "").trim().toLowerCase() || "anon";
+    return `fp_agenda_prefs_${e}`;
+  }
   function prefsKey() {
-    const email = getUserEmail() || "anon";
-    return `fp_agenda_prefs_${email}`;
+    return prefsKeyForEmail(getUserEmail() || "anon");
+  }
+
+  async function ensureAuthForPrefs() {
+    // diary.js is loaded via <script> and may run before app.js finishes auth.
+    // If we load prefs too early, we end up using the "anon" key and the user never sees their saved settings.
+    const wait = async () => {
+      try {
+        if (typeof window.fpAuthMe === "function") await window.fpAuthMe();
+      } catch {}
+    };
+    try {
+      await Promise.race([wait(), new Promise((r) => setTimeout(r, 800))]);
+    } catch {}
+  }
+
+  function migrateAnonPrefsIfNeeded() {
+    try {
+      const email = getUserEmail();
+      if (!email) return;
+      const kAnon = prefsKeyForEmail("anon");
+      const kUser = prefsKeyForEmail(email);
+      const anonRaw = localStorage.getItem(kAnon);
+      if (!anonRaw) return;
+      const userRaw = localStorage.getItem(kUser);
+      if (!userRaw) {
+        localStorage.setItem(kUser, anonRaw);
+      }
+      // keep anon copy for safety (don't delete)
+    } catch {}
   }
   function loadPrefs() {
     try {
-      const raw = localStorage.getItem(prefsKey());
+      const email = getUserEmail();
+      const kUser = email ? prefsKeyForEmail(email) : "";
+      const kAnon = prefsKeyForEmail("anon");
+      const raw = (kUser && localStorage.getItem(kUser)) || localStorage.getItem(kAnon);
       if (!raw) return;
       const obj = JSON.parse(raw);
       if (obj && typeof obj === "object") {
@@ -1458,7 +1493,9 @@
     try {
       const toSave = { ...(prefs || {}) };
       delete toSave.operatorColors;
-      localStorage.setItem(prefsKey(), JSON.stringify(toSave));
+      const email = getUserEmail();
+      const key = email ? prefsKeyForEmail(email) : prefsKeyForEmail("anon");
+      localStorage.setItem(key, JSON.stringify(toSave));
     } catch {}
   }
   function resetPrefs() {
@@ -4259,12 +4296,17 @@
     if (d) anchorDate = d;
   } catch {}
 
-  loadPrefs();
-  initSelectionFromPrefs();
-  syncLoginName();
-  // Render immediately with saved selection (empty grid), then load data.
-  try { render(); } catch {}
-  setView("7days");
+  // Ensure auth is available before reading per-user prefs (avoids "anon" key).
+  (async () => {
+    await ensureAuthForPrefs();
+    migrateAnonPrefsIfNeeded();
+    loadPrefs();
+    initSelectionFromPrefs();
+    syncLoginName();
+    // Render immediately with saved selection (empty grid), then load data.
+    try { render(); } catch {}
+    setView("7days");
+  })();
 
   // If "Impostazioni Disponibilità" changes, refresh availability cache + re-render.
   const onAvailabilityChanged = () => {
