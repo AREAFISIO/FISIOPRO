@@ -155,8 +155,8 @@ function ensureUnifiedSidebarMenu(roleRaw) {
 
   // Generale (sempre)
   html.push(section("Generale"));
-  html.push(link("anagrafica.html", "Pazienti"));
   html.push(link("agenda.html", "Agenda"));
+  html.push(link("anagrafica.html", "Pazienti"));
 
   // Fisioterapista (menu ridotto)
   if (role === "physio") {
