@@ -3726,6 +3726,8 @@
   };
   document.addEventListener("scroll", onDocScroll, true);
   window.addEventListener("resize", onResize);
+  const onLayoutReady = () => { try { render(); } catch {} };
+  window.addEventListener("fpAgendaLayoutReady", onLayoutReady);
 
   // Operator selector
   opsBar?.addEventListener("click", () => { pickMode = "view"; openOpsMenu(); });
@@ -3926,6 +3928,7 @@
   window.__FP_DIARY_CLEANUP = () => {
     try { document.removeEventListener("scroll", onDocScroll, true); } catch {}
     try { window.removeEventListener("resize", onResize); } catch {}
+    try { window.removeEventListener("fpAgendaLayoutReady", onLayoutReady); } catch {}
     try { window.removeEventListener("fpAvailabilityChanged", onAvailabilityChanged); } catch {}
     try { window.removeEventListener("fpAppointmentsSettingsChanged", onAppointmentsSettingsChanged); } catch {}
     try { hoverCard?.remove?.(); } catch {}
