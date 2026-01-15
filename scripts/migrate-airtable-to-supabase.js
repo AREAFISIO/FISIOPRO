@@ -1,7 +1,7 @@
 /**
- * Full Airtable -> Supabase migration (raw + normalized core).
+ * Airtable -> Supabase migration (RAW + CORE).
  *
- * Usage (local):
+ * Modes:
  *   node scripts/migrate-airtable-to-supabase.js raw
  *   node scripts/migrate-airtable-to-supabase.js core
  *   node scripts/migrate-airtable-to-supabase.js all
@@ -13,19 +13,48 @@
  *   SUPABASE_SERVICE_ROLE_KEY
  *
  * Notes:
- * - Runs in two phases:
- *   1) raw: dumps ALL tables defined in lib/airtableSchema.json into airtable_raw_records
- *   2) core: builds normalized tables for the operational core
- * - Keeps a stable mapping via airtable_id unique column.
+ * - RAW: dumps all Airtable tables (from lib/airtableSchema.json) into `airtable_raw_records` (JSONB).
+ * - CORE: populates normalized tables (patients/collaborators/services/cases/appointments/erogato/...) using `airtable_id` mapping.
+ * - This script is meant to be run via GitHub Actions (no local terminal required).
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { airtableList } from "../lib/airtableClient.js";
-import { airtableSchema } from "../lib/airtableClient.js";
+import { airtableList, airtableSchema } from "../lib/airtableClient.js";
 
-function norm(s) {
-  const v = String(s ?? "").trim();
-  return v ? v : "";
+function norm(v) {
+  const s = String(v ?? "").trim();
+  return s ? s : "";
+}
+
+function envOrThrow(name) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing ${name}`);
+  return v;
+}
+
+function supabaseClient() {
+  const url = envOrThrow("SUPABASE_URL");
+  const key = envOrThrow("SUPABASE_SERVICE_ROLE_KEY");
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+function chunk(arr, size) {
+  const out = [];
+  const n = Math.max(1, Number(size) || 1);
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
+
+async function upsertRows(sb, tableName, rows, onConflict) {
+  if (!rows.length) return [];
+  const parts = chunk(rows, 200);
+  const out = [];
+  for (const p of parts) {
+    const { data, error } = await sb.from(tableName).upsert(p, { onConflict }).select("*");
+    if (error) throw new Error(`${tableName} upsert failed: ${error.message}`);
+    out.push(...(data || []));
+  }
+  return out;
 }
 
 function asNumber(v) {
@@ -39,8 +68,7 @@ function asNumber(v) {
 
 function asInt(v) {
   const n = asNumber(v);
-  if (n === null) return null;
-  return Number.isFinite(n) ? Math.trunc(n) : null;
+  return n === null ? null : Math.trunc(n);
 }
 
 function asBool(v) {
@@ -56,8 +84,6 @@ function asBool(v) {
 function asDateOnly(v) {
   const s = norm(v);
   if (!s) return null;
-  // Airtable dates are often "YYYY-MM-DD" already.
-  // If it's ISO datetime, keep date part.
   const d = new Date(s);
   if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
@@ -72,54 +98,23 @@ function asTimestamptz(v) {
   return d.toISOString();
 }
 
-function firstLinkedId(fields, fieldName) {
-  const val = fields?.[fieldName];
-  if (Array.isArray(val) && val.length) return String(val[0] || "").trim();
-  if (typeof val === "string" && val.startsWith("rec")) return val;
+function firstLinkValue(fields, fieldName) {
+  const v = fields?.[fieldName];
+  if (Array.isArray(v) && v.length) return norm(v[0]);
+  if (typeof v === "string") return norm(v);
   return "";
 }
 
-function chunk(arr, size) {
-  const out = [];
-  const n = Math.max(1, Number(size) || 1);
-  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
-  return out;
-}
-
-function envOrThrow(name) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing ${name}`);
-  return v;
-}
-
-function supabaseClient() {
-  const url = envOrThrow("SUPABASE_URL");
-  const key = envOrThrow("SUPABASE_SERVICE_ROLE_KEY");
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-async function upsertRows(sb, tableName, rows, onConflict) {
-  if (!rows.length) return [];
-  // Use small chunks to avoid payload limits.
-  const chunks = chunk(rows, 200);
-  const out = [];
-  for (const c of chunks) {
-    const q = sb.from(tableName).upsert(c, { onConflict });
-    const { data, error } = await q.select("*");
-    if (error) throw new Error(`${tableName} upsert failed: ${error.message}`);
-    out.push(...(data || []));
-  }
-  return out;
+function keyLower(s) {
+  return norm(s).toLowerCase();
 }
 
 async function migrateRaw() {
   const sb = supabaseClient();
-  const tableNames = Object.keys(airtableSchema || {});
-  if (!tableNames.length) throw new Error("No tables found in lib/airtableSchema.json");
+  const tables = Object.keys(airtableSchema || {});
+  if (!tables.length) throw new Error("No tables found in lib/airtableSchema.json");
 
-  for (const t of tableNames) {
+  for (const t of tables) {
     console.log(`[raw] ${t} ...`);
     const { records } = await airtableList(t, { pageSize: 100 });
     const rows = (records || []).map((r) => ({
@@ -130,47 +125,43 @@ async function migrateRaw() {
       synced_at: new Date().toISOString(),
     }));
     await upsertRows(sb, "airtable_raw_records", rows, "table_name,airtable_id");
-    console.log(`[raw] ${t}: ${rows.length} records`);
+    console.log(`[raw] ${t}: ${rows.length}`);
   }
 }
 
 async function migrateCore() {
   const sb = supabaseClient();
 
-  // -----------------------
-  // Pass 1: base entities
-  // -----------------------
+  // Build lookup maps
   const maps = {
-    patients: new Map(), // airtable_id -> uuid
-    collaborators: new Map(),
-    services: new Map(),
-    cases: new Map(),
-    sales: new Map(),
-    appointments: new Map(),
-    erogato: new Map(),
+    patientsByAirtable: new Map(),
+    patientsByLabel: new Map(),
+    collaboratorsByAirtable: new Map(),
+    collaboratorsByName: new Map(),
+    servicesByAirtable: new Map(),
+    casesByAirtable: new Map(),
+    salesByAirtable: new Map(),
+    appointmentsByAirtable: new Map(),
   };
 
-  async function buildMap(tableName, rows, onConflict) {
-    const inserted = await upsertRows(sb, tableName, rows, onConflict);
-    for (const r of inserted) {
-      if (r?.airtable_id && r?.id) maps[tableName]?.set(r.airtable_id, r.id);
-    }
-  }
+  const upsertAndIndex = async (tableName, rows) => {
+    const inserted = await upsertRows(sb, tableName, rows, "airtable_id");
+    return inserted || [];
+  };
 
   // COLLABORATORI
   {
     const { records } = await airtableList("COLLABORATORI", { pageSize: 100 });
     const rows = (records || []).map((r) => {
       const f = r.fields || {};
-      return {
-        airtable_id: r.id,
-        name: norm(f.Collaboratore || f.Nome || f.Name || r.id),
-        role: norm(f.Ruolo),
-        airtable_fields: f,
-      };
+      return { airtable_id: r.id, name: norm(f.Collaboratore || f.Nome || f.Name || r.id), role: norm(f.Ruolo), airtable_fields: f };
     });
     console.log(`[core] collaborators: ${rows.length}`);
-    await buildMap("collaborators", rows, "airtable_id");
+    const ins = await upsertAndIndex("collaborators", rows);
+    for (const c of ins) {
+      if (c.airtable_id && c.id) maps.collaboratorsByAirtable.set(c.airtable_id, c.id);
+      if (c.name && c.id) maps.collaboratorsByName.set(keyLower(c.name), c.id);
+    }
   }
 
   // ANAGRAFICA
@@ -198,7 +189,11 @@ async function migrateCore() {
       };
     });
     console.log(`[core] patients: ${rows.length}`);
-    await buildMap("patients", rows, "airtable_id");
+    const ins = await upsertAndIndex("patients", rows);
+    for (const p of ins) {
+      if (p.airtable_id && p.id) maps.patientsByAirtable.set(p.airtable_id, p.id);
+      if (p.label && p.id) maps.patientsByLabel.set(keyLower(p.label), p.id);
+    }
   }
 
   // PRESTAZIONI
@@ -220,25 +215,35 @@ async function migrateCore() {
       };
     });
     console.log(`[core] services: ${rows.length}`);
-    await buildMap("services", rows, "airtable_id");
+    const ins = await upsertAndIndex("services", rows);
+    for (const s of ins) if (s.airtable_id && s.id) maps.servicesByAirtable.set(s.airtable_id, s.id);
   }
 
-  // -----------------------
-  // Pass 2: relational core
-  // -----------------------
+  const resolvePatientUuid = (v) => {
+    const s = norm(v);
+    if (!s) return null;
+    if (s.startsWith("rec")) return maps.patientsByAirtable.get(s) || null;
+    return maps.patientsByLabel.get(keyLower(s)) || null;
+  };
+  const resolveCollaboratorUuid = (v) => {
+    const s = norm(v);
+    if (!s) return null;
+    if (s.startsWith("rec")) return maps.collaboratorsByAirtable.get(s) || null;
+    return maps.collaboratorsByName.get(keyLower(s)) || null;
+  };
 
   // CASI CLINICI
   {
     const { records } = await airtableList("CASI CLINICI", { pageSize: 100 });
     const rows = (records || []).map((r) => {
       const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const refAirtableId = firstLinkedId(f, "Fisioterapista referente");
+      const paz = firstLinkValue(f, "Paziente");
+      const ref = firstLinkValue(f, "Fisioterapista referente");
       return {
         airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        referente_id: maps.collaborators.get(refAirtableId) || null,
-        case_code: norm(f["ID caso clinico"] || f["CASO CLINICO"] || f["CASO CLINICO"] || f["Caso Clinico"]),
+        patient_id: resolvePatientUuid(paz),
+        referente_id: resolveCollaboratorUuid(ref),
+        case_code: norm(f["ID caso clinico"] || f["CASO CLINICO"] || f["Caso Clinico"] || r.id),
         status: norm(f["Stato caso"] || f.Stato),
         opened_on: asDateOnly(f["Data apertura"] || f["Data Apertura"]),
         closed_on: asDateOnly(f["DATA CHIUSURA"]),
@@ -247,22 +252,29 @@ async function migrateCore() {
       };
     });
     console.log(`[core] cases: ${rows.length}`);
-    await buildMap("cases", rows, "airtable_id");
+    const ins = await upsertAndIndex("cases", rows);
+    for (const c of ins) if (c.airtable_id && c.id) maps.casesByAirtable.set(c.airtable_id, c.id);
   }
 
-  // VENDITE
+  // VENDITE (may be empty)
   {
-    const { records } = await airtableList("VENDITE", { pageSize: 100 });
+    let records = [];
+    try {
+      const res = await airtableList("VENDITE", { pageSize: 100 });
+      records = res.records || [];
+    } catch {
+      records = [];
+    }
     const rows = (records || []).map((r) => {
       const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const caseAirtableId = firstLinkedId(f, "Caso clinico");
-      const serviceAirtableId = firstLinkedId(f, "LINK TO PRESTAZIONI");
+      const paz = firstLinkValue(f, "Paziente");
+      const cas = firstLinkValue(f, "Caso clinico");
+      const srv = firstLinkValue(f, "LINK TO PRESTAZIONI");
       return {
         airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        case_id: maps.cases.get(caseAirtableId) || null,
-        service_id: maps.services.get(serviceAirtableId) || null,
+        patient_id: resolvePatientUuid(paz),
+        case_id: cas && cas.startsWith("rec") ? (maps.casesByAirtable.get(cas) || null) : null,
+        service_id: srv && srv.startsWith("rec") ? (maps.servicesByAirtable.get(srv) || null) : null,
         status: norm(f["Stato vendita"]),
         sale_type: norm(f["Tipo di vendita"]),
         sold_at: asTimestamptz(f["DATA E ORA VENDITA"]),
@@ -276,7 +288,8 @@ async function migrateCore() {
       };
     });
     console.log(`[core] sales: ${rows.length}`);
-    await buildMap("sales", rows, "airtable_id");
+    const ins = rows.length ? await upsertAndIndex("sales", rows) : [];
+    for (const s of ins) if (s.airtable_id && s.id) maps.salesByAirtable.set(s.airtable_id, s.id);
   }
 
   // APPUNTAMENTI
@@ -284,18 +297,19 @@ async function migrateCore() {
     const { records } = await airtableList("APPUNTAMENTI", { pageSize: 100 });
     const rows = (records || []).map((r) => {
       const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const collabAirtableId = firstLinkedId(f, "Collaboratore");
-      const serviceAirtableId = firstLinkedId(f, "Prestazione prevista");
-      const caseAirtableId = firstLinkedId(f, "Caso clinico");
-      const saleAirtableId = firstLinkedId(f, "Vendita collegata");
+      const paz = firstLinkValue(f, "Paziente");
+      const col = firstLinkValue(f, "Collaboratore");
+      const srv = firstLinkValue(f, "Prestazione prevista");
+      const cas = firstLinkValue(f, "Caso clinico");
+      const sal = firstLinkValue(f, "Vendita collegata");
+
       return {
         airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        collaborator_id: maps.collaborators.get(collabAirtableId) || null,
-        service_id: maps.services.get(serviceAirtableId) || null,
-        case_id: maps.cases.get(caseAirtableId) || null,
-        sale_id: maps.sales.get(saleAirtableId) || null,
+        patient_id: resolvePatientUuid(paz),
+        collaborator_id: resolveCollaboratorUuid(col),
+        service_id: srv && srv.startsWith("rec") ? (maps.servicesByAirtable.get(srv) || null) : null,
+        case_id: cas && cas.startsWith("rec") ? (maps.casesByAirtable.get(cas) || null) : null,
+        sale_id: sal && sal.startsWith("rec") ? (maps.salesByAirtable.get(sal) || null) : null,
         start_at: asTimestamptz(f["Data e ora INIZIO"]),
         end_at: asTimestamptz(f["Data e ora fine"]),
         duration_minutes: asInt(f["Durata (minuti)"]),
@@ -310,7 +324,8 @@ async function migrateCore() {
       };
     });
     console.log(`[core] appointments: ${rows.length}`);
-    await buildMap("appointments", rows, "airtable_id");
+    const ins = await upsertAndIndex("appointments", rows);
+    for (const a of ins) if (a.airtable_id && a.id) maps.appointmentsByAirtable.set(a.airtable_id, a.id);
   }
 
   // EROGATO
@@ -318,121 +333,41 @@ async function migrateCore() {
     const { records } = await airtableList("EROGATO", { pageSize: 100 });
     const rows = (records || []).map((r) => {
       const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const collabAirtableId = firstLinkedId(f, "Collaboratore");
-      const apptAirtableId = firstLinkedId(f, "Appuntamento");
-      const caseAirtableId =
-        firstLinkedId(f, "Caso clinico") || firstLinkedId(f, "CASI CLINICI");
-      const evalLink = firstLinkedId(f, "Valutazione collegata");
+      const paz = firstLinkValue(f, "Paziente");
+      const col = firstLinkValue(f, "Collaboratore");
+      const app = firstLinkValue(f, "Appuntamento");
+      const cas = firstLinkValue(f, "Caso clinico") || firstLinkValue(f, "CASI CLINICI");
       return {
         airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        collaborator_id: maps.collaborators.get(collabAirtableId) || null,
-        appointment_id: maps.appointments.get(apptAirtableId) || null,
-        case_id: maps.cases.get(caseAirtableId) || null,
-        evaluation_airtable_link: evalLink || null,
+        patient_id: resolvePatientUuid(paz),
+        collaborator_id: resolveCollaboratorUuid(col),
+        appointment_id: app && app.startsWith("rec") ? (maps.appointmentsByAirtable.get(app) || null) : null,
+        case_id: cas && cas.startsWith("rec") ? (maps.casesByAirtable.get(cas) || null) : null,
         start_at: asTimestamptz(f["Data e ora INIZIO"]),
         end_at: asTimestamptz(f["Data e ora FINE"]),
         minutes: asInt(f["Minuti lavoro"]),
-        economic_outcome: norm(f["Esito economico"]),
+        status: norm(f["Stato appuntamento"]),
         work_type: norm(f["Tipo lavoro "] || f["Tipo lavoro (da prestazioni)"]),
         is_evaluation: asBool(f["È valutazione?"]),
         is_home: asBool(f["DOMICILIO (from Appuntamento)"]),
-        status: norm(f["Stato appuntamento"]),
         airtable_fields: f,
       };
     });
     console.log(`[core] erogato: ${rows.length}`);
-    const inserted = await upsertRows(sb, "erogato", rows, "airtable_id");
-    for (const rr of inserted) {
-      if (rr?.airtable_id && rr?.id) maps.erogato.set(rr.airtable_id, rr.id);
-    }
-  }
-
-  // VALUTAZIONI (links to EROGATO)
-  {
-    // Might not exist in every base; ignore if missing.
-    let records = [];
-    try {
-      const res = await airtableList("VALUTAZIONI", { pageSize: 100 });
-      records = res.records || [];
-    } catch (e) {
-      console.log(`[core] evaluations: skipped (${e.message})`);
-      records = [];
-    }
-    const rows = records.map((r) => {
-      const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const collabAirtableId = firstLinkedId(f, "Collaboratore");
-      const caseAirtableId = firstLinkedId(f, "Caso clinico");
-      const apptAirtableId = firstLinkedId(f, "Appuntamento");
-      const erogatoAirtableId = firstLinkedId(f, "Erogato");
-      return {
-        airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        collaborator_id: maps.collaborators.get(collabAirtableId) || null,
-        case_id: maps.cases.get(caseAirtableId) || null,
-        appointment_id: maps.appointments.get(apptAirtableId) || null,
-        erogato_id: maps.erogato.get(erogatoAirtableId) || null,
-        evaluated_at: asDateOnly(f["Data valutazione"]),
-        evaluation_type: norm(f["Tipo valutazione"]),
-        outcome: norm(f["Indicazioni percorso"] || f.Scale),
-        note: norm(f.Note),
-        airtable_fields: f,
-      };
-    });
-    console.log(`[core] evaluations: ${rows.length}`);
-    await upsertRows(sb, "evaluations", rows, "airtable_id");
-  }
-
-  // TRATTAMENTI (links to EROGATO / VENDITE)
-  {
-    let records = [];
-    try {
-      const res = await airtableList("TRATTAMENTI", { pageSize: 100 });
-      records = res.records || [];
-    } catch (e) {
-      console.log(`[core] treatments: skipped (${e.message})`);
-      records = [];
-    }
-    const rows = records.map((r) => {
-      const f = r.fields || {};
-      const patientAirtableId = firstLinkedId(f, "Paziente");
-      const collabAirtableId = firstLinkedId(f, "Collaboratore");
-      const caseAirtableId = firstLinkedId(f, "Caso clinico") || firstLinkedId(f, "CASI CLINICI");
-      const apptAirtableId = firstLinkedId(f, "Appuntamento");
-      const erogatoAirtableId = firstLinkedId(f, "Erogato");
-      const saleAirtableId = firstLinkedId(f, "Vendita di riferimento");
-      return {
-        airtable_id: r.id,
-        patient_id: maps.patients.get(patientAirtableId) || null,
-        collaborator_id: maps.collaborators.get(collabAirtableId) || null,
-        case_id: maps.cases.get(caseAirtableId) || null,
-        appointment_id: maps.appointments.get(apptAirtableId) || null,
-        erogato_id: maps.erogato.get(erogatoAirtableId) || null,
-        sale_id: maps.sales.get(saleAirtableId) || null,
-        performed_at: asDateOnly(f.Data),
-        treatment_type: norm(f["Tipo trattamento"]),
-        note: norm(f["Note Fisioterapista"]),
-        airtable_fields: f,
-      };
-    });
-    console.log(`[core] treatments: ${rows.length}`);
-    await upsertRows(sb, "treatments", rows, "airtable_id");
+    if (rows.length) await upsertAndIndex("erogato", rows);
   }
 
   console.log("[core] done");
 }
 
 async function main() {
-  const arg = norm(process.argv[2]).toLowerCase() || "all";
-  if (!["raw", "core", "all"].includes(arg)) {
+  const mode = (process.argv[2] || "all").toLowerCase();
+  if (!["raw", "core", "all"].includes(mode)) {
     console.log("Usage: node scripts/migrate-airtable-to-supabase.js [raw|core|all]");
     process.exit(2);
   }
-
-  if (arg === "raw" || arg === "all") await migrateRaw();
-  if (arg === "core" || arg === "all") await migrateCore();
+  if (mode === "raw" || mode === "all") await migrateRaw();
+  if (mode === "core" || mode === "all") await migrateCore();
 }
 
 main().catch((e) => {
