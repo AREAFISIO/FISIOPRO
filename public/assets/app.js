@@ -171,6 +171,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     html.push(section("Operativo"));
     html.push(link("operativo.html", "Oggi"));
     html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+    html.push(link("notifiche.html", "Notifiche"));
     html.push(link("fatturazione.html", "Fatturazione"));
 
     html.push(section("Front Office"));
@@ -187,6 +188,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     html.push(link("gestione-contabile.html", "Gestione contabile"));
     html.push(link("erogato.html", "Erogato"));
     html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+    html.push(link("notifiche.html", "Notifiche"));
   }
 
   // Manager/CEO: vede tutto (unione delle aree)
@@ -199,6 +201,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     html.push(section("Operativo"));
     html.push(link("operativo.html", "Oggi"));
     html.push(link("note.html", "Note & Alert", `<span class="badge" data-fp-inbox-badge style="display:none;"></span>`));
+    html.push(link("notifiche.html", "Notifiche"));
     html.push(link("fatturazione.html", "Fatturazione"));
 
     html.push(section("Front Office"));

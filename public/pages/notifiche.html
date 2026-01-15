@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="it">
+<script src="/assets/auth-guard.js"></script>
+<script src="/assets/session-timeout.js"></script>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FisioPro • Notifiche</title>
+  <link rel="stylesheet" href="../assets/app.css?v=fpui-20260115b" />
+  <style>
+    .nGrid3{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; }
+    @media (max-width: 1100px){ .nGrid3{ grid-template-columns:1fr; } }
+    .nCard{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    .nCardTop{ display:flex; align-items:center; gap:12px; justify-content:space-between; }
+    .nChan{ display:flex; align-items:center; gap:10px; font-weight:950; font-size:18px; }
+    .nIcon{
+      width:44px; height:44px; border-radius: 14px;
+      display:grid; place-items:center;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      font-size: 20px;
+    }
+    .nStats{ margin-top: 12px; display:grid; grid-template-columns: 1fr auto; gap: 8px 12px; color: var(--muted); font-weight: 800; }
+    .nStats b{ color: var(--text); font-weight: 950; }
+    .nDivider{ margin-top:14px; padding-top:12px; border-top:1px solid var(--border); color: var(--muted); font-weight:800; display:flex; align-items:center; gap:10px;}
+
+    .nToolbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .nFilters{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .nFilters .field{ min-width: 160px; }
+    .nTable{ width:100%; border-collapse: collapse; }
+    .nTable th, .nTable td{ border-bottom:1px solid var(--border); padding: 10px 10px; text-align:left; vertical-align:middle; }
+    .nTable th{ color: var(--muted); font-weight: 900; font-size: 13px; }
+    .nPill{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      font-weight: 950;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .nPill.ok{ border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); color: var(--ok); }
+    .nPill.err{ border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); color: var(--warn); }
+    .nTiny{ color: var(--muted); font-size: 12px; font-weight: 800; }
+    .nEmpty{ padding: 14px; color: var(--muted); font-weight: 800; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">AreA FISIO</div>
+        <div class="sub">Notifiche</div>
+      </div>
+    </div>
+    <nav class="nav"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="toprow">
+        <div class="h1">Notifiche <span class="pill" data-user-badge>—</span></div>
+        <div class="actions">
+          <button class="btn" onclick="history.back()">Indietro</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" style="margin-bottom:14px;">
+      <div class="head"><h2>Panoramica</h2><span class="chip">ultimi 30 giorni</span></div>
+      <div class="body">
+        <div class="nGrid3">
+          <div class="nCard">
+            <div class="nCardTop">
+              <div class="nChan"><span class="nIcon">✉️</span> Email</div>
+              <div class="nTiny">Ultimi 30 giorni</div>
+            </div>
+            <div class="nStats">
+              <div>Inviate:</div><div><b data-stat-email-sent>0</b></div>
+              <div>In errore:</div><div><b data-stat-email-error>0</b></div>
+              <div>Lette:</div><div><b data-stat-email-read>0</b></div>
+              <div>Programmate:</div><div><b data-stat-email-scheduled>0</b></div>
+            </div>
+            <div class="nDivider"><span>📅</span><span>Ultimi 30 giorni</span></div>
+          </div>
+
+          <div class="nCard">
+            <div class="nCardTop">
+              <div class="nChan"><span class="nIcon">💬</span> SMS</div>
+              <div class="nTiny">Ultimi 30 giorni</div>
+            </div>
+            <div class="nStats">
+              <div>Inviati:</div><div><b data-stat-sms-sent>0</b></div>
+              <div>In errore:</div><div><b data-stat-sms-error>0</b></div>
+              <div>Disponibili:</div><div><b data-stat-sms-available>0</b></div>
+              <div>Programmati:</div><div><b data-stat-sms-scheduled>0</b></div>
+            </div>
+            <div class="nDivider"><span>📅</span><span>Ultimi 30 giorni</span></div>
+          </div>
+
+          <div class="nCard">
+            <div class="nCardTop">
+              <div class="nChan"><span class="nIcon">🟢</span> WhatsApp</div>
+              <div class="nTiny">Ultimi 30 giorni</div>
+            </div>
+            <div class="nStats">
+              <div>Inviati:</div><div><b data-stat-wa-sent>0</b></div>
+              <div>In errore:</div><div><b data-stat-wa-error>0</b></div>
+              <div>Disponibili:</div><div><b data-stat-wa-available>0</b></div>
+              <div>Programmati:</div><div><b data-stat-wa-scheduled>0</b></div>
+            </div>
+            <div class="nDivider"><span>📅</span><span>Ultimi 30 giorni</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="head">
+        <h2>Notifiche</h2>
+        <span class="chip">log invii</span>
+      </div>
+      <div class="body">
+        <div class="nToolbar">
+          <div class="nFilters">
+            <label class="field">
+              <span class="fpFormLabel">Anno</span>
+              <select class="select" data-n-year>
+                <option value="">—</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="fpFormLabel">Mese</span>
+              <select class="select" data-n-month>
+                <option value="">—</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="fpFormLabel">Canale</span>
+              <select class="select" data-n-channel>
+                <option value="">Tutti</option>
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="whatsapp">WhatsApp</option>
+              </select>
+            </label>
+            <label class="field" style="min-width: 240px;">
+              <span class="fpFormLabel">Ricerca</span>
+              <input class="input" data-n-q placeholder="Email, nome, oggetto…" />
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:800;">
+              <input type="checkbox" data-n-only-failed />
+              <span>Solo invii falliti</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; font-weight:800;">
+              <input type="checkbox" data-n-only-scheduled />
+              <span>Solo programmate</span>
+            </label>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <button class="btn" data-n-refresh>Aggiorna</button>
+            <button class="btn primary" data-n-new>+ Nuova notifica</button>
+          </div>
+        </div>
+
+        <div class="nTiny" style="margin-top:10px;" data-n-count>—</div>
+        <div style="height:10px;"></div>
+
+        <div data-n-loading class="nEmpty" style="display:none;">Caricamento…</div>
+        <div data-n-error class="nEmpty" style="display:none; color:rgba(255,214,222,.95);">Errore caricamento.</div>
+
+        <div style="overflow:auto; border:1px solid var(--border); border-radius:16px;">
+          <table class="nTable">
+            <thead>
+              <tr>
+                <th style="width:42px;"><input type="checkbox" disabled /></th>
+                <th>Data e ora</th>
+                <th>Canale</th>
+                <th>Destinatario</th>
+                <th>Nome</th>
+                <th>Oggetto</th>
+                <th style="width:70px;">n° msg</th>
+                <th style="width:180px;">Stato invio</th>
+              </tr>
+            </thead>
+            <tbody data-n-tbody>
+              <tr><td colspan="8" class="nEmpty">Nessuna notifica da mostrare.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="rightbar"></aside>
+</div>
+
+<div class="toast"></div>
+<script src="/assets/app-loader.js" data-src="/assets/app.js" data-v="fpui-20260115b"></script>
+<script>
+  (function () {
+    const $ = (s) => document.querySelector(s);
+    const show = (el, msg) => { if (!el) return; el.style.display = "block"; if (msg !== undefined) el.textContent = String(msg || ""); };
+    const hide = (el) => { if (!el) return; el.style.display = "none"; };
+    const esc = (x) => String(x ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+
+    const tb = $("[data-n-tbody]");
+    const loadingEl = $("[data-n-loading]");
+    const errorEl = $("[data-n-error]");
+    const countEl = $("[data-n-count]");
+
+    const yearSel = $("[data-n-year]");
+    const monthSel = $("[data-n-month]");
+    const channelSel = $("[data-n-channel]");
+    const qInp = $("[data-n-q]");
+    const onlyFailed = $("[data-n-only-failed]");
+    const onlyScheduled = $("[data-n-only-scheduled]");
+
+    function setStat(key, val) {
+      const el = document.querySelector(`[data-stat-${key}]`);
+      if (el) el.textContent = String(val ?? 0);
+    }
+
+    function fillYears() {
+      if (!yearSel) return;
+      const now = new Date();
+      const y = now.getFullYear();
+      const years = [y - 1, y, y + 1];
+      yearSel.innerHTML = `<option value="">—</option>` + years.map((n) => `<option value="${n}">${n}</option>`).join("");
+      yearSel.value = String(y);
+    }
+    function fillMonths() {
+      if (!monthSel) return;
+      const labels = ["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
+      monthSel.innerHTML = `<option value="">—</option>` + labels.map((l, i) => `<option value="${String(i+1).padStart(2,"0")}">${l}</option>`).join("");
+      const m = String(new Date().getMonth() + 1).padStart(2, "0");
+      monthSel.value = m;
+    }
+
+    async function load() {
+      hide(errorEl);
+      show(loadingEl);
+      try {
+        const params = new URLSearchParams();
+        if (yearSel?.value) params.set("year", yearSel.value);
+        if (monthSel?.value) params.set("month", monthSel.value);
+        if (channelSel?.value) params.set("channel", channelSel.value);
+        if (qInp?.value) params.set("q", qInp.value);
+        if (onlyFailed?.checked) params.set("onlyFailed", "1");
+        if (onlyScheduled?.checked) params.set("onlyScheduled", "1");
+
+        const data = await window.fpApi(`/api/notifications?${params.toString()}`);
+        const s = data.summary || {};
+        setStat("email-sent", s.email?.sent || 0);
+        setStat("email-error", s.email?.error || 0);
+        setStat("email-read", s.email?.read || 0);
+        setStat("email-scheduled", s.email?.scheduled || 0);
+        setStat("sms-sent", s.sms?.sent || 0);
+        setStat("sms-error", s.sms?.error || 0);
+        setStat("sms-available", s.sms?.available || 0);
+        setStat("sms-scheduled", s.sms?.scheduled || 0);
+        setStat("wa-sent", s.whatsapp?.sent || 0);
+        setStat("wa-error", s.whatsapp?.error || 0);
+        setStat("wa-available", s.whatsapp?.available || 0);
+        setStat("wa-scheduled", s.whatsapp?.scheduled || 0);
+
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (countEl) countEl.textContent = `${items.length} risultati`;
+
+        if (!tb) return;
+        if (!items.length) {
+          tb.innerHTML = `<tr><td colspan="8" class="nEmpty">Nessuna notifica da mostrare.</td></tr>`;
+        } else {
+          tb.innerHTML = items.map((it) => {
+            const st = String(it.status || "");
+            const pillCls = st.toLowerCase().includes("error") ? "err" : "ok";
+            return `
+              <tr>
+                <td><input type="checkbox" disabled /></td>
+                <td>${esc(it.datetime || "—")}</td>
+                <td>${esc(it.channel || "—")}</td>
+                <td>${esc(it.to || "—")}</td>
+                <td>${esc(it.name || "—")}</td>
+                <td>${esc(it.subject || "—")}</td>
+                <td>${esc(it.count || "1")}</td>
+                <td><span class="nPill ${pillCls}">${esc(st || "—")}</span></td>
+              </tr>
+            `;
+          }).join("");
+        }
+        hide(loadingEl);
+      } catch (e) {
+        console.error(e);
+        hide(loadingEl);
+        show(errorEl, "Errore caricamento (verifica permessi).");
+      }
+    }
+
+    fillYears();
+    fillMonths();
+    $("[data-n-refresh]")?.addEventListener("click", load);
+    $("[data-n-new]")?.addEventListener("click", () => (window.toast ? window.toast("In arrivo: creazione notifiche") : alert("In arrivo: creazione notifiche")));
+    [yearSel, monthSel, channelSel].forEach((x) => x && x.addEventListener("change", load));
+    qInp && qInp.addEventListener("input", () => { clearTimeout(window.__NQ_T); window.__NQ_T = setTimeout(load, 180); });
+    onlyFailed && onlyFailed.addEventListener("change", load);
+    onlyScheduled && onlyScheduled.addEventListener("change", load);
+
+    load();
+  })();
+</script>
+</body>
+</html>
+
