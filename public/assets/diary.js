@@ -1273,7 +1273,12 @@
     // Back-compat: userColor (applies to "me" only)
     const me = String(getUserName() || "").trim();
     const my = normalizeHexColor(prefs.userColor);
-    if (my && me && n === me) return my;
+    if (my) {
+      if (me && n === me) return my;
+      // If appointment label differs but maps to the same operator id, still apply my color.
+      const myOpId = me ? (operatorNameToId.get(me) || "") : "";
+      if (myOpId && opId && myOpId === opId) return my;
+    }
 
     return defaultHexForName(n) || "#22E6C3";
   }
@@ -2008,7 +2013,12 @@
           const c = normalizeHexColor(x.color);
           if (id && c) nextColors[id] = c;
         });
-        prefs.operatorColors = nextColors;
+        // Merge server colors into local prefs (do NOT wipe local-only overrides).
+        // This is important for roles that can't persist colors server-side (e.g. physio),
+        // otherwise the UI "snaps back" to default colors.
+        ensureOperatorColorsObject();
+        const localColors = prefs.operatorColors && typeof prefs.operatorColors === "object" ? prefs.operatorColors : {};
+        prefs.operatorColors = { ...localColors, ...nextColors };
 
         // If appointments were loaded in lite mode, backfill therapist names from ids.
         backfillTherapistNamesFromIds();
