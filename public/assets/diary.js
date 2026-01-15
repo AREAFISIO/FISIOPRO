@@ -17,10 +17,8 @@
 
     // build marker (helps verify cache busting)
     console.log("FISIOPRO diary build", "2b3c1d2-20251231b");
-    const root = document.querySelector("[data-diary]");
-    if (!root) return;
-
   const gridEl = document.querySelector("[data-cal-grid]");
+  if (!gridEl) return;
   const qEl = document.querySelector("[data-cal-q]");
   const rangeEl = document.querySelector("[data-cal-range]");
   const monthEl = document.querySelector("[data-cal-month]");
