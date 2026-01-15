@@ -3,7 +3,7 @@
 (function () {
   // Build marker (to verify cache-busting in production)
   try {
-    window.__FP_DIARY_BUILD = "fpui-20260115e";
+    window.__FP_DIARY_BUILD = "fpui-20260115f";
     console.info("[Agenda] diary.js build:", window.__FP_DIARY_BUILD);
   } catch {}
   if (typeof window.fpDiaryInit === "function") return;
@@ -3426,55 +3426,61 @@
       };
 
       const applyMove = async ({ targetDayIndex, targetTherapist, targetStartMin }) => {
-        const dayObj = addDays(start, targetDayIndex);
-        const rule = getSlotRule(targetTherapist || it.therapist, dayObj, targetStartMin);
-        if (!rule?.on) {
-          const hhmm = minToTime(targetStartMin);
-          const whenLabel = `${hhmm} • ${WEEKDAY_LABELS[weekdayIdxMon0(dayObj)]} ${dayObj.getDate()}/${dayObj.getMonth() + 1}`;
-          const ok = await confirmOutsideWorkingHours({
-            whenLabel,
-            therapistName: String(targetTherapist || it.therapist || "").trim(),
-            mode: "spostare",
-          });
-          if (!ok) return;
-        }
-
-        const durMin = (() => {
-          const stMin0 = minutesOfDay(it.startAt);
-          let d0 = 30;
-          if (it.endAt) {
-            const en0 = minutesOfDay(it.endAt);
-            if (en0 > stMin0) d0 = en0 - stMin0;
-          }
-          return d0;
-        })();
-
-        const newStart = new Date(dayObj.getFullYear(), dayObj.getMonth(), dayObj.getDate(), 0, 0, 0, 0);
-        newStart.setMinutes(targetStartMin);
-        const newEnd = new Date(newStart.getTime() + durMin * 60000);
-
-        const fromLabel = `${fmtDT(it.startAt)} • ${String(it.therapist || "").trim() || "—"}`;
-        const toLabel = `${fmtDT(newStart)} • ${String(targetTherapist || it.therapist || "").trim() || "—"}`;
-        const ok = await confirmMoveAppointment({ fromLabel, toLabel });
-        if (!ok) return;
-
-        const payload = {
-          start_at: newStart.toISOString(),
-          end_at: newEnd.toISOString(),
-        };
-
-        // If moving across therapists, update collaborator link (required for correct column on reload).
-        const therTrim = String(targetTherapist || "").trim();
-        if (multiUser && therTrim && therTrim !== String(it.therapist || "").trim()) {
-          const opId = operatorNameToId.get(therTrim) || "";
-          if (!opId) {
-            toast?.("Operatore non mappato: impossibile spostare su altra agenda");
-            return;
-          }
-          payload.therapist_id = opId;
-        }
-
         try {
+          const dayObj = addDays(start, targetDayIndex);
+          const targetMin = Number(targetStartMin);
+          if (!Number.isFinite(targetMin)) throw new Error("Orario non valido per lo spostamento (slotStartMin).");
+
+          const rule = getSlotRule(targetTherapist || it.therapist, dayObj, targetMin);
+          if (!rule?.on) {
+            const hhmm = minToTime(targetMin);
+            const whenLabel = `${hhmm} • ${WEEKDAY_LABELS[weekdayIdxMon0(dayObj)]} ${dayObj.getDate()}/${dayObj.getMonth() + 1}`;
+            const ok = await confirmOutsideWorkingHours({
+              whenLabel,
+              therapistName: String(targetTherapist || it.therapist || "").trim(),
+              mode: "spostare",
+            });
+            if (!ok) return;
+          }
+
+          const durMin = (() => {
+            const stMin0 = minutesOfDay(it.startAt);
+            let d0 = 30;
+            if (it.endAt) {
+              const en0 = minutesOfDay(it.endAt);
+              if (en0 > stMin0) d0 = en0 - stMin0;
+            }
+            return d0;
+          })();
+
+          const newStart = new Date(dayObj.getFullYear(), dayObj.getMonth(), dayObj.getDate(), 0, 0, 0, 0);
+          newStart.setMinutes(targetMin);
+          if (!Number.isFinite(newStart.getTime())) throw new Error("Data/ora non valida per lo spostamento.");
+          const newEnd = new Date(newStart.getTime() + durMin * 60000);
+          if (!Number.isFinite(newEnd.getTime())) throw new Error("Data/ora fine non valida per lo spostamento.");
+
+          const fromLabel = `${fmtDT(it.startAt)} • ${String(it.therapist || "").trim() || "—"}`;
+          const toLabel = `${fmtDT(newStart)} • ${String(targetTherapist || it.therapist || "").trim() || "—"}`;
+          const ok = await confirmMoveAppointment({ fromLabel, toLabel });
+          if (!ok) return;
+
+          const payload = {
+            start_at: newStart.toISOString(),
+            end_at: newEnd.toISOString(),
+          };
+
+          // If moving across therapists, update collaborator link (required for correct column on reload).
+          const therTrim = String(targetTherapist || "").trim();
+          if (multiUser && therTrim && therTrim !== String(it.therapist || "").trim()) {
+            const opId = operatorNameToId.get(therTrim) || "";
+            if (!opId) {
+              toast?.("Operatore non mappato: impossibile spostare su altra agenda");
+              return;
+            }
+            payload.therapist_id = opId;
+          }
+
+          try {
           const patchOnce = async () => {
             const res = await fetch(`/api/appointments?id=${encodeURIComponent(it.id)}`, {
               method: "PATCH",
@@ -3569,6 +3575,10 @@
 
           // Reload without cache so server data stays consistent.
           load({ nocache: true }).catch(() => {});
+          } catch (e) {
+            console.error(e);
+            alert(e.message || "Errore spostamento appuntamento");
+          }
         } catch (e) {
           console.error(e);
           alert(e.message || "Errore spostamento appuntamento");
@@ -3650,6 +3660,9 @@
               targetDayIndex: Number(tgt.dIdx || 0),
               targetTherapist: String(tgt.ther || "").trim() || String(it.therapist || "").trim(),
               targetStartMin: Number(tgt.slotStartMin || startMin),
+            }).catch((e) => {
+              console.error(e);
+              alert(e?.message || "Errore spostamento appuntamento");
             });
           };
 
