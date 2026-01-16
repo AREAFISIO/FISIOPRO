@@ -1,8 +1,20 @@
+import crypto from "node:crypto";
 import { airtableFetch, ensureRes, requireRoles } from "./_auth.js";
+import { getSupabaseAdmin, isSupabaseEnabled } from "../lib/supabaseServer.js";
 
 function norm(v) {
   const s = String(v ?? "").trim();
   return s ? s : "";
+}
+
+function makeAirtableLikeId() {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let out = "rec";
+  const bytes = crypto.randomBytes(14);
+  for (let i = 0; i < 14; i += 1) {
+    out += alphabet[bytes[i] % alphabet.length];
+  }
+  return out;
 }
 
 async function readJsonBody(req) {
@@ -57,6 +69,44 @@ export default async function handler(req, res) {
 
     if (!nome && !cognome) {
       return res.status(400).json({ ok: false, error: "missing_name", message: "Inserisci almeno Nome o Cognome." });
+    }
+
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseAdmin();
+      const recordId = norm(body.recordId || body.id) || makeAirtableLikeId();
+      const label = [cognome, nome].filter(Boolean).join(" ").trim() || [nome, cognome].filter(Boolean).join(" ").trim();
+
+      const airtableFields = {};
+      if (label) airtableFields.Paziente = label;
+      if (nome) airtableFields.Nome = nome;
+      if (cognome) airtableFields.Cognome = cognome;
+      if (cf) airtableFields["Codice Fiscale"] = cf;
+      if (email) airtableFields.Email = email;
+      if (telefono) {
+        airtableFields["Numero di telefono"] = telefono;
+        airtableFields.Telefono = telefono;
+      }
+      if (dob) airtableFields["Data di nascita"] = dob;
+      if (channels && (Array.isArray(channels) ? channels.length : String(channels).trim())) {
+        airtableFields["Canali di comunicazione preferiti"] = channels;
+      }
+
+      const payload = {
+        airtable_id: recordId,
+        label: label || null,
+        cognome: cognome || null,
+        nome: nome || null,
+        codice_fiscale: cf || null,
+        phone: telefono || null,
+        email: email || null,
+        date_of_birth: dob || null,
+        airtable_fields: airtableFields,
+      };
+
+      const { data, error } = await sb.from("patients").insert(payload).select("airtable_id").maybeSingle();
+      if (error) return res.status(500).json({ ok: false, error: `supabase_patient_insert_failed: ${error.message}` });
+
+      return res.status(200).json({ ok: true, id: data?.airtable_id || recordId, fields: airtableFields });
     }
 
     const fields = {};
