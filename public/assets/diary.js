@@ -65,6 +65,7 @@
   let knownOperators = []; // [{id,name,email,...}] from /api/operators
   let operatorNameToId = new Map(); // name -> recId
   let operatorIdToName = new Map(); // recId -> name
+  let operatorIdToInitials = new Map(); // recId -> initials
   let operatorNameToRole = new Map(); // name -> role label
   let locationsCache = null; // [{id,name}]
   let servicesCache = null; // [{id,name}]
@@ -1247,13 +1248,36 @@
     };
   }
 
+  function computeInitialsFromName(name) {
+    const raw = String(name || "").trim();
+    if (!raw) return "";
+    const cleaned = raw
+      .replace(/\(.*?\)/g, " ")
+      .replace(/[•|/]+/g, " ")
+      .replace(/[-–—]+/g, " ")
+      .replace(/[.,]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const parts = cleaned.split(/\s+/).filter(Boolean);
+    if (!parts.length) return "";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function initialsFromNameParts(nome, cognome) {
+    const first = String(nome || "").trim();
+    const last = String(cognome || "").trim();
+    if (!first && !last) return "";
+    if (first && last) return (first[0] + last[0]).toUpperCase();
+    return computeInitialsFromName(first || last);
+  }
+
   function therapistKey(name) {
     const s = String(name || "").trim();
     if (!s) return "";
-    // prefer initials for chip label
-    const parts = s.split(/\s+/).filter(Boolean);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    const opId = s.startsWith("rec") ? s : String(operatorNameToId.get(s) || "").trim();
+    if (opId && operatorIdToInitials.has(opId)) return operatorIdToInitials.get(opId);
+    return computeInitialsFromName(s);
   }
 
   function colorForTherapist(name) {
@@ -2053,6 +2077,14 @@
         knownByEmail = new Map(items.map((x) => [String(x.email || "").trim().toLowerCase(), String(x.name || "").trim()]).filter((p) => p[0] && p[1]));
         operatorNameToId = new Map(items.map((x) => [String(x.name || "").trim(), String(x.id || "").trim()]).filter((p) => p[0] && p[1]));
         operatorNameToRole = new Map(items.map((x) => [String(x.name || "").trim(), String(x.role || "").trim()]).filter((p) => p[0] && p[1]));
+        operatorIdToInitials = new Map(items.map((x) => {
+          const id = String(x.id || "").trim();
+          if (!id) return null;
+          const first = String(x.nome || "").trim();
+          const last = String(x.cognome || "").trim();
+          const initials = initialsFromNameParts(first, last) || computeInitialsFromName(String(x.name || ""));
+          return initials ? [id, initials] : null;
+        }).filter(Boolean));
 
         // Shared colors (from Airtable via /api/operators)
         ensureOperatorColorsObject();

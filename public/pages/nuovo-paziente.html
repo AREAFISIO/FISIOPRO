@@ -91,7 +91,6 @@
           </div>
         </div>
         <div class="hr"></div>
-        <div class="mini" style="color:var(--muted);">Salvando, il paziente viene creato su Airtable (tabella ANAGRAFICA).</div>
       </div>
     </section>
   </main>
@@ -107,6 +106,17 @@
 <div class="toast"></div>
 <script src="/assets/app-loader.js" data-src="/assets/app.js" data-v="fpui-20260108a"></script>
 <script>
+  const api = window.fpApi || (async (path, opts = {}) => {
+    const headers = { ...(opts.headers || {}) };
+    if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+    const res = await fetch(path, { ...opts, headers, credentials: "include" });
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  });
+
   function getChannels() {
     return Array.from(document.querySelectorAll("[data-channel]"))
       .filter((x) => x.checked)

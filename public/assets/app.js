@@ -139,7 +139,7 @@ function ensureUnifiedSidebarMenu(roleRaw) {
     return `/pages/${s.replace(/^\/+/, "")}`;
   };
   const link = (href, label, extraHtml = "") => `<a data-nav href="${pageHref(href)}">${label}${extraHtml}</a>`;
-  const section = (title) => `<div class="section">${title}</div>`;
+  const section = () => "";
 
   const html = [];
 
