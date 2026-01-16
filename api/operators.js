@@ -17,6 +17,49 @@ function pickName(fields) {
   );
 }
 
+function pickNameParts(fields) {
+  const f = fields || {};
+  const nome = String(f.Nome || f["First name"] || f["Firstname"] || "").trim();
+  const cognome = String(f.Cognome || f["Last name"] || f["Lastname"] || "").trim();
+  if (nome || cognome) return { nome, cognome };
+
+  const cognomeNome = String(f["Cognome e Nome"] || "").trim();
+  if (cognomeNome) {
+    const clean = cognomeNome.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+    if (clean.includes(",")) {
+      const [lastRaw, firstRaw] = clean.split(",");
+      return {
+        nome: String(firstRaw || "").trim().split(/\s+/)[0] || "",
+        cognome: String(lastRaw || "").trim(),
+      };
+    }
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return { nome: parts.slice(1).join(" "), cognome: parts[0] };
+    }
+    return { nome: "", cognome: parts[0] || "" };
+  }
+
+  const full = String(f["Nome completo"] || f["Full Name"] || f.Name || "").trim();
+  if (full) {
+    const clean = full.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+    if (clean.includes(",")) {
+      const [lastRaw, firstRaw] = clean.split(",");
+      return {
+        nome: String(firstRaw || "").trim().split(/\s+/)[0] || "",
+        cognome: String(lastRaw || "").trim(),
+      };
+    }
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return { nome: parts[0], cognome: parts.slice(1).join(" ") };
+    }
+    return { nome: parts[0] || "", cognome: "" };
+  }
+
+  return { nome: "", cognome: "" };
+}
+
 function normalizeHexColor(s) {
   const x = String(s || "").trim();
   const m = x.match(/^#([0-9a-fA-F]{6})$/);
@@ -56,6 +99,7 @@ export default async function handler(req, res) {
             const attivo = f.Attivo === undefined ? true : Boolean(f.Attivo);
             const email = String(f.Email || "").trim().toLowerCase();
             const color = normalizeHexColor(f[COLOR_FIELD] ?? "");
+            const parts = pickNameParts(f);
             return {
               id: String(r.airtable_id || ""), // UI expects Airtable record id
               name: String(r.name || "").trim(),
@@ -63,6 +107,8 @@ export default async function handler(req, res) {
               role: ruolo,
               active: attivo,
               color,
+              nome: parts.nome || "",
+              cognome: parts.cognome || "",
             };
           })
           .filter((x) => x.name)
@@ -130,13 +176,14 @@ export default async function handler(req, res) {
 
     const cacheKey = `operators:${tableName}:${formula}`;
     if (req.method === "GET") {
-      const items = await memGetOrSet(cacheKey, 5 * 60_000, async () => {
+        const items = await memGetOrSet(cacheKey, 5 * 60_000, async () => {
         const data = await airtableFetch(`${table}?${qs.toString()}`);
         return (data.records || [])
           .map((r) => {
             const f = r.fields || {};
             const name = String(pickName(f) || "").trim();
             if (!name) return null;
+              const parts = pickNameParts(f);
             return {
               id: r.id,
               name,
@@ -144,6 +191,8 @@ export default async function handler(req, res) {
               role: String(f.Ruolo || "").trim(),
               active: Boolean(f.Attivo),
               color: normalizeHexColor(f[COLOR_FIELD] ?? ""),
+                nome: parts.nome || "",
+                cognome: parts.cognome || "",
             };
           })
           .filter(Boolean)
